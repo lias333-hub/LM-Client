@@ -265,7 +265,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   List<PlatformFile> attached = [];
 
   Future<void> pickFiles() async {
-    final res = await FilePicker.platform.pickFiles(allowMultiple: true);
+    final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true)
     if (res != null) setState(() => attached = res.files);
   }
     Future<void> send() async {
@@ -303,7 +303,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       String full = "";
             await for (final chunk in ref.read(universalApiProvider).chatStream(
         baseUrl: baseUrl, apiKey: apiKey, model: model,
-        history: ref.read(messagesProvider), prompt: fullPrompt)) {
+        history: ref.read(messagesProvider).sublist(0, ref.read(messagesProvider).length -1), prompt: fullPrompt)) {
         full += chunk;
         setState(() => streamingText = full);
       }
