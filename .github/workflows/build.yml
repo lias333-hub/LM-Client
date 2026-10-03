@@ -1,0 +1,25 @@
+name: Build APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+      - name: Fix project structure
+        run: |
+          mkdir -p /tmp/bak
+          cp pubspec.yaml /tmp/bak/pubspec.yaml
+          cp lib/main.dart /tmp/bak/main.dart
+          rm -rf lib pubspec.yaml pubspec.lock
+          flutter create . --project-name private_lm_v2 --org com.privatelm --platforms android --overwrite
+          cp /tmp/bak/pubspec.yaml ./pubspec.yaml
+          cp /tmp/bak/main.dart ./lib/main.dart
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PrivateLM-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
