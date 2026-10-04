@@ -32,9 +32,12 @@ class ChatMessage {
   final String content;
   final List<String> fileNames;
   final DateTime time;
-  ChatMessage({required this.id, required this.role, required this.content, this.fileNames = const [], required this.time});
+  final bool excluded;
+  ChatMessage({required this.id, required this.role, required this.content, this.fileNames = const [], required this.time, this.excluded = false});
+  Map<String,dynamic> toJson() => {"id":id,"role":role,"content":content,"fileNames":fileNames,"time":time.toIso8601String(),"excluded":excluded};
+  factory ChatMessage.fromJson(Map<String,dynamic> j) => ChatMessage(id:j["id"], role:j["role"], content:j["content"], fileNames:List<String>.from(j["fileNames"]??[]), time:DateTime.parse(j["time"]), excluded:j["excluded"]??false);
+  ChatMessage copyWith({bool? excluded}) => ChatMessage(id:id, role:role, content:content, fileNames:fileNames, time:time, excluded: excluded??this.excluded);
 }
-
 class Project {
   final String id;
   final String name;
