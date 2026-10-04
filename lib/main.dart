@@ -51,8 +51,15 @@ final projectsProvider = StateProvider<List<Project>>((ref) => []);
 // Universal API - بدون حدود Context
 class UniversalApi {
   final Dio dio = Dio();
+  String fixUrl(String url) {
+    url = url.trim();
+    if (url.endsWith('/')) url = url.substring(0, url.length - 1);
+    if (url.endsWith('/v1')) url = url.substring(0, url.length - 3);
+    return url;
+  }
   Future<List<String>> fetchModels(String baseUrl, String apiKey) async {
-    final res = await dio.get("$baseUrl/v1/models",
+    final base = fixUrl(baseUrl);
+    final res = await dio.get("$base/v1/models",
       options: Options(headers: {"Authorization": "Bearer $apiKey"}));
     return (res.data['data'] as List).map((e) => e['id'].toString()).toList();
   }
@@ -63,7 +70,29 @@ class UniversalApi {
     required List<ChatMessage> history,
     required String prompt,
   }) async* {
-    // بدون حدود - نرسل كل الرسائل كاملة بدون قص
+    final base = fixUrl(baseUrl);
+    final messages = [
+      ...history.map((m) => {"role": m.role, "content": m.content}),
+      {"role": "user", "content": prompt}
+    ];
+    final res = await dio.post("$base/v1/chat/completions",
+      data: {"model": model, "messages": messages, "stream": true},
+      options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
+    await for (var chunk in res.data.stream) {
+      final lines = utf8.decode(chunk).split("\n");
+      for (var line in lines) {
+        if (line.startsWith("data: ") && !line.contains("[DONE]")) {
+          try {
+            final j = jsonDecode(line.substring(6));
+            final d = j['choices'][0]['delta']['content'];
+            if (d != null) yield d.toString();
+          } catch (_) {}
+        }
+      }
+    }
+  }
+}
+// بدون حدود - نرسل كل الرسائل كاملة بدون قص
     final messages = [
       ...history.map((m) => {"role": m.role, "content": m.content}),
       {"role": "user", "content": prompt}
