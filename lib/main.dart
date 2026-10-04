@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -8,24 +9,56 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
-  runApp(const ProviderScope(child: PrivateLMApp()));
+  runApp(const ProviderScope(child: LMClientApp()));
 }
 
-class PrivateLMApp extends StatelessWidget {
-  const PrivateLMApp({super.key});
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+
+// حفظ محلي لكل شي - Offline First
+class LocalStorage {
+  static Future<Directory> getDir() async {
+    final d = await getApplicationDocumentsDirectory();
+    final lm = Directory("${d.path}/LMClient");
+    if (!await lm.exists()) await lm.create(recursive: true);
+    return lm;
+  }
+  static Future<void> save(String folder, String name, String data) async {
+    final dir = await getDir();
+    final f = Directory("${dir.path}/$folder");
+    if (!await f.exists()) await f.create(recursive: true);
+    await File("${f.path}/$name.json").writeAsString(data);
+  }
+  static Future<String?> load(String folder, String name) async {
+    final dir = await getDir();
+    final file = File("${dir.path}/$folder/$name.json");
+    if (await file.exists()) return await file.readAsString();
+    return null;
+  }
+}
+
+class LMClientApp extends ConsumerWidget {
+  const LMClientApp({super.key});
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
     return MaterialApp(
-      title: 'PrivateLM V2',
+      title: 'LMClient',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo, brightness: Brightness.light),
+      darkTheme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo, brightness: Brightness.dark),
+      themeMode: mode,
       home: const HomeScreen(),
     );
   }
 }
-// Models
+// Models + حساب التوكنز
+int estimateTokens(String t) => (t.length / 4).ceil();
+
 class ChatMessage {
   final String id;
   final String role;
@@ -38,19 +71,44 @@ class ChatMessage {
   factory ChatMessage.fromJson(Map<String,dynamic> j) => ChatMessage(id:j["id"], role:j["role"], content:j["content"], fileNames:List<String>.from(j["fileNames"]??[]), time:DateTime.parse(j["time"]), excluded:j["excluded"]??false);
   ChatMessage copyWith({bool? excluded}) => ChatMessage(id:id, role:role, content:content, fileNames:fileNames, time:time, excluded: excluded??this.excluded);
 }
+
 class Project {
   final String id;
   final String name;
   final String instructions;
   Project({required this.id, required this.name, this.instructions = ""});
+  Map<String,dynamic> toJson() => {"id":id,"name":name,"instructions":instructions};
+  factory Project.fromJson(Map<String,dynamic> j) => Project(id:j["id"], name:j["name"], instructions:j["instructions"]??"");
 }
-// Providers - Riverpod (مافي GetX نهائيا)
-final apiBaseUrlProvider = StateProvider<String>((ref) => "https://api.openai.com");
+
+class MemoryPart {
+  final String id;
+  final String title;
+  final String content;
+  MemoryPart({required this.id, required this.title, required this.content});
+  Map<String,dynamic> toJson() => {"id":id,"title":title,"content":content};
+  factory MemoryPart.fromJson(Map<String,dynamic> j) => MemoryPart(id:j["id"], title:j["title"], content:j["content"]);
+}
+
+class LibraryItem {
+  final String id;
+  final String name;
+  final int size;
+  final DateTime time;
+  LibraryItem({required this.id, required this.name, required this.size, required this.time});
+}
+// Providers - بدون حدود + ذاكرة مقسمة عابرة + حفظ محلي
+final apiBaseUrlProvider = StateProvider<String>((ref) => "https://cleanapis.com");
 final apiKeyProvider = StateProvider<String>((ref) => "");
 final modelsProvider = StateProvider<List<String>>((ref) => []);
 final selectedModelProvider = StateProvider<String>((ref) => "");
 final messagesProvider = StateProvider<List<ChatMessage>>((ref) => []);
 final projectsProvider = StateProvider<List<Project>>((ref) => []);
+final memoryPartsProvider = StateProvider<List<MemoryPart>>((ref) => []);
+final libraryProvider = StateProvider<List<LibraryItem>>((ref) => []);
+final thinkingProvider = StateProvider<String>((ref) => "");
+final lastContextProvider = StateProvider<String>((ref) => "");
+final lastTokensProvider = StateProvider<Map<String,int>>((ref) => {"input":0,"output":0});
 // Universal API - بدون حدود Input/Output + تصليح cleanapis.com
 class UniversalApi {
   final Dio dio = Dio();
@@ -74,10 +132,12 @@ class UniversalApi {
     required String prompt,
   }) async* {
     final base = fixUrl(baseUrl);
+    // بدون حدود - نرسل كل الرسائل غير المستبعدة كاملة
     final messages = [
       ...history.where((m) => !m.excluded).map((m) => {"role": m.role, "content": m.content}),
       {"role": "user", "content": prompt}
     ];
+    // لا نرسل max_tokens نهائيا - الموديل يحدد حده
     final res = await dio.post("$base/v1/chat/completions",
       data: {"model": model, "messages": messages, "stream": true},
       options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
@@ -96,10 +156,7 @@ class UniversalApi {
   }
 }
 final universalApiProvider = Provider((ref) => UniversalApi());
-// ذاكرة طويلة - تحفظ معلومات مهمة للأبد
-final memoryProvider = StateProvider<List<String>>((ref) => []);
-
-// HomeScreen مع تبويب الذاكرة
+// HomeScreen + الوضع الليلي
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -109,14 +166,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int idx = 0;
   @override
   Widget build(BuildContext context) {
+    final screens = [const ChatScreen(), const ProjectsScreen(), const LibraryScreen(), const MemoryScreen(), const SettingsScreen()];
     return Scaffold(
-      body: [const ChatScreen(), const ProjectsScreen(), const MemoryScreen(), const SettingsScreen()][idx],
+      body: screens[idx],
       bottomNavigationBar: NavigationBar(
         selectedIndex: idx,
         onDestinationSelected: (v) => setState(() => idx = v),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.chat), label: "شات"),
           NavigationDestination(icon: Icon(Icons.folder), label: "Projects"),
+          NavigationDestination(icon: Icon(Icons.library_books), label: "المكتبة"),
           NavigationDestination(icon: Icon(Icons.memory), label: "الذاكرة"),
           NavigationDestination(icon: Icon(Icons.settings), label: "الإعدادات"),
         ],
@@ -124,27 +183,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
-// شاشة الذاكرة الطويلة
+// شاشة الذاكرة المقسمة العابرة - النموذج يقسمها ويستدعي أي جزء
 class MemoryScreen extends ConsumerWidget {
   const MemoryScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mem = ref.watch(memoryProvider);
+    final mem = ref.watch(memoryPartsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text("الذاكرة الطويلة")),
+      appBar: AppBar(title: const Text("الذاكرة المقسمة")),
       body: mem.isEmpty
-          ? const Center(child: Text("لا يوجد ذاكرة\nاضغط + لإضافة معلومة مهمة"))
+          ? const Center(child: Text("لا يوجد ذاكرة\nاضغط + لإضافة جزء جديد"))
           : ListView.builder(
               itemCount: mem.length,
-              itemBuilder: (c, i) => ListTile(
-                leading: const Icon(Icons.lightbulb),
-                title: Text(mem[i]),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () {
-                    final l = [...mem]..removeAt(i);
-                    ref.read(memoryProvider.notifier).state = l;
-                  },
+              itemBuilder: (c, i) => Card(
+                margin: const EdgeInsets.all(8),
+                child: ListTile(
+                  leading: const Icon(Icons.memory),
+                  title: Text(mem[i].title),
+                  subtitle: Text(mem[i].content, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () async {
+                      final l = [...mem]..removeAt(i);
+                      ref.read(memoryPartsProvider.notifier).state = l;
+                      await LocalStorage.save("memory", "parts", jsonEncode(l.map((e) => e.toJson()).toList()));
+                    },
+                  ),
                 ),
               ),
             ),
@@ -155,20 +219,126 @@ class MemoryScreen extends ConsumerWidget {
     );
   }
   void _addMemory(BuildContext ctx, WidgetRef ref) {
+    final t = TextEditingController();
     final c = TextEditingController();
     showDialog(context: ctx, builder: (_) => AlertDialog(
-      title: const Text("إضافة للذاكرة"),
-      content: TextField(controller: c, decoration: const InputDecoration(hintText: "مثال: اسمي أحمد، أفضل الرد بالعربي")),
-      actions: [TextButton(onPressed: () {
-        if (c.text.isNotEmpty) {
-          ref.read(memoryProvider.notifier).state = [...ref.read(memoryProvider), c.text];
+      title: const Text("إضافة جزء للذاكرة"),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: t, decoration: const InputDecoration(labelText: "العنوان", hintText: "مثال: تفضيلات اللغة")),
+        const SizedBox(height: 8),
+        TextField(controller: c, decoration: const InputDecoration(labelText: "المحتوى", hintText: "مثال: أفضل الرد بالعربي"), maxLines: 3),
+      ]),
+      actions: [TextButton(onPressed: () async {
+        if (t.text.isNotEmpty && c.text.isNotEmpty) {
+          final part = MemoryPart(id: const Uuid().v4(), title: t.text, content: c.text);
+          final l = [...ref.read(memoryPartsProvider), part];
+          ref.read(memoryPartsProvider.notifier).state = l;
+          await LocalStorage.save("memory", "parts", jsonEncode(l.map((e) => e.toJson()).toList()));
           Navigator.pop(ctx);
         }
       }, child: const Text("حفظ"))],
     ));
   }
 }
-// الإعدادات - Universal API
+// المكتبة - كل المرفقات مصنفة + بحث + إعادة استخدام
+class LibraryScreen extends ConsumerWidget {
+  const LibraryScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lib = ref.watch(libraryProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text("المكتبة")),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: TextField(
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: "ابحث في المكتبة...", border: OutlineInputBorder()),
+            onChanged: (v) {},
+          ),
+        ),
+        Expanded(
+          child: lib.isEmpty
+              ? const Center(child: Text("المكتبة فارغة\nارفع ملفات من الشات وستظهر هنا"))
+              : ListView.builder(
+                  itemCount: lib.length,
+                  itemBuilder: (c, i) => ListTile(
+                    leading: const Icon(Icons.insert_drive_file),
+                    title: Text(lib[i].name),
+                    subtitle: Text("${lib[i].size} bytes - ${lib[i].time.day}/${lib[i].time.month}"),
+                    trailing: IconButton(icon: const Icon(Icons.share), onPressed: () {}),
+                  ),
+                ),
+        ),
+      ]),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
+          if (res != null) {
+            final items = res.files.map((f) => LibraryItem(id: const Uuid().v4(), name: f.name, size: f.size, time: DateTime.now())).toList();
+            ref.read(libraryProvider.notifier).state = [...lib, ...items];
+            await LocalStorage.save("library", "items", jsonEncode([...lib, ...items].map((e) => {"id":e.id,"name":e.name,"size":e.size,"time":e.time.toIso8601String()}).toList()));
+          }
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+// Projects مثل Claude مع Knowledge
+class ProjectsScreen extends ConsumerWidget {
+  const ProjectsScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final projects = ref.watch(projectsProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text("Projects - مثل Claude")),
+      body: projects.isEmpty
+          ? const Center(child: Text("لا يوجد Projects\nاضغط + لإنشاء مشروع"))
+          : ListView.builder(
+              itemCount: projects.length,
+              itemBuilder: (c, i) => Card(
+                margin: const EdgeInsets.all(8),
+                child: ListTile(
+                  leading: const Icon(Icons.folder_special),
+                  title: Text(projects[i].name),
+                  subtitle: Text(projects[i].instructions.isEmpty ? "بدون تعليمات" : projects[i].instructions),
+                  onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(project: projects[i]))),
+                  trailing: IconButton(icon: const Icon(Icons.delete), onPressed: () async {
+                    final l = [...projects]..removeAt(i);
+                    ref.read(projectsProvider.notifier).state = l;
+                    await LocalStorage.save("projects", "list", jsonEncode(l.map((e) => e.toJson()).toList()));
+                  }),
+                ),
+              ),
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addProject(context, ref),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+  void _addProject(BuildContext ctx, WidgetRef ref) {
+    final n = TextEditingController();
+    final ins = TextEditingController();
+    showDialog(context: ctx, builder: (_) => AlertDialog(
+      title: const Text("مشروع جديد"),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: n, decoration: const InputDecoration(labelText: "اسم المشروع")),
+        TextField(controller: ins, decoration: const InputDecoration(labelText: "تعليمات المشروع - Knowledge")),
+      ]),
+      actions: [TextButton(onPressed: () async {
+        if (n.text.isNotEmpty) {
+          final p = Project(id: const Uuid().v4(), name: n.text, instructions: ins.text);
+          final l = [...ref.read(projectsProvider), p];
+          ref.read(projectsProvider.notifier).state = l;
+          await LocalStorage.save("projects", "list", jsonEncode(l.map((e) => e.toJson()).toList()));
+          Navigator.pop(ctx);
+        }
+      }, child: const Text("إنشاء"))],
+    ));
+  }
+}
+// SettingsScreen - Universal API + الوضع الليلي + Drive
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
   @override
@@ -177,16 +347,30 @@ class SettingsScreen extends ConsumerWidget {
     final apiKey = ref.watch(apiKeyProvider);
     final models = ref.watch(modelsProvider);
     final selected = ref.watch(selectedModelProvider);
+    final mode = ref.watch(themeModeProvider);
     final baseCtrl = TextEditingController(text: baseUrl);
     final keyCtrl = TextEditingController(text: apiKey);
     return Scaffold(
-      appBar: AppBar(title: const Text("الإعدادات - Universal API")),
+      appBar: AppBar(title: const Text("الإعدادات")),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        TextField(controller: baseCtrl, decoration: const InputDecoration(labelText: "Base URL", hintText: "https://api.openai.com", border: OutlineInputBorder())),
+        const Text("المظهر", style: TextStyle(fontWeight: FontWeight.bold)),
+        SegmentedButton<ThemeMode>(
+          segments: const [
+            ButtonSegment(value: ThemeMode.light, label: Text("فاتح"), icon: Icon(Icons.light_mode)),
+            ButtonSegment(value: ThemeMode.dark, label: Text("داكن"), icon: Icon(Icons.dark_mode)),
+            ButtonSegment(value: ThemeMode.system, label: Text("تلقائي"), icon: Icon(Icons.auto_mode)),
+          ],
+          selected: {mode},
+          onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).state = s.first,
+        ),
+        const Divider(height: 32),
+        const Text("Universal API", style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        TextField(controller: baseCtrl, decoration: const InputDecoration(labelText: "Base URL", hintText: "https://cleanapis.com", border: OutlineInputBorder())),
         const SizedBox(height: 12),
         TextField(controller: keyCtrl, decoration: const InputDecoration(labelText: "API Key", border: OutlineInputBorder()), obscureText: true),
         const SizedBox(height: 12),
-        FilledButton(
+                FilledButton(
           onPressed: () async {
             ref.read(apiBaseUrlProvider.notifier).state = baseCtrl.text;
             ref.read(apiKeyProvider.notifier).state = keyCtrl.text;
@@ -210,54 +394,32 @@ class SettingsScreen extends ConsumerWidget {
             items: models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
             onChanged: (v) => ref.read(selectedModelProvider.notifier).state = v!,
           ),
+        const Divider(height: 32),
+        const Text("Drive والصلاحيات", style: TextStyle(fontWeight: FontWeight.bold)),
+        ListTile(
+          leading: const Icon(Icons.cloud),
+          title: const Text("ربط Google Drive"),
+          trailing: FilledButton(onPressed: () {}, child: const Text("ربط")),
+        ),
+        ListTile(
+          leading: const Icon(Icons.folder_open),
+          title: const Text("صلاحيات الملفات"),
+          trailing: IconButton(icon: const Icon(Icons.settings), onPressed: () async { await openAppSettings(); }),
+        ),
+        const Divider(height: 32),
+        ListTile(
+          leading: const Icon(Icons.backup),
+          title: const Text("تصدير نسخة احتياطية"),
+          onTap: () async {
+            final dir = await LocalStorage.getDir();
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("المجلد: ${dir.path}")));
+          },
+        ),
       ]),
     );
   }
 }
-// Projects مثل Claude
-class ProjectsScreen extends ConsumerWidget {
-  const ProjectsScreen({super.key});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final projects = ref.watch(projectsProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text("Projects - مثل Claude")),
-      body: projects.isEmpty
-          ? const Center(child: Text("لا يوجد Projects\nاضغط + لإنشاء مشروع"))
-          : ListView.builder(
-              itemCount: projects.length,
-              itemBuilder: (c, i) => ListTile(
-                leading: const Icon(Icons.folder_special),
-                title: Text(projects[i].name),
-                subtitle: Text(projects[i].instructions.isEmpty ? "بدون تعليمات" : projects[i].instructions),
-                onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(project: projects[i]))),
-              ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _addProject(context, ref),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-  void _addProject(BuildContext ctx, WidgetRef ref) {
-    final n = TextEditingController();
-    final ins = TextEditingController();
-    showDialog(context: ctx, builder: (_) => AlertDialog(
-      title: const Text("مشروع جديد"),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: n, decoration: const InputDecoration(labelText: "اسم المشروع")),
-        TextField(controller: ins, decoration: const InputDecoration(labelText: "تعليمات المشروع")),
-      ]),
-      actions: [TextButton(onPressed: () {
-        if (n.text.isNotEmpty) {
-          ref.read(projectsProvider.notifier).state = [...ref.read(projectsProvider), Project(id: const Uuid().v4(), name: n.text, instructions: ins.text)];
-          Navigator.pop(ctx);
-        }
-      }, child: const Text("إنشاء"))],
-    ));
-  }
-}
-// ChatScreen - بدون حدود Context + حقن الذاكرة الطويلة
+// ChatScreen - بدون حدود + الذاكرة المقسمة + حالة التفكير Live + حفظ محلي
 class ChatScreen extends ConsumerStatefulWidget {
   final Project? project;
   const ChatScreen({super.key, this.project});
@@ -273,9 +435,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool isListening = false;
   String streamingText = "";
   List<PlatformFile> attached = [];
+  Set<String> selectedIds = {};
+  bool selectionMode = false;
 
   Future<void> pickFiles() async {
-        final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
+    final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
     if (res != null) setState(() => attached = res.files);
   }
     Future<void> send() async {
@@ -285,7 +449,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       fileText += "\n[File: ${f.name} - ${f.size} bytes]\n";
       if (f.bytes != null) {
         try {
-          // فك الملفات المضغوطة ZIP وغيرها - نقرأ النص داخلها
           String content = utf8.decode(f.bytes!, allowMalformed: true);
           if (content.length > 8000) content = content.substring(0, 8000) + "\n...[truncated]";
           fileText += content;
@@ -297,54 +460,97 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final prompt = ctrl.text + fileText;
     final userMsg = ChatMessage(id: const Uuid().v4(), role: "user", content: ctrl.text, fileNames: attached.map((e) => e.name).toList(), time: DateTime.now());
     setState(() { isLoading = true; streamingText = ""; });
-    ref.read(messagesProvider.notifier).state = [...ref.read(messagesProvider), userMsg];
+    ref.read(thinkingProvider.notifier).state = "Thinking...";
+    final updated = [...ref.read(messagesProvider), userMsg];
+    ref.read(messagesProvider.notifier).state = updated;
+    await LocalStorage.save("chats", "current", jsonEncode(updated.map((e) => e.toJson()).toList()));
+    if (attached.isNotEmpty) {
+      final items = attached.map((f) => LibraryItem(id: const Uuid().v4(), name: f.name, size: f.size, time: DateTime.now())).toList();
+      final lib = [...ref.read(libraryProvider), ...items];
+      ref.read(libraryProvider.notifier).state = lib;
+      await LocalStorage.save("library", "items", jsonEncode(lib.map((e) => {"id":e.id,"name":e.name,"size":e.size,"time":e.time.toIso8601String()}).toList()));
+    }
     ctrl.clear();
     setState(() => attached = []);
     try {
       final baseUrl = ref.read(apiBaseUrlProvider);
       final apiKey = ref.read(apiKeyProvider);
       final model = ref.read(selectedModelProvider);
-      // بدون حدود + حقن الذاكرة الطويلة + تعليمات المشروع
-      final mem = ref.read(memoryProvider);
+      final mem = ref.read(memoryPartsProvider);
       String sysPrompt = "";
-      if (mem.isNotEmpty) sysPrompt += "Memory:\n" + mem.join("\n") + "\n";
-      if (widget.project != null && widget.project!.instructions.isNotEmpty) sysPrompt += "Project: " + widget.project!.instructions + "\n";
+      if (mem.isNotEmpty) sysPrompt += "Memory:\n" + mem.map((m) => "${m.title}: ${m.content}").join("\n") + "\n";
+      if (widget.project != null && widget.project!.instructions.isNotEmpty) sysPrompt += "Project: ${widget.project!.instructions}\n";
       String fullPrompt = sysPrompt.isEmpty ? prompt : sysPrompt + "\nUser: " + prompt;
+      final ctx = [...ref.read(messagesProvider).where((m) => !m.excluded).map((m) => "[${m.role.toUpperCase()}] ${m.content}"), "[USER] $fullPrompt"].join("\n\n");
+      ref.read(lastContextProvider.notifier).state = ctx;
+      ref.read(lastTokensProvider.notifier).state = {"input": estimateTokens(ctx), "output": 0};
+      ref.read(thinkingProvider.notifier).state = "Working...";
       String full = "";
             await for (final chunk in ref.read(universalApiProvider).chatStream(
         baseUrl: baseUrl, apiKey: apiKey, model: model,
-        history: ref.read(messagesProvider).sublist(0, ref.read(messagesProvider).length -1), prompt: fullPrompt)) {
+        history: ref.read(messagesProvider).length > 1 ? ref.read(messagesProvider).sublist(0, ref.read(messagesProvider).length - 1) : [],
+        prompt: fullPrompt)) {
         full += chunk;
         setState(() => streamingText = full);
+        ref.read(lastTokensProvider.notifier).state = {"input": estimateTokens(ctx), "output": estimateTokens(full)};
+        ref.read(thinkingProvider.notifier).state = "Writing...";
       }
-      final botMsg = ChatMessage(
-        id: const Uuid().v4(), role: "assistant",
-        content: full, time: DateTime.now());
-      ref.read(messagesProvider.notifier).state =
-          [...ref.read(messagesProvider), botMsg];
+      final botMsg = ChatMessage(id: const Uuid().v4(), role: "assistant", content: full, time: DateTime.now());
+      final finalList = [...ref.read(messagesProvider), botMsg];
+      ref.read(messagesProvider.notifier).state = finalList;
+      await LocalStorage.save("chats", "current", jsonEncode(finalList.map((e) => e.toJson()).toList()));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("خطأ: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
     } finally {
       setState(() { isLoading = false; streamingText = ""; });
+      ref.read(thinkingProvider.notifier).state = "";
     }
   }
     @override
   Widget build(BuildContext context) {
     final msgs = ref.watch(messagesProvider);
+    final thinking = ref.watch(thinkingProvider);
+    final tokens = ref.watch(lastTokensProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.project?.name ?? "شات - PrivateLM")),
+      appBar: AppBar(
+        title: Text(widget.project?.name ?? "LMClient"),
+        actions: [
+          IconButton(icon: const Icon(Icons.visibility), tooltip: "عرض السياق", onPressed: () => showContextViewer(context, ref)),
+          IconButton(icon: Icon(selectionMode ? Icons.close : Icons.checklist), onPressed: () => setState(() { selectionMode = !selectionMode; selectedIds.clear(); })),
+          if (selectionMode && selectedIds.isNotEmpty)
+            IconButton(icon: const Icon(Icons.delete), onPressed: () => deleteSelected()),
+        ],
+      ),
       body: Column(children: [
-        Expanded(
+        if (thinking.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            color: Theme.of(context).colorScheme.surfaceVariant,
+            child: Row(children: [
+              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 8),
+              Text(thinking, style: const TextStyle(fontSize: 13)),
+            ]),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(children: [
+            Text("~${tokens["input"]} in / ~${tokens["output"]} out", style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            const Spacer(),
+            Text("${msgs.where((m) => !m.excluded).length}/${msgs.length} في السياق", style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ]),
+        ),
+                Expanded(
           child: ListView.builder(
             controller: scroll,
             padding: const EdgeInsets.all(12),
             itemCount: msgs.length + (streamingText.isNotEmpty ? 1 : 0),
             itemBuilder: (c, i) {
-              if (i < msgs.length) return MessageBubble(msg: msgs[i], tts: tts);
+              if (i < msgs.length) return MessageBubble(msg: msgs[i], tts: tts, selectionMode: selectionMode, selected: selectedIds.contains(msgs[i].id), onSelect: () => toggleSelect(msgs[i].id));
               return MessageBubble(
                 msg: ChatMessage(id: "stream", role: "assistant", content: streamingText, time: DateTime.now()),
-                tts: tts,
+                tts: tts, selectionMode: false, selected: false, onSelect: () {},
               );
             },
           ),
@@ -423,6 +629,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void toggleSelect(String id) {
+    setState(() {
+      if (selectedIds.contains(id)) selectedIds.remove(id);
+      else selectedIds.add(id);
+    });
+  }
+
+  Future<void> deleteSelected() async {
+    final ids = Set<String>.from(selectedIds);
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text("حذف المحدد"),
+      content: Text("تم تحديد ${ids.length} رسالة"),
+      actions: [
+        TextButton(onPressed: () async {
+          final list = ref.read(messagesProvider).where((m) => !ids.contains(m.id)).toList();
+          ref.read(messagesProvider.notifier).state = list;
+          await LocalStorage.save("chats", "current", jsonEncode(list.map((e) => e.toJson()).toList()));
+          setState(() { selectedIds.clear(); selectionMode = false; });
+          Navigator.pop(context);
+        }, child: const Text("حذف نهائي")),
+        TextButton(onPressed: () async {
+          final list = ref.read(messagesProvider).map((m) => ids.contains(m.id) ? m.copyWith(excluded: true) : m).toList();
+          ref.read(messagesProvider.notifier).state = list;
+          await LocalStorage.save("chats", "current", jsonEncode(list.map((e) => e.toJson()).toList()));
+          setState(() { selectedIds.clear(); selectionMode = false; });
+          Navigator.pop(context);
+        }, child: const Text("استبعاد من السياق")),
+      ],
+    ));
+  }
+    void showContextViewer(BuildContext ctx, WidgetRef ref) {
+    final ctxText = ref.read(lastContextProvider);
+    showDialog(context: ctx, builder: (_) => AlertDialog(
+      title: const Text("ما يراه النموذج بالحرف"),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 400,
+        child: SingleChildScrollView(child: SelectableText(ctxText.isEmpty ? "لا يوجد سياق بعد" : ctxText)),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("إغلاق"))],
+    ));
+  }
+
   @override
   void dispose() {
     ctrl.dispose();
@@ -430,41 +679,62 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 }
-// MessageBubble - Markdown + Voice + حفظ للذاكرة
+// MessageBubble - Markdown + عداد التوكنز + تحديد نص محسن + Artifacts
 class MessageBubble extends ConsumerWidget {
   final ChatMessage msg;
   final FlutterTts tts;
-  const MessageBubble({super.key, required this.msg, required this.tts});
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback onSelect;
+  const MessageBubble({super.key, required this.msg, required this.tts, required this.selectionMode, required this.selected, required this.onSelect});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = msg.role == "user";
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+    final tokens = estimateTokens(msg.content);
+    return GestureDetector(
+      onLongPress: onSelect,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isUser ? Colors.indigo : Colors.grey.shade200,
+          border: selected ? Border.all(color: Colors.indigo, width: 2) : null,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (msg.fileNames.isNotEmpty)
-            Wrap(spacing: 4, children: msg.fileNames.map((n) => Chip(label: Text(n, style: const TextStyle(fontSize: 11)))).toList()),
-          isUser
-              ? Text(msg.content, style: const TextStyle(color: Colors.white))
-              : MarkdownBody(data: msg.content, selectable: true),
-          const SizedBox(height: 6),
-          Row(children: [
-            Text("${msg.time.hour}:${msg.time.minute.toString().padLeft(2,'0')}", style: TextStyle(fontSize: 10, color: isUser ? Colors.white70 : Colors.black54)),
-            const Spacer(),
-            if (!isUser) IconButton(icon: const Icon(Icons.volume_up, size: 18), onPressed: () => tts.speak(msg.content)),
-            IconButton(icon: const Icon(Icons.copy, size: 18), onPressed: () {}),
-            if (!isUser) IconButton(icon: const Icon(Icons.bookmark_add, size: 18), onPressed: () {
-              ref.read(memoryProvider.notifier).state = [...ref.read(memoryProvider), msg.content];
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ في الذاكرة")));
-            }),
-          ]),
-        ]),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Opacity(
+            opacity: msg.excluded ? 0.4 : 1.0,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isUser ? Colors.indigo : Theme.of(context).colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (msg.fileNames.isNotEmpty)
+                  Wrap(spacing: 4, children: msg.fileNames.map((n) => Chip(label: Text(n, style: const TextStyle(fontSize: 11)))).toList()),
+                isUser
+                    ? SelectableText(msg.content, style: const TextStyle(color: Colors.white))
+                    : MarkdownBody(data: msg.content, selectable: true),
+                const SizedBox(height: 6),
+                                Row(children: [
+                  Text("~$tokens tok", style: TextStyle(fontSize: 10, color: isUser ? Colors.white70 : Colors.black54)),
+                  const SizedBox(width: 6),
+                  Text("${msg.time.hour}:${msg.time.minute.toString().padLeft(2,'0')}", style: TextStyle(fontSize: 10, color: isUser ? Colors.white70 : Colors.black54)),
+                  const Spacer(),
+                  if (!isUser) IconButton(icon: const Icon(Icons.volume_up, size: 18), onPressed: () => tts.speak(msg.content)),
+                  IconButton(icon: const Icon(Icons.copy, size: 18), onPressed: () {}),
+                  if (!isUser) IconButton(icon: const Icon(Icons.bookmark_add, size: 18), onPressed: () async {
+                    final part = MemoryPart(id: const Uuid().v4(), title: "من الشات ${DateTime.now().day}/${DateTime.now().month}", content: msg.content);
+                    final l = [...ref.read(memoryPartsProvider), part];
+                    ref.read(memoryPartsProvider.notifier).state = l;
+                    await LocalStorage.save("memory", "parts", jsonEncode(l.map((e) => e.toJson()).toList()));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم الحفظ في الذاكرة المقسمة")));
+                  }),
+                                                  ]),
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }
