@@ -10,13 +10,13 @@ jobs:
           flutter-version: '3.22.0'
       - name: Fix project structure
         run: |
+          ls -la
           mkdir -p /tmp/bak
-          cp pubspec.yaml /tmp/bak/pubspec.yaml
-          cp lib/main.dart /tmp/bak/main.dart
-          rm -rf lib pubspec.yaml pubspec.lock
+          if [ -f pubspec.yaml ]; then cp pubspec.yaml /tmp/bak/pubspec.yaml; fi
+          if [ -f lib/main.dart ]; then cp lib/main.dart /tmp/bak/main.dart; fi
           flutter create . --project-name private_lm_v2 --org com.privatelm --platforms android --overwrite
-          cp /tmp/bak/pubspec.yaml ./pubspec.yaml
-          cp /tmp/bak/main.dart ./lib/main.dart
+          if [ -f /tmp/bak/pubspec.yaml ]; then cp /tmp/bak/pubspec.yaml ./pubspec.yaml; fi
+          if [ -f /tmp/bak/main.dart ]; then mkdir -p lib; cp /tmp/bak/main.dart ./lib/main.dart; fi
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
