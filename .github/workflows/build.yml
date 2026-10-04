@@ -14,12 +14,12 @@ jobs:
           mkdir -p /tmp/bak
           if [ -f pubspec.yaml ]; then cp pubspec.yaml /tmp/bak/pubspec.yaml; fi
           if [ -f lib/main.dart ]; then cp lib/main.dart /tmp/bak/main.dart; fi
-          flutter create . --project-name private_lm_v2 --org com.privatelm --platforms android --overwrite
+          flutter create . --project-name lm_client --org com.lmclient --platforms android --overwrite
           if [ -f /tmp/bak/pubspec.yaml ]; then cp /tmp/bak/pubspec.yaml ./pubspec.yaml; fi
           if [ -f /tmp/bak/main.dart ]; then mkdir -p lib; cp /tmp/bak/main.dart ./lib/main.dart; fi
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: PrivateLM-APK
+          name: LMClient-APK
           path: build/app/outputs/flutter-apk/app-release.apk
