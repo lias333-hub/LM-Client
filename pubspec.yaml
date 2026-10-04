@@ -1,4 +1,4 @@
-name: LMClient
+name: lm_client
 description: LMClient - Claude Clone
 publish_to: 'none'
 version: 1.0.0+1
