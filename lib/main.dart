@@ -48,7 +48,7 @@ final modelsProvider = StateProvider<List<String>>((ref) => []);
 final selectedModelProvider = StateProvider<String>((ref) => "");
 final messagesProvider = StateProvider<List<ChatMessage>>((ref) => []);
 final projectsProvider = StateProvider<List<Project>>((ref) => []);
-// Universal API - بدون حدود Context
+// Universal API - بدون حدود Input/Output + تصليح cleanapis.com
 class UniversalApi {
   final Dio dio = Dio();
   String fixUrl(String url) {
@@ -72,32 +72,10 @@ class UniversalApi {
   }) async* {
     final base = fixUrl(baseUrl);
     final messages = [
-      ...history.map((m) => {"role": m.role, "content": m.content}),
+      ...history.where((m) => !m.excluded).map((m) => {"role": m.role, "content": m.content}),
       {"role": "user", "content": prompt}
     ];
     final res = await dio.post("$base/v1/chat/completions",
-      data: {"model": model, "messages": messages, "stream": true},
-      options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
-    await for (var chunk in res.data.stream) {
-      final lines = utf8.decode(chunk).split("\n");
-      for (var line in lines) {
-        if (line.startsWith("data: ") && !line.contains("[DONE]")) {
-          try {
-            final j = jsonDecode(line.substring(6));
-            final d = j['choices'][0]['delta']['content'];
-            if (d != null) yield d.toString();
-          } catch (_) {}
-        }
-      }
-    }
-  }
-}
-// بدون حدود - نرسل كل الرسائل كاملة بدون قص
-    final messages = [
-      ...history.map((m) => {"role": m.role, "content": m.content}),
-      {"role": "user", "content": prompt}
-    ];
-    final res = await dio.post("$baseUrl/v1/chat/completions",
       data: {"model": model, "messages": messages, "stream": true},
       options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
     await for (var chunk in res.data.stream) {
