@@ -89,7 +89,19 @@ class MemoryPart {
   Map<String,dynamic> toJson() => {"id":id,"title":title,"content":content};
   factory MemoryPart.fromJson(Map<String,dynamic> j) => MemoryPart(id:j["id"], title:j["title"], content:j["content"]);
 }
-
+// Agent - مع صلاحيات كاملة انت بتحددها
+class Agent {
+  final String id;
+  final String name;
+  final String systemPrompt;
+  final List<String> allowedPaths;
+  final bool canRead;
+  final bool canWrite;
+  final bool canExecute;
+  Agent({required this.id, required this.name, required this.systemPrompt, this.allowedPaths = const [], this.canRead = true, this.canWrite = false, this.canExecute = false});
+  Map<String,dynamic> toJson() => {"id":id,"name":name,"systemPrompt":systemPrompt,"allowedPaths":allowedPaths,"canRead":canRead,"canWrite":canWrite,"canExecute":canExecute};
+  factory Agent.fromJson(Map<String,dynamic> j) => Agent(id:j["id"], name:j["name"], systemPrompt:j["systemPrompt"]??"", allowedPaths:List<String>.from(j["allowedPaths"]??[]), canRead:j["canRead"]??true, canWrite:j["canWrite"]??false, canExecute:j["canExecute"]??false);
+}
 class LibraryItem {
   final String id;
   final String name;
@@ -106,6 +118,8 @@ final messagesProvider = StateProvider<List<ChatMessage>>((ref) => []);
 final projectsProvider = StateProvider<List<Project>>((ref) => []);
 final memoryPartsProvider = StateProvider<List<MemoryPart>>((ref) => []);
 final libraryProvider = StateProvider<List<LibraryItem>>((ref) => []);
+final agentsProvider = StateProvider<List<Agent>>((ref) => []);
+final selectedAgentProvider = StateProvider<Agent?>((ref) => null);
 final thinkingProvider = StateProvider<String>((ref) => "");
 final lastContextProvider = StateProvider<String>((ref) => "");
 final lastTokensProvider = StateProvider<Map<String,int>>((ref) => {"input":0,"output":0});
