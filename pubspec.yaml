@@ -1,5 +1,5 @@
-name: private_lm_v2
-description: PrivateLM V2 - Universal LLM Client
+name: lm_client
+description: LMClient - Claude Clone
 publish_to: 'none'
 version: 1.0.0+1
 environment:
@@ -15,5 +15,10 @@ dependencies:
   speech_to_text: ^6.5.1
   flutter_tts: ^3.8.5
   uuid: ^4.3.3
+  shared_preferences: ^2.2.2
+  google_sign_in: ^6.2.1
+  googleapis: ^13.1.0
+  permission_handler: ^11.3.0
+  path_provider: ^2.1.2
 flutter:
   uses-material-design: true
