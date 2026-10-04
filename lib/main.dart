@@ -265,7 +265,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   List<PlatformFile> attached = [];
 
   Future<void> pickFiles() async {
-    final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true)
+        final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
     if (res != null) setState(() => attached = res.files);
   }
     Future<void> send() async {
