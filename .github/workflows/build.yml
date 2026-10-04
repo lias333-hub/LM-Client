@@ -10,13 +10,16 @@ jobs:
           flutter-version: '3.22.0'
       - name: Fix project structure
         run: |
-          ls -la
           mkdir -p /tmp/bak
           if [ -f pubspec.yaml ]; then cp pubspec.yaml /tmp/bak/pubspec.yaml; fi
           if [ -f lib/main.dart ]; then cp lib/main.dart /tmp/bak/main.dart; fi
           flutter create . --project-name lm_client --org com.lmclient --platforms android --overwrite
           if [ -f /tmp/bak/pubspec.yaml ]; then cp /tmp/bak/pubspec.yaml ./pubspec.yaml; fi
           if [ -f /tmp/bak/main.dart ]; then mkdir -p lib; cp /tmp/bak/main.dart ./lib/main.dart; fi
+          # حقن الصلاحيات
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" \/>\n    <application/' $MANIFEST
+          cat $MANIFEST
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
