@@ -352,6 +352,82 @@ class ProjectsScreen extends ConsumerWidget {
     ));
   }
 }
+// AgentsScreen - تحكم كامل بالتطبيقات والملفات اللي يوصلها النموذج
+class AgentsScreen extends ConsumerWidget {
+  const AgentsScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final agents = ref.watch(agentsProvider);
+    final selected = ref.watch(selectedAgentProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text("Agents")),
+      body: agents.isEmpty
+          ? const Center(child: Text("لا يوجد Agents\nاضغط + لإنشاء Agent"))
+          : ListView.builder(
+              itemCount: agents.length,
+              itemBuilder: (c, i) {
+                final a = agents[i];
+                final isSel = selected?.id == a.id;
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  color: isSel ? Colors.indigo.shade50 : null,
+                  child: ListTile(
+                    leading: Icon(Icons.smart_toy, color: isSel ? Colors.indigo : null),
+                    title: Text(a.name),
+                    subtitle: Text("${a.systemPrompt}\nصلاحيات: ${a.canRead ? 'قراءة ' : ''}${a.canWrite ? 'كتابة ' : ''}${a.canExecute ? 'تنفيذ' : ''}\nمسارات: ${a.allowedPaths.isEmpty ? 'الكل' : a.allowedPaths.join(', ')}", maxLines: 3),
+                    isThreeLine: true,
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      IconButton(icon: Icon(isSel ? Icons.check_circle : Icons.circle_outlined, color: Colors.indigo), onPressed: () => ref.read(selectedAgentProvider.notifier).state = a),
+                      IconButton(icon: const Icon(Icons.delete), onPressed: () async {
+                        final l = [...agents]..removeAt(i);
+                        ref.read(agentsProvider.notifier).state = l;
+                        if (isSel) ref.read(selectedAgentProvider.notifier).state = null;
+                        await LocalStorage.save("agents", "list", jsonEncode(l.map((e) => e.toJson()).toList()));
+                      }),
+                    ]),
+                    onTap: () => ref.read(selectedAgentProvider.notifier).state = a,
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addAgent(context, ref),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+  void _addAgent(BuildContext ctx, WidgetRef ref) {
+    final n = TextEditingController();
+    final p = TextEditingController();
+    final paths = TextEditingController();
+    bool canRead = true;
+    bool canWrite = false;
+    bool canExecute = false;
+    showDialog(context: ctx, builder: (_) => StatefulBuilder(builder: (c, setSt) => AlertDialog(
+      title: const Text("Agent جديد"),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: n, decoration: const InputDecoration(labelText: "اسم الـ Agent")),
+        const SizedBox(height: 8),
+        TextField(controller: p, decoration: const InputDecoration(labelText: "System Prompt"), maxLines: 3),
+        const SizedBox(height: 8),
+        TextField(controller: paths, decoration: const InputDecoration(labelText: "المسارات المسموحة (مفصولة ب ,)", hintText: "مثال: /DCIM, /Documents")),
+        SwitchListTile(title: const Text("قراءة"), value: canRead, onChanged: (v) => setSt(() => canRead = v)),
+        SwitchListTile(title: const Text("كتابة / إنشاء"), value: canWrite, onChanged: (v) => setSt(() => canWrite = v)),
+        SwitchListTile(title: const Text("تنفيذ مهام"), value: canExecute, onChanged: (v) => setSt(() => canExecute = v)),
+      ])),
+      actions: [TextButton(onPressed: () async {
+        if (n.text.isNotEmpty) {
+          final list = paths.text.isEmpty ? <String>[] : paths.text.split(',').map((e) => e.trim()).toList();
+          final a = Agent(id: const Uuid().v4(), name: n.text, systemPrompt: p.text, allowedPaths: list, canRead: canRead, canWrite: canWrite, canExecute: canExecute);
+          final l = [...ref.read(agentsProvider), a];
+          ref.read(agentsProvider.notifier).state = l;
+          await LocalStorage.save("agents", "list", jsonEncode(l.map((e) => e.toJson()).toList()));
+          Navigator.pop(ctx);
+        }
+      }, child: const Text("إنشاء"))],
+    )));
+  }
+}
 // SettingsScreen - Universal API + الوضع الليلي + Drive
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
