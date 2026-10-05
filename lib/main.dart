@@ -123,6 +123,30 @@ final selectedAgentProvider = StateProvider<Agent?>((ref) => null);
 final thinkingProvider = StateProvider<String>((ref) => "");
 final lastContextProvider = StateProvider<String>((ref) => "");
 final lastTokensProvider = StateProvider<Map<String,int>>((ref) => {"input":0,"output":0});
+// حفظ الـ API والجلسات بشكل دائم
+Future<void> loadSavedData(WidgetRef ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  final savedUrl = prefs.getString("api_baseUrl");
+  final savedKey = prefs.getString("api_key");
+  final savedModel = prefs.getString("api_model");
+  if (savedUrl != null) ref.read(apiBaseUrlProvider.notifier).state = savedUrl;
+  if (savedKey != null) ref.read(apiKeyProvider.notifier).state = savedKey;
+  if (savedModel != null) ref.read(selectedModelProvider.notifier).state = savedModel;
+  // تحميل المحادثات المحفوظة
+  final chatsJson = await LocalStorage.load("chats", "current");
+  if (chatsJson != null) {
+    try {
+      final list = (jsonDecode(chatsJson) as List).map((e) => ChatMessage.fromJson(e)).toList();
+      ref.read(messagesProvider.notifier).state = list;
+    } catch (_) {}
+  }
+}
+Future<void> saveApi(String url, String key, String model) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString("api_baseUrl", url);
+  await prefs.setString("api_key", key);
+  await prefs.setString("api_model", model);
+}
 // Universal API - بدون حدود Input/Output + تصليح cleanapis.com
 class UniversalApi {
   final Dio dio = Dio();
@@ -178,6 +202,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int idx = 0;
+    @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => loadSavedData(ref));
+  }
   @override
   Widget build(BuildContext context) {
     final screens = [const ChatScreen(), const ProjectsScreen(), const LibraryScreen(), const MemoryScreen(), const SettingsScreen()];
