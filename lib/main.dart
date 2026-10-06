@@ -204,7 +204,7 @@ class UniversalApi {
       data: {"model": model, "messages": messages, "stream": true},
       options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
     await for (var chunk in res.data.stream) {
-      final lines = utf8.decode(chunk).split("\n")
+      final lines = utf8.decode(chunk).split("\n");
       for (var line in lines) {
         if (line.startsWith("data: ") && !line.contains("[DONE]")) {
           try {
