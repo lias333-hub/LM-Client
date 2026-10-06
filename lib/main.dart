@@ -46,11 +46,35 @@ class LMClientApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeProvider);
+    final lightTheme = ThemeData(
+      useMaterial3: true,
+      scaffoldBackgroundColor: const Color(0xFFFAF9F5),
+      colorScheme: const ColorScheme.light(
+        primary: Color(0xFFCC785C),
+        surface: Color(0xFFFFFFFF),
+        surfaceVariant: Color(0xFFF0EEE6),
+        background: Color(0xFFFAF9F5),
+                onSurface: Color(0xFF2D2D2D),
+      ),
+      appBarTheme: const AppBarTheme(backgroundColor: Color(0xFFFAF9F5), elevation: 0, foregroundColor: Color(0xFF2D2D2D)),
+    );
+    final darkTheme = ThemeData(
+      useMaterial3: true,
+      scaffoldBackgroundColor: const Color(0xFF191919),
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFFE8A082),
+        surface: Color(0xFF2A2A2A),
+        surfaceVariant: Color(0xFF2F2F2F),
+        background: Color(0xFF191919),
+        onSurface: Color(0xFFE8E8E8),
+      ),
+      appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF191919), elevation: 0),
+    );
     return MaterialApp(
       title: 'LMClient',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo, brightness: Brightness.light),
-      darkTheme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo, brightness: Brightness.dark),
+      theme: lightTheme,
+      darkTheme: darkTheme,
       themeMode: mode,
       home: const HomeScreen(),
     );
@@ -180,7 +204,7 @@ class UniversalApi {
       data: {"model": model, "messages": messages, "stream": true},
       options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
     await for (var chunk in res.data.stream) {
-      final lines = utf8.decode(chunk).split("\n");
+      final lines = utf8.decode(chunk).split("\n")
       for (var line in lines) {
         if (line.startsWith("data: ") && !line.contains("[DONE]")) {
           try {
@@ -202,31 +226,49 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int idx = 0;
-    @override
+  @override
   void initState() {
     super.initState();
     Future.microtask(() => loadSavedData(ref));
   }
   @override
   Widget build(BuildContext context) {
-    final screens = [const ChatScreen(), const ProjectsScreen(), const LibraryScreen(), const MemoryScreen(), const SettingsScreen()];
+    final screens = [const ChatScreen(), const ProjectsScreen(), const LibraryScreen(), const MemoryScreen(), const AgentsScreen(), const SettingsScreen()];
+    final titles = ["LMClient", "Projects", "المكتبة", "الذاكرة", "Agents", "الإعدادات"];
+    final models = ref.watch(modelsProvider);
+    final selected = ref.watch(selectedModelProvider);
     return Scaffold(
-      body: screens[idx],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: idx,
-        onDestinationSelected: (v) => setState(() => idx = v),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.chat), label: "شات"),
-          NavigationDestination(icon: Icon(Icons.folder), label: "Projects"),
-          NavigationDestination(icon: Icon(Icons.library_books), label: "المكتبة"),
-          NavigationDestination(icon: Icon(Icons.memory), label: "الذاكرة"),
-          NavigationDestination(icon: Icon(Icons.settings), label: "الإعدادات"),
-        ],
+      appBar: AppBar(
+        leading: Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(ctx).openDrawer())),
+        title: models.isEmpty ? Text(titles[idx]) : DropdownButton<String>(value: selected.isEmpty ? null : selected, hint: const Text("اختر الموديل"), underline: const SizedBox(), items: models.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 14)))).toList(), onChanged: (v) => ref.read(selectedModelProvider.notifier).state = v!),
+        centerTitle: true,
+        actions: [IconButton(icon: const Icon(Icons.edit_square), tooltip: "محادثة جديدة", onPressed: () { ref.read(messagesProvider.notifier).state = []; ref.read(lastContextProvider.notifier).state = ""; setState(() => idx = 0); })],
       ),
+      drawer: Drawer(
+        child: ListView(padding: EdgeInsets.zero, children: [
+          DrawerHeader(decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end, children: [Text("LMClient", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text("Claude Clone - بدون حدود")])),
+          ListTile(leading: const Icon(Icons.add), title: const Text("محادثة جديدة"), onTap: () { ref.read(messagesProvider.notifier).state = []; Navigator.pop(context); setState(() => idx = 0); }),
+          const Divider(),
+          ListTile(leading: const Icon(Icons.chat), title: const Text("الشات"), selected: idx==0, onTap: () { Navigator.pop(context); setState(() => idx=0); }),
+          ListTile(leading: const Icon(Icons.folder), title: const Text("Projects"), selected: idx==1, onTap: () { Navigator.pop(context); setState(() => idx=1); }),
+          ListTile(leading: const Icon(Icons.library_books), title: const Text("المكتبة"), selected: idx==2, onTap: () { Navigator.pop(context); setState(() => idx=2); }),
+          ListTile(leading: const Icon(Icons.memory), title: const Text("الذاكرة"), selected: idx==3, onTap: () { Navigator.pop(context); setState(() => idx=3); }),
+          ListTile(leading: const Icon(Icons.smart_toy), title: const Text("Agents"), selected: idx==4, onTap: () { Navigator.pop(context); setState(() => idx=4); }),
+          ListTile(leading: const Icon(Icons.settings), title: const Text("الإعدادات"), selected: idx==5, onTap: () { Navigator.pop(context); setState(() => idx=5); }),
+        ]),
+      ),
+      body: screens[idx],
     );
   }
 }
 // شاشة الذاكرة المقسمة العابرة - النموذج يقسمها ويستدعي أي جزء
+        centerTitle: true,
+        actions: [IconButton(icon: const Icon(Icons.edit_square), tooltip: "محادثة جديدة", onPressed: () { ref.read(messagesProvider.notifier).state = []; ref.read(lastContextProvider.notifier).state = ""; setState(() => idx = 0); })],
+      ),
+      drawer: Drawer(
+        child: ListView(padding: EdgeInsets.zero, children: [
+          DrawerHeader(decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end, children: [Text("LMClient", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text("Claude Clone - بدون حدود")])),
+          ListTile(leading: const Icon(Icons.add), title: const Text("محادثة جديدة"), onTap: () { ref.read(messagesProvider.notifier).state = [];
 class MemoryScreen extends ConsumerWidget {
   const MemoryScreen({super.key});
   @override
