@@ -262,13 +262,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 // شاشة الذاكرة المقسمة العابرة - النموذج يقسمها ويستدعي أي جزء
-        centerTitle: true,
-        actions: [IconButton(icon: const Icon(Icons.edit_square), tooltip: "محادثة جديدة", onPressed: () { ref.read(messagesProvider.notifier).state = []; ref.read(lastContextProvider.notifier).state = ""; setState(() => idx = 0); })],
-      ),
-      drawer: Drawer(
-        child: ListView(padding: EdgeInsets.zero, children: [
-          DrawerHeader(decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end, children: [Text("LMClient", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text("Claude Clone - بدون حدود")])),
-          ListTile(leading: const Icon(Icons.add), title: const Text("محادثة جديدة"), onTap: () { ref.read(messagesProvider.notifier).state = [];
 class MemoryScreen extends ConsumerWidget {
   const MemoryScreen({super.key});
   @override
@@ -638,8 +631,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final apiKey = ref.read(apiKeyProvider);
       final model = ref.read(selectedModelProvider);
       final mem = ref.read(memoryPartsProvider);
-      String sysPrompt = "";
-            final mem = ref.read(memoryPartsProvider);
       final agent = ref.read(selectedAgentProvider);
       final lib = ref.read(libraryProvider);
       String sysPrompt = "[LMClient System - Claude Clone]\nNo client Input/Output limits, only model limit. Context is full history without truncation, max_tokens not sent.\nMemory parts: ${mem.isEmpty ? "none" : mem.map((m) => "${m.title}: ${m.content}").join(" | ")}\nProject: ${widget.project?.instructions ?? "none"}\nLibrary: ${lib.isEmpty ? "empty" : lib.map((e) => e.name).join(", ")} - you can request via [SEARCH_LIBRARY: query]\nAgent: ${agent?.name ?? "none"} allowed:${agent?.allowedPaths.join(",")} canRead:${agent?.canRead} canWrite:${agent?.canWrite} canExecute:${agent?.canExecute}\nYou can save memory via [SAVE_MEMORY: title|content] and create/edit files if allowed.\n";
