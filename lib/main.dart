@@ -639,9 +639,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final model = ref.read(selectedModelProvider);
       final mem = ref.read(memoryPartsProvider);
       String sysPrompt = "";
-      if (mem.isNotEmpty) sysPrompt += "Memory:\n" + mem.map((m) => "${m.title}: ${m.content}").join("\n") + "\n";
-      if (widget.project != null && widget.project!.instructions.isNotEmpty) sysPrompt += "Project: ${widget.project!.instructions}\n";
-      String fullPrompt = sysPrompt.isEmpty ? prompt : sysPrompt + "\nUser: " + prompt;
+            final mem = ref.read(memoryPartsProvider);
+      final agent = ref.read(selectedAgentProvider);
+      final lib = ref.read(libraryProvider);
+      String sysPrompt = "[LMClient System - Claude Clone]\nNo client Input/Output limits, only model limit. Context is full history without truncation, max_tokens not sent.\nMemory parts: ${mem.isEmpty ? "none" : mem.map((m) => "${m.title}: ${m.content}").join(" | ")}\nProject: ${widget.project?.instructions ?? "none"}\nLibrary: ${lib.isEmpty ? "empty" : lib.map((e) => e.name).join(", ")} - you can request via [SEARCH_LIBRARY: query]\nAgent: ${agent?.name ?? "none"} allowed:${agent?.allowedPaths.join(",")} canRead:${agent?.canRead} canWrite:${agent?.canWrite} canExecute:${agent?.canExecute}\nYou can save memory via [SAVE_MEMORY: title|content] and create/edit files if allowed.\n";
+      String fullPrompt = sysPrompt + "\nUser: " + prompt;
       final ctx = [...ref.read(messagesProvider).where((m) => !m.excluded).map((m) => "[${m.role.toUpperCase()}] ${m.content}"), "[USER] $fullPrompt"].join("\n\n");
       ref.read(lastContextProvider.notifier).state = ctx;
       ref.read(lastTokensProvider.notifier).state = {"input": estimateTokens(ctx), "output": 0};
