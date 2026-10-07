@@ -264,6 +264,7 @@ class UniversalApi {
     required String model,
     required List<ChatMessage> history,
     required String prompt,
+    CancelToken? cancelToken,
   }) async* {
     final base = fixUrl(baseUrl);
     // بدون حدود - نرسل كل الرسائل غير المستبعدة كاملة
@@ -274,7 +275,8 @@ class UniversalApi {
     // لا نرسل max_tokens نهائيا - الموديل يحدد حده
     final res = await dio.post("$base/v1/chat/completions",
       data: {"model": model, "messages": messages, "stream": true},
-      options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream));
+      options: Options(headers: {"Authorization": "Bearer $apiKey"}, responseType: ResponseType.stream),
+      cancelToken: cancelToken);
     await for (var chunk in res.data.stream) {
       final lines = utf8.decode(chunk).split("\n");
       for (var line in lines) {
@@ -832,6 +834,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final SpeechToText stt = SpeechToText();
   final FlutterTts tts = FlutterTts();
   bool isLoading = false;
+  CancelToken? cancelToken;
   bool isListening = false;
   String streamingText = "";
   List<PlatformFile> attached = [];
@@ -860,6 +863,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final prompt = ctrl.text + fileText;
     final userMsg = ChatMessage(id: const Uuid().v4(), role: "user", content: ctrl.text, fileNames: attached.map((e) => e.name).toList(), time: DateTime.now());
     setState(() { isLoading = true; streamingText = ""; });
+    cancelToken = CancelToken();
     ref.read(thinkingProvider.notifier).state = "Thinking...";
     final updated = [...ref.read(messagesProvider), userMsg];
     ref.read(messagesProvider.notifier).state = updated;
@@ -886,10 +890,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.read(lastTokensProvider.notifier).state = {"input": estimateTokens(ctx), "output": 0};
       ref.read(thinkingProvider.notifier).state = "Working...";
       String full = "";
-            await for (final chunk in ref.read(universalApiProvider).chatStream(
+      await for (final chunk in ref.read(universalApiProvider).chatStream(
         baseUrl: baseUrl, apiKey: apiKey, model: model,
         history: ref.read(messagesProvider).length > 1 ? ref.read(messagesProvider).sublist(0, ref.read(messagesProvider).length - 1) : [],
-        prompt: fullPrompt)) {
+        prompt: fullPrompt, cancelToken: cancelToken)) {
         full += chunk;
         setState(() => streamingText = full);
         ref.read(lastTokensProvider.notifier).state = {"input": estimateTokens(ctx), "output": estimateTokens(full)};
