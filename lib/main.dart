@@ -956,6 +956,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: w,
               );
             },
+          ),
+        ),
         if (attached.isNotEmpty)
           Container(
             height: 40,
