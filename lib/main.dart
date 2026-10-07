@@ -304,8 +304,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final screens = [const ChatScreen(), const ProjectsScreen(), const LibraryScreen(), const MemoryScreen(), const AgentsScreen(), const SettingsScreen()];
-    final titles = ["LMClient", "Projects", "المكتبة", "الذاكرة", "Agents", "الإعدادات"];
+    final screens = [const ChatScreen(), const ProjectsScreen(), const LibraryScreen(), const MemoryScreen(), const AgentsScreen(), const PhoneFilesScreen(), const SettingsScreen()];
+    final titles = ["LMClient", "Projects", "المكتبة", "الذاكرة", "Agents", "ملفات الهاتف", "الإعدادات"];
     final models = ref.watch(modelsProvider);
     final selected = ref.watch(selectedModelProvider);
     return Scaffold(
@@ -325,10 +325,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ListTile(leading: const Icon(Icons.library_books), title: const Text("المكتبة"), selected: idx==2, onTap: () { Navigator.pop(context); setState(() => idx=2); }),
           ListTile(leading: const Icon(Icons.memory), title: const Text("الذاكرة"), selected: idx==3, onTap: () { Navigator.pop(context); setState(() => idx=3); }),
           ListTile(leading: const Icon(Icons.smart_toy), title: const Text("Agents"), selected: idx==4, onTap: () { Navigator.pop(context); setState(() => idx=4); }),
+          ListTile(leading: const Icon(Icons.phone_android), title: const Text("ملفات الهاتف"), selected: idx==5, onTap: () { Navigator.pop(context); setState(() => idx=6); }),
           ListTile(leading: const Icon(Icons.settings), title: const Text("الإعدادات"), selected: idx==5, onTap: () { Navigator.pop(context); setState(() => idx=5); }),
         ]),
       ),
-      body: screens[idx],
+            body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+            child: child,
+          ),
+        ),
+        child: KeyedSubtree(key: ValueKey(idx), child: screens[idx]),
+      ),
     );
   }
 }
@@ -561,6 +572,93 @@ class AgentsScreen extends ConsumerWidget {
         }
       }, child: const Text("إنشاء"))],
     )));
+  }
+}
+// تصفح ملفات الهاتف الحقيقي - PrivateAgent
+class PhoneFilesScreen extends ConsumerStatefulWidget {
+  const PhoneFilesScreen({super.key});
+  @override
+  ConsumerState<PhoneFilesScreen> createState() => _PhoneFilesScreenState();
+}
+class _PhoneFilesScreenState extends ConsumerState<PhoneFilesScreen> {
+  String currentPath = "/storage/emulated/0";
+  List<FileSystemEntity> files = [];
+  bool loading = true;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+  Future<void> _load() async {
+    setState(() => loading = true);
+    final ok = await PhoneStorage.requestPermissions();
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يجب السماح بصلاحيات الملفات")));
+    }
+    final list = await PhoneStorage.listFiles(currentPath);
+    setState(() { files = list; loading = false; });
+  }
+  @override
+  Widget build(BuildContext context) {
+    final agent = ref.watch(selectedAgentProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(currentPath.split('/').last.isEmpty ? "الهاتف" : currentPath.split('/').last),
+        leading: IconButton(icon: const Icon(Icons.arrow_upward), onPressed: () {
+          final parent = Directory(currentPath).parent.path;
+          if (parent != currentPath) { currentPath = parent; _load(); }
+        }),
+      ),
+      body: loading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
+        itemCount: files.length,
+        itemBuilder: (c, i) {
+          final f = files[i];
+          final isDir = f is Directory;
+          return ListTile(
+            leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file, color: isDir ? Colors.amber : null),
+            title: Text(f.path.split('/').last),
+            subtitle: Text(isDir ? "مجلد" : "${File(f.path).lengthSync()} bytes"),
+            onTap: () async {
+              if (isDir) { currentPath = f.path; _load(); }
+              else {
+                try {
+                  final content = await PhoneStorage.readFile(f.path, agent);
+                  showDialog(context: context, builder: (_) => AlertDialog(
+                    title: Text(f.path.split('/').last),
+                    content: SizedBox(width: double.maxFinite, height: 300, child: SingleChildScrollView(child: SelectableText(content.length > 5000 ? content.substring(0,5000)+"..." : content))),
+                    actions: [TextButton(onPressed: ()=>Navigator.pop(context), child: const Text("إغلاق"))],
+                  ));
+                } catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$e"))); }
+              }
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.create_new_folder),
+        label: Text(agent == null ? "إنشاء ملف" : "بصلاحية ${agent.name}"),
+        onPressed: () => _createFile(agent),
+      ),
+    );
+  }
+  void _createFile(Agent? agent) {
+    final nameCtrl = TextEditingController();
+    final contentCtrl = TextEditingController();
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text("إنشاء ملف"),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: nameCtrl, decoration: InputDecoration(labelText: "الاسم", hintText: "test.txt - سيحفظ في $currentPath")),
+        TextField(controller: contentCtrl, decoration: const InputDecoration(labelText: "المحتوى"), maxLines: 4),
+      ]),
+      actions: [TextButton(onPressed: () async {
+        if (nameCtrl.text.isNotEmpty) {
+          try {
+            await PhoneStorage.createFile("$currentPath/${nameCtrl.text}", contentCtrl.text, agent);
+            Navigator.pop(context); _load();
+          } catch (e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$e"))); }
+        }
+      }, child: const Text("إنشاء"))],
+    ));
   }
 }
 // SettingsScreen - Universal API + الوضع الليلي + Drive
@@ -847,15 +945,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             controller: scroll,
             padding: const EdgeInsets.all(12),
             itemCount: msgs.length + (streamingText.isNotEmpty ? 1 : 0),
-            itemBuilder: (c, i) {
-              if (i < msgs.length) return MessageBubble(msg: msgs[i], tts: tts, selectionMode: selectionMode, selected: selectedIds.contains(msgs[i].id), onSelect: () => toggleSelect(msgs[i].id));
-              return MessageBubble(
-                msg: ChatMessage(id: "stream", role: "assistant", content: streamingText, time: DateTime.now()),
-                tts: tts, selectionMode: false, selected: false, onSelect: () {},
+                        itemBuilder: (c, i) {
+              final w = i < msgs.length ? MessageBubble(msg: msgs[i], tts: tts, selectionMode: selectionMode, selected: selectedIds.contains(msgs[i].id), onSelect: () => toggleSelect(msgs[i].id)) : MessageBubble(msg: ChatMessage(id: "stream", role: "assistant", content: streamingText, time: DateTime.now()), tts: tts, selectionMode: false, selected: false, onSelect: () {},);
+              return TweenAnimationBuilder<double>(
+                duration: Duration(milliseconds: 300 + (i % 4) * 60),
+                tween: Tween(begin: 0.0, end: 1.0),
+                curve: Curves.easeOutCubic,
+                builder: (ctx, v, child) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 12 * (1 - v)), child: child)),
+                child: w,
               );
             },
-          ),
-        ),
         if (attached.isNotEmpty)
           Container(
             height: 40,
