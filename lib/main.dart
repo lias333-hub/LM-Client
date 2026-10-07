@@ -147,6 +147,49 @@ final selectedAgentProvider = StateProvider<Agent?>((ref) => null);
 final thinkingProvider = StateProvider<String>((ref) => "");
 final lastContextProvider = StateProvider<String>((ref) => "");
 final lastTokensProvider = StateProvider<Map<String,int>>((ref) => {"input":0,"output":0});
+// بروفايلات API - تعدد حسابات مثل واتساب
+class ApiProfile {
+  final String id;
+  final String name;
+  final String baseUrl;
+  final String apiKey;
+  final String selectedModel;
+  final List<String> models;
+  ApiProfile({required this.id, required this.name, required this.baseUrl, required this.apiKey, this.selectedModel="", this.models=const []});
+  Map<String,dynamic> toJson() => {"id":id,"name":name,"baseUrl":baseUrl,"apiKey":apiKey,"selectedModel":selectedModel,"models":models};
+  factory ApiProfile.fromJson(Map<String,dynamic> j) => ApiProfile(id:j["id"], name:j["name"], baseUrl:j["baseUrl"]??"", apiKey:j["apiKey"]??"", selectedModel:j["selectedModel"]??"", models:List<String>.from(j["models"]??[]));
+}
+final profilesProvider = StateProvider<List<ApiProfile>>((ref) => []);
+final selectedProfileProvider = StateProvider<ApiProfile?>((ref) => null);
+
+Future<void> loadProfiles(WidgetRef ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  final json = prefs.getString("profiles");
+  final selId = prefs.getString("selected_profile");
+  if (json != null) {
+    try {
+      final list = (jsonDecode(json) as List).map((e) => ApiProfile.fromJson(e)).toList();
+      ref.read(profilesProvider.notifier).state = list;
+      if (selId != null) {
+        final sel = list.where((p) => p.id == selId).toList();
+        if (sel.isNotEmpty) {
+          ref.read(selectedProfileProvider.notifier).state = sel.first;
+          ref.read(apiBaseUrlProvider.notifier).state = sel.first.baseUrl;
+          ref.read(apiKeyProvider.notifier).state = sel.first.apiKey;
+          ref.read(selectedModelProvider.notifier).state = sel.first.selectedModel;
+          ref.read(modelsProvider.notifier).state = sel.first.models;
+        }
+      }
+    } catch (_) {}
+  }
+}
+Future<void> saveProfiles(WidgetRef ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  final list = ref.read(profilesProvider);
+  final sel = ref.read(selectedProfileProvider);
+  await prefs.setString("profiles", jsonEncode(list.map((e) => e.toJson()).toList()));
+  if (sel != null) await prefs.setString("selected_profile", sel.id);
+}
 // حفظ الـ API والجلسات بشكل دائم
 Future<void> loadSavedData(WidgetRef ref) async {
   final prefs = await SharedPreferences.getInstance();
