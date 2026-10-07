@@ -40,6 +40,34 @@ class LocalStorage {
     return null;
   }
 }
+// وصول الهاتف الحقيقي - مثل PrivateAgent وأقوى
+class PhoneStorage {
+  static Future<bool> requestPermissions() async {
+    final s1 = await Permission.storage.request();
+    final s2 = await Permission.manageExternalStorage.request();
+    return s1.isGranted || s2.isGranted;
+  }
+  static Future<List<FileSystemEntity>> listFiles(String path) async {
+    final dir = Directory(path);
+    if (!await dir.exists()) return [];
+    return dir.listSync();
+  }
+  static Future<String> readFile(String path, Agent? agent) async {
+    if (agent != null && !agent.canRead) throw "Agent غير مسموح له بالقراءة";
+    if (agent != null && agent.allowedPaths.isNotEmpty && !agent.allowedPaths.any((p) => path.contains(p))) throw "المسار غير مسموح: $path";
+    return await File(path).readAsString();
+  }
+  static Future<void> writeFile(String path, String content, Agent? agent) async {
+    if (agent != null && !agent.canWrite) throw "Agent غير مسموح له بالكتابة";
+    if (agent != null && agent.allowedPaths.isNotEmpty && !agent.allowedPaths.any((p) => path.contains(p))) throw "المسار غير مسموح: $path";
+    final f = File(path);
+    await f.create(recursive: true);
+    await f.writeAsString(content);
+  }
+  static Future<void> createFile(String path, String content, Agent? agent) async {
+    await writeFile(path, content, agent);
+  }
+}
 
 class LMClientApp extends ConsumerWidget {
   const LMClientApp({super.key});
