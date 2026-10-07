@@ -272,7 +272,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => loadSavedData(ref));
+    Future.microtask(() async { await loadSavedData(ref); await loadProfiles(ref); });
   }
   @override
   Widget build(BuildContext context) {
@@ -540,13 +540,11 @@ class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final baseUrl = ref.watch(apiBaseUrlProvider);
-    final apiKey = ref.watch(apiKeyProvider);
+    final profiles = ref.watch(profilesProvider);
+    final sel = ref.watch(selectedProfileProvider);
+    final mode = ref.watch(themeModeProvider);
     final models = ref.watch(modelsProvider);
     final selected = ref.watch(selectedModelProvider);
-    final mode = ref.watch(themeModeProvider);
-    final baseCtrl = TextEditingController(text: baseUrl);
-    final keyCtrl = TextEditingController(text: apiKey);
     return Scaffold(
       appBar: AppBar(title: const Text("الإعدادات")),
       body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -561,36 +559,87 @@ class SettingsScreen extends ConsumerWidget {
           onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).state = s.first,
         ),
         const Divider(height: 32),
-        const Text("Universal API", style: TextStyle(fontWeight: FontWeight.bold)),
+        Row(children: [
+          const Text("البروفايلات", style: TextStyle(fontWeight: FontWeight.bold)),
+          const Spacer(),
+          FilledButton.icon(icon: const Icon(Icons.add, size: 18), label: const Text("إضافة"), onPressed: () => _addProfile(context, ref)),
+        ]),
         const SizedBox(height: 8),
-        TextField(controller: baseCtrl, decoration: const InputDecoration(labelText: "Base URL", hintText: "https://cleanapis.com", border: OutlineInputBorder())),
-        const SizedBox(height: 12),
-        TextField(controller: keyCtrl, decoration: const InputDecoration(labelText: "API Key", border: OutlineInputBorder()), obscureText: true),
-        const SizedBox(height: 12),
-                FilledButton(
-          onPressed: () async {
-            ref.read(apiBaseUrlProvider.notifier).state = baseCtrl.text;
-            ref.read(apiKeyProvider.notifier).state = keyCtrl.text;
-            try {
-              final list = await ref.read(universalApiProvider).fetchModels(baseCtrl.text, keyCtrl.text);
-              ref.read(modelsProvider.notifier).state = list;
-              if (list.isNotEmpty) ref.read(selectedModelProvider.notifier).state = list.first;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم جلب ${list.length} موديل")));
+        if (profiles.isEmpty) const Text("لا يوجد بروفايلات - اضغط إضافة", style: TextStyle(color: Colors.grey)),
+        ...profiles.map((p) {
+          final isSel = sel?.id == p.id;
+          return Card(color: isSel ? Theme.of(context).colorScheme.surfaceVariant : null, child: ListTile(
+            leading: Icon(Icons.account_circle, color: isSel ? Theme.of(context).colorScheme.primary : null),
+            title: Text(p.name, style: TextStyle(fontWeight: isSel ? FontWeight.bold : null)),
+            subtitle: Text("${p.baseUrl}\n${p.selectedModel.isEmpty ? "بدون موديل" : p.selectedModel}", maxLines: 2),
+            isThreeLine: true,
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(icon: Icon(isSel ? Icons.check_circle : Icons.circle_outlined, color: Theme.of(context).colorScheme.primary), onPressed: () async {
+                ref.read(selectedProfileProvider.notifier).state = p;
+                ref.read(apiBaseUrlProvider.notifier).state = p.baseUrl;
+                ref.read(apiKeyProvider.notifier).state = p.apiKey;
+                ref.read(selectedModelProvider.notifier).state = p.selectedModel;
+                ref.read(modelsProvider.notifier).state = p.models;
+                await saveProfiles(ref);
+              }),
+              IconButton(icon: const Icon(Icons.delete, size: 20), onPressed: () async {
+                final l = [...profiles]..removeWhere((e) => e.id == p.id);
+                ref.read(profilesProvider.notifier).state = l;
+                if (isSel) ref.read(selectedProfileProvider.notifier).state = null;
+                await saveProfiles(ref);
+              }),
+            ]),
+            onTap: () async {
+              ref.read(selectedProfileProvider.notifier).state = p;
+              ref.read(apiBaseUrlProvider.notifier).state = p.baseUrl;
+              ref.read(apiKeyProvider.notifier).state = p.apiKey;
+              ref.read(selectedModelProvider.notifier).state = p.selectedModel;
+              ref.read(modelsProvider.notifier).state = p.models;
+              await saveProfiles(ref);
+            },
+          ));
+        }),
+        const Divider(height: 32),
+        if (sel != null) ...[
+          Text("البروفايل الحالي: ${sel.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: () async {
+              try {
+                final list = await ref.read(universalApiProvider).fetchModels(sel.baseUrl, sel.apiKey);
+                ref.read(modelsProvider.notifier).state = list;
+                if (list.isNotEmpty) {
+                  ref.read(selectedModelProvider.notifier).state = list.first;
+                  final updated = ApiProfile(id: sel.id, name: sel.name, baseUrl: sel.baseUrl, apiKey: sel.apiKey, selectedModel: list.first, models: list);
+                  final l = profiles.map((e) => e.id == sel.id ? updated : e).toList();
+                  ref.read(profilesProvider.notifier).state = l;
+                  ref.read(selectedProfileProvider.notifier).state = updated;
+                  await saveProfiles(ref);
+                }
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم جلب ${list.length} موديل")));
             } catch (e) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: $e")));
             }
           },
           child: const Text("Fetch Models - جلب الموديلات"),
         ),
-        const SizedBox(height: 16),
-        if (models.isNotEmpty)
-          DropdownButton<String>(
-            value: selected.isEmpty ? null : selected,
-            hint: const Text("اختر الموديل"),
-            isExpanded: true,
-            items: models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-            onChanged: (v) => ref.read(selectedModelProvider.notifier).state = v!,
-          ),
+          const SizedBox(height: 8),
+          if (models.isNotEmpty)
+            DropdownButton<String>(
+              value: selected.isEmpty ? null : selected,
+              hint: const Text("اختر الموديل"),
+              isExpanded: true,
+              items: models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+              onChanged: (v) async {
+                ref.read(selectedModelProvider.notifier).state = v!;
+                final updated = ApiProfile(id: sel.id, name: sel.name, baseUrl: sel.baseUrl, apiKey: sel.apiKey, selectedModel: v, models: models);
+                final l = profiles.map((e) => e.id == sel.id ? updated : e).toList();
+                ref.read(profilesProvider.notifier).state = l;
+                ref.read(selectedProfileProvider.notifier).state = updated;
+                await saveProfiles(ref);
+              },
+            ),
+        ],
         const Divider(height: 32),
         const Text("Drive والصلاحيات", style: TextStyle(fontWeight: FontWeight.bold)),
         ListTile(
@@ -614,6 +663,33 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ]),
     );
+  }
+  void _addProfile(BuildContext ctx, WidgetRef ref) {
+    final n = TextEditingController();
+    final u = TextEditingController(text: "https://cleanapis.com");
+    final k = TextEditingController();
+    showDialog(context: ctx, builder: (_) => AlertDialog(
+      title: const Text("بروفايل جديد"),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: n, decoration: const InputDecoration(labelText: "اسم البروفايل", hintText: "مثال: CleanAPI الرئيسي")),
+        const SizedBox(height: 8),
+        TextField(controller: u, decoration: const InputDecoration(labelText: "Base URL")),
+        const SizedBox(height: 8),
+        TextField(controller: k, decoration: const InputDecoration(labelText: "API Key"), obscureText: true),
+      ]),
+      actions: [TextButton(onPressed: () async {
+        if (n.text.isNotEmpty && u.text.isNotEmpty) {
+          final p = ApiProfile(id: const Uuid().v4(), name: n.text, baseUrl: u.text, apiKey: k.text);
+          final l = [...ref.read(profilesProvider), p];
+          ref.read(profilesProvider.notifier).state = l;
+          ref.read(selectedProfileProvider.notifier).state = p;
+          ref.read(apiBaseUrlProvider.notifier).state = p.baseUrl;
+          ref.read(apiKeyProvider.notifier).state = p.apiKey;
+          await saveProfiles(ref);
+          Navigator.pop(ctx);
+        }
+      }, child: const Text("إنشاء"))],
+    ));
   }
 }
 // ChatScreen - بدون حدود + الذاكرة المقسمة + حالة التفكير Live + حفظ محلي
