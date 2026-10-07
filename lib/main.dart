@@ -923,15 +923,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(children: [
         if (thinking.isNotEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(8),
-            color: Theme.of(context).colorScheme.surfaceVariant,
-            child: Row(children: [
-              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-              const SizedBox(width: 8),
-              Text(thinking, style: const TextStyle(fontSize: 13)),
-            ]),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.7, end: 1.0),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeInOut,
+            builder: (ctx, v, child) => Opacity(opacity: 0.6 + 0.4*v, child: child),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              child: Row(children: [
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 8),
+                Text(thinking, style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 4),
+                const Text("● ● ●", style: TextStyle(fontSize: 10, letterSpacing: 2)),
+              ]),
+            ),
           ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1001,11 +1009,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               icon: const Icon(Icons.arrow_right),
               onPressed: () => moveCursor(1),
             ),
-            FilledButton(
-              onPressed: isLoading ? null : send,
-              child: isLoading
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.send),
+            TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 150),
+              tween: Tween(begin: 1.0, end: isLoading ? 0.92 : 1.0),
+              builder: (ctx, s, child) => Transform.scale(scale: s, child: child),
+              child: FilledButton(
+                onPressed: isLoading ? null : send,
+                child: isLoading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send),
+              ),
             ),
           ]),
         ),
