@@ -1013,15 +1013,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               icon: const Icon(Icons.arrow_right),
               onPressed: () => moveCursor(1),
             ),
-            TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 150),
-              tween: Tween(begin: 1.0, end: isLoading ? 0.92 : 1.0),
-              builder: (ctx, s, child) => Transform.scale(scale: s, child: child),
-              child: FilledButton(
-                onPressed: isLoading ? null : send,
-                child: isLoading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send),
-              ),
-            ),
+            isLoading
+                ? FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                    onPressed: () {
+                      cancelToken?.cancel("User stopped");
+                      setState(() { isLoading = false; streamingText = ""; });
+                      ref.read(thinkingProvider.notifier).state = "";
+                    },
+                    child: const Icon(Icons.stop),
+                  )
+                : FilledButton(
+                    onPressed: send,
+                    child: const Icon(Icons.send),
+                  ),
           ]),
         ),
       ]),
