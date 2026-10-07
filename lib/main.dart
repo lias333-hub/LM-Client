@@ -945,7 +945,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             controller: scroll,
             padding: const EdgeInsets.all(12),
             itemCount: msgs.length + (streamingText.isNotEmpty ? 1 : 0),
-                        itemBuilder: (c, i) {
+            itemBuilder: (c, i) {
               final w = i < msgs.length ? MessageBubble(msg: msgs[i], tts: tts, selectionMode: selectionMode, selected: selectedIds.contains(msgs[i].id), onSelect: () => toggleSelect(msgs[i].id)) : MessageBubble(msg: ChatMessage(id: "stream", role: "assistant", content: streamingText, time: DateTime.now()), tts: tts, selectionMode: false, selected: false, onSelect: () {},);
               return TweenAnimationBuilder<double>(
                 duration: Duration(milliseconds: 300 + (i % 4) * 60),
@@ -1122,7 +1122,8 @@ class MessageBubble extends ConsumerWidget {
                   Text("${msg.time.hour}:${msg.time.minute.toString().padLeft(2,'0')}", style: TextStyle(fontSize: 10, color: isUser ? Colors.white70 : Colors.black54)),
                   const Spacer(),
                   if (!isUser) IconButton(icon: const Icon(Icons.volume_up, size: 18), onPressed: () => tts.speak(msg.content)),
-                  IconButton(icon: const Icon(Icons.copy, size: 18), onPressed: () {}),
+                                  IconButton(icon: const Icon(Icons.copy, size: 18), onPressed: () async { await Clipboard.setData(ClipboardData(text: msg.content)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم النسخ"))); }),
+IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () { final c = TextEditingController(text: msg.content); showDialog(context: context, builder: (_) => AlertDialog(title: const Text("تعديل"), content: TextField(controller: c, maxLines: 5), actions: [TextButton(onPressed: ()=>Navigator.pop(context), child: const Text("إلغاء")), TextButton(onPressed: () async { final l = ref.read(messagesProvider).map((m)=> m.id==msg.id ? ChatMessage(id:m.id, role:m.role, content:c.text, fileNames:m.fileNames, time:m.time, excluded:m.excluded)
                   if (!isUser) IconButton(icon: const Icon(Icons.bookmark_add, size: 18), onPressed: () async {
                     final part = MemoryPart(id: const Uuid().v4(), title: "من الشات ${DateTime.now().day}/${DateTime.now().month}", content: msg.content);
                     final l = [...ref.read(memoryPartsProvider), part];
