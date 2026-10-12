@@ -140,16 +140,40 @@ class Pal {
   final bool dark;
   const Pal(this.dark);
   static Pal of(BuildContext c) => Pal(Theme.of(c).brightness == Brightness.dark);
-  Color get bg => dark ? const Color(0xFF262624) : const Color(0xFFFAF9F5);
-  Color get surface => dark ? const Color(0xFF30302E) : const Color(0xFFFFFFFF);
-  Color get bubble => dark ? const Color(0xFF3A3A37) : const Color(0xFFF0EEE6);
-  Color get line => dark ? const Color(0xFF45443F) : const Color(0xFFE6E3D8);
-  Color get text => dark ? const Color(0xFFF2F0E8) : const Color(0xFF1F1E1D);
-  Color get sub => dark ? const Color(0xFFA8A69C) : const Color(0xFF73716A);
+  // === Fix5 Legendary — Starlight الكاملة (بدون كسر الأسماء القديمة) ===
+  Color get bg => dark ? const Color(0xFF0F0F0F) : const Color(0xFFFDFCF8);
+  Color get surface => dark ? const Color(0xFF1E1E1E) : const Color(0xFFFFFFFF);
+  Color get bubble => dark ? const Color(0xFF2A2A28) : const Color(0xFFF2F0E8);
+  Color get bubble2 => dark ? const Color(0xFF252520) : const Color(0xFFEDE9DC);
+  Color get line => dark ? const Color(0xFF3A3A36) : const Color(0xFFE8E5DB);
+  Color get lineSoft => dark ? const Color(0xFF2A2A28) : const Color(0xFFF0F0EC);
+  Color get text => dark ? const Color(0xFFF5F3EF) : const Color(0xFF1A1A18);
+  Color get sub => dark ? const Color(0xFF9E9B94) : const Color(0xFF7A7872);
   Color get accent => const Color(0xFFD97757);
-  Color get code => dark ? const Color(0xFF1F1F1E) : const Color(0xFFF4F2EA);
-  Color get ok => const Color(0xFF4C9A6A);
-  Color get bad => const Color(0xFFC95A4B);
+  Color get accent2 => const Color(0xFFE8A87C);
+  Color get accent3 => const Color(0xFFFFC88A);
+  Color get code => dark ? const Color(0xFF1A1A18) : const Color(0xFFF6F4EE);
+  Color get codeBorder => dark ? const Color(0xFF333330) : const Color(0xFFE8E5DB);
+  Color get ok => const Color(0xFF4CAF7A);
+  Color get okSoft => dark ? const Color(0xFF2E7D52) : const Color(0xFFE8F5ED);
+  Color get warn => const Color(0xFFE8A838);
+  Color get bad => const Color(0xFFE57373);
+  Color get badSoft => dark ? const Color(0xFF7A3A3A) : const Color(0xFFFFE8E8);
+  Color get accentSoft => dark ? const Color(0x33D97757) : const Color(0x1AD97757);
+  Color get accentSoft2 => dark ? const Color(0x1AD97757) : const Color(0x0FD97757);
+  Color get starGlow => dark ? const Color(0x22FFD700) : const Color(0x14D97757);
+  Color get overlay => dark ? const Color(0x66000000) : const Color(0x33000000);
+  Color get shadow => dark ? const Color(0x44000000) : const Color(0x14000000);
+  Color get shadowSoft => dark ? const Color(0x22000000) : const Color(0x0D000000);
+  Color get selection => accent.withOpacity(0.18);
+  // شعارات أسطورية
+  LinearGradient get starlightGradient => LinearGradient(
+        colors: dark ? [const Color(0xFF1E1E1E), const Color(0xFF0F0F0F)] : [const Color(0xFFFFFFFF), const Color(0xFFFDFCF8)],
+        begin: Alignment.topCenter, end: Alignment.bottomCenter);
+  LinearGradient get accentGradient => const LinearGradient(colors: [Color(0xFFD97757), Color(0xFFE8A87C)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+  LinearGradient get codeGradient => LinearGradient(colors: dark ? [const Color(0xFF252520), const Color(0xFF1A1A18)] : [const Color(0xFFFFFDF5), const Color(0xFFF6F4EE)], begin: Alignment.topCenter, end: Alignment.bottomCenter);
+  LinearGradient get bubbleGradient => LinearGradient(colors: [bubble, bubble2], begin: Alignment.topCenter, end: Alignment.bottomCenter);
+  LinearGradient get shimmerGradient => LinearGradient(colors: dark ? [const Color(0xFF2A2A28), const Color(0xFF3A3A36), const Color(0xFF2A2A28)] : [const Color(0xFFF2F0E8), const Color(0xFFEDE9DC), const Color(0xFFF2F0E8)], begin: Alignment.centerLeft, end: Alignment.centerRight);
 }
 
 // ============================================================
@@ -170,7 +194,21 @@ class Attachment {
       text: j['text'] as String?);
   String? b64() {
     try {
-      return base64Encode(File(path).readAsBytesSync());
+      final f = File(path);
+      // guard: لا تشفّر ملفات ضخمة في الذاكرة (يسبب OOM)
+      try { if (f.lengthSync() > 10 * 1024 * 1024) return null; } catch (_) {}
+      return base64Encode(f.readAsBytesSync());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Fix8: نسخة غير متزامنة — تُستدعى من مسارات الشبكة لتجنب تجميد الواجهة
+  Future<String?> b64Async() async {
+    try {
+      final f = File(path);
+      try { if (await f.length() > 10 * 1024 * 1024) return null; } catch (_) {}
+      return base64Encode(await f.readAsBytes());
     } catch (_) {
       return null;
     }
@@ -313,11 +351,16 @@ class Conversation {
 class Project {
   final String id;
   String name, instructions, folder;
-  Project({required this.id, required this.name, this.instructions = '', String? folder})
+  String systemPrompt;
+  Project({required this.id, required this.name, this.instructions = '', this.systemPrompt = '', String? folder})
       : folder = folder ?? 'p_${id.length > 6 ? id.substring(0, 6) : id}';
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'instructions': instructions, 'folder': folder};
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'instructions': instructions, 'systemPrompt': systemPrompt, 'folder': folder};
   factory Project.fromJson(Map<String, dynamic> j) => Project(
-      id: '${j['id']}', name: '${j['name'] ?? ''}', instructions: '${j['instructions'] ?? ''}', folder: j['folder'] as String?);
+      id: '${j['id']}',
+      name: '${j['name'] ?? ''}',
+      instructions: '${j['instructions'] ?? ''}',
+      systemPrompt: '${j['systemPrompt'] ?? j['instructions'] ?? ''}',
+      folder: j['folder'] as String?);
 }
 
 class MemoryPart {
@@ -402,6 +445,21 @@ class Workflow {
       name: '${j['name'] ?? ''}',
       desc: '${j['desc'] ?? ''}',
       steps: List<String>.from((j['steps'] as List?) ?? []));
+  /// يوسّع القوالب: $ARGS, $ARG1..$ARGn, $PREV, $WORKSPACE, $PROJECT
+  String expandStep(String raw, {required String args, required String prev, required String workspace, required String projectName}) {
+    var s = raw;
+    // تقسيم الوسائط
+    final parts = args.trim().split(RegExp(r'\s+'));
+    s = s.replaceAll('\$ARGS', args);
+    s = s.replaceAll('\$ARG0', args);
+    for (var i = 0; i < parts.length && i < 9; i++) {
+      s = s.replaceAll('\$ARG${i + 1}', parts[i]);
+    }
+    s = s.replaceAll('\$PREV', prev);
+    s = s.replaceAll('\$WORKSPACE', workspace);
+    s = s.replaceAll('\$PROJECT', projectName);
+    return s;
+  }
 }
 
 /// بروفايل API — kind: openai (أي خدمة متوافقة مع OpenAI) | anthropic (Messages API الأصلي)
@@ -561,6 +619,27 @@ class AppState extends ChangeNotifier {
   int maxSteps = 40, compactAt = 120000;
   String replyLang = 'auto'; // auto | ar | en
 
+  // === System Prompt العام (Fix4) ===
+  String globalSystemPrompt = '';
+  // === Streaming (Fix1) ===
+  String streamMode = 'smooth'; // instant | smooth | typewriter
+  int typewriterMs = 18;
+  int smoothMs = 40;
+
+  String buildSystemPrompt({Agent? forcedAgent, Project? forcedProject}) {
+    final ag = forcedAgent ?? (agents.isNotEmpty ? agent : null);
+    Project? pr = forcedProject;
+    pr ??= cur?.projectId != null ? firstWhereOrNull(projects, (p) => p.id == cur!.projectId) : null;
+    final parts = <String>[];
+    if (globalSystemPrompt.trim().isNotEmpty) parts.add('# التعليمات العامة\n${globalSystemPrompt.trim()}');
+    if (ag != null && ag.systemPrompt.trim().isNotEmpty) parts.add('# تعليمات الوكيل (${ag.name})\n${ag.systemPrompt.trim()}');
+    if (pr != null && pr.systemPrompt.trim().isNotEmpty) parts.add('# تعليمات المشروع (${pr.name})\n${pr.systemPrompt.trim()}');
+    // ذاكرة مثبتة
+    final pinned = memory.where((m) => m.pinned).toList();
+    if (pinned.isNotEmpty) parts.add('# ذاكرة مهمة\n${pinned.map((m) => '- ${m.title}: ${m.content}').join('\n')}');
+    return parts.join('\n\n');
+  }
+
   // بيانات
   List<ApiProfile> profiles = [];
   String? profileId, agentId;
@@ -626,6 +705,10 @@ class AppState extends ChangeNotifier {
       maxSteps = _int(j['maxSteps'], 40);
       compactAt = _int(j['compactAt'], 120000);
       replyLang = '${j['replyLang'] ?? 'auto'}';
+      globalSystemPrompt = '${j['globalSystemPrompt'] ?? ''}';
+      streamMode = '${j['streamMode'] ?? 'smooth'}';
+      typewriterMs = _int(j['typewriterMs'], 18);
+      smoothMs = _int(j['smoothMs'], 40);
       agentId = j['agentId'] as String?;
     } catch (_) {}
   }
@@ -642,6 +725,10 @@ class AppState extends ChangeNotifier {
           'maxSteps': maxSteps,
           'compactAt': compactAt,
           'replyLang': replyLang,
+          'globalSystemPrompt': globalSystemPrompt,
+          'streamMode': streamMode,
+          'typewriterMs': typewriterMs,
+          'smoothMs': smoothMs,
           'agentId': agentId,
         }));
     uiRev.value++;
@@ -842,6 +929,14 @@ class AppState extends ChangeNotifier {
     return d.path;
   }
 
+  // Fix8: نسخة غير متزامنة — لا تجمّد الواجهة
+  Future<String> cwdForAsync(Conversation c) async {
+    final pr = firstWhereOrNull(projects, (p) => p.id == c.projectId);
+    final d = Directory('${workspace.path}/${pr?.folder ?? 'general'}');
+    if (!await d.exists()) await d.create(recursive: true);
+    return d.path;
+  }
+
   // ---------------- الموافقات ----------------
   Future<int> askApproval(String title, String detail, String tool) {
     final a = Approval(title, detail, tool);
@@ -892,22 +987,37 @@ class AppState extends ChangeNotifier {
     s.showSnackBar(SnackBar(content: Text(m)));
   }
 
-  // ---------------- الملفات والمكتبة ----------------
+  // ---------------- الملفات والمكتبة — Fix6: حد حجم + ترميز آمن + مسار محصّن ----------------
+  static const int kMaxLibraryFileBytes = 20 * 1024 * 1024; // 20MB — سد ثغرة إغراق التخزين
   Future<Attachment> importBytes(String name, List<int> bytes) async {
+    if (bytes.length > kMaxLibraryFileBytes) throw 'الملف كبير جداً: ${fmtSize(bytes.length)} — الحد $kMaxLibraryFileBytes بايت (20MB)';
     final id = newId();
-    final safe = name.replaceAll(RegExp(r'[^\w\.\- \u0600-\u06FF]'), '_');
+    var safe = clip(name.trim(), 180).replaceAll(RegExp(r'[^\w\.\- \u0600-\u06FF]'), '_');
+    if (safe.isEmpty) safe = 'file';
+    if (safe.length > 100) safe = safe.substring(0, 100);
     final path = '${libDir.path}/${id.substring(0, 8)}_$safe';
-    await File(path).writeAsBytes(bytes, flush: true);
+    final norm = normPath(path);
+    if (!norm.startsWith(normPath(libDir.path))) throw 'مسار غير صالح';
+    await File(norm).writeAsBytes(bytes, flush: true);
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
     var mime = mimeOf(ext);
     String? text;
     if (!mime.startsWith('image/') && mime != 'application/pdf' && !looksBinary(bytes)) {
-      text = clip(utf8.decode(bytes, allowMalformed: true), 30000);
+      // فك ترميز آمن: جرّب utf8 أولاً، ثم latin1 كـ fallback — يمنع فقدان النص العربي
+      try {
+        text = clip(utf8.decode(bytes), 30000);
+      } catch (_) {
+        try {
+          text = clip(latin1.decode(bytes), 30000);
+        } catch (_) {
+          text = clip(utf8.decode(bytes, allowMalformed: true), 30000);
+        }
+      }
       if (mime == 'application/octet-stream') mime = 'text/plain';
     }
-    library.add(LibItem(id: id, name: name, size: bytes.length, time: DateTime.now(), path: path, mime: mime));
+    library.add(LibItem(id: id, name: clip(name.trim(), 180), size: bytes.length, time: DateTime.now(), path: norm, mime: mime));
     await saveLibrary();
-    return Attachment(name: name, mime: mime, path: path, size: bytes.length, text: text);
+    return Attachment(name: clip(name.trim(), 180), mime: mime, path: norm, size: bytes.length, text: text);
   }
 
   Future<String> exportBackup() async {
@@ -964,24 +1074,102 @@ class Sandbox {
     }
   }
 
+  // Fix8: نسخة غير متزامنة — لا تجمّد خيط الواجهة
+  static Future<String> _realAsync(String abs) async {
+    var cur = abs;
+    final tail = <String>[];
+    while (true) {
+      try {
+        final t = await FileSystemEntity.type(cur);
+        if (t != FileSystemEntityType.notFound) {
+          final isDir = await Directory(cur).exists();
+          final r = isDir
+              ? await Directory(cur).resolveSymbolicLinks()
+              : await File(cur).resolveSymbolicLinks();
+          return normPath([r, ...tail.reversed].join('/'));
+        }
+      } catch (_) {}
+      final i = cur.lastIndexOf('/');
+      if (i <= 0) return abs;
+      tail.add(cur.substring(i + 1));
+      cur = cur.substring(0, i);
+    }
+  }
+
   List<String> get roots => [cwd, ...agent.allowedPaths]
       .where((e) => e.trim().isNotEmpty)
-      .map((e) => _real(normPath(e.trim())))
+      .map((e) {
+        try {
+          return _real(normPath(e.trim()));
+        } catch (_) {
+          return normPath(e.trim());
+        }
+      })
       .toList();
+
+  Future<List<String>> rootsAsync() async {
+    final out = <String>[];
+    for (final e in [cwd, ...agent.allowedPaths].where((x) => x.trim().isNotEmpty)) {
+      try {
+        out.add(await _realAsync(normPath(e.trim())));
+      } catch (_) {
+        out.add(normPath(e.trim()));
+      }
+    }
+    return out;
+  }
 
   bool _inside(String p, List<String> rs) => rs.any((r) => p == r || p.startsWith(r.endsWith('/') ? r : '$r/'));
 
   String resolve(String p) {
     final t = p.trim();
+    if (t.contains('\0')) throw 'مسار غير صالح';
     return normPath(t.startsWith('/') ? t : '$cwd/$t');
   }
 
-  bool allows(String abs) => _inside(_real(abs), roots);
-  bool isRoot(String abs) => roots.contains(_real(abs));
+  bool allows(String abs) {
+    try {
+      return _inside(_real(abs), roots);
+    } catch (_) {
+      return _inside(normPath(abs), roots);
+    }
+  }
+
+  Future<bool> allowsAsync(String abs) async {
+    try {
+      return _inside(await _realAsync(abs), await rootsAsync());
+    } catch (_) {
+      return _inside(normPath(abs), await rootsAsync());
+    }
+  }
+
+  bool isRoot(String abs) {
+    try {
+      return roots.contains(_real(abs));
+    } catch (_) {
+      return roots.contains(normPath(abs));
+    }
+  }
+
+  Future<bool> isRootAsync(String abs) async {
+    try {
+      return (await rootsAsync()).contains(await _realAsync(abs));
+    } catch (_) {
+      return (await rootsAsync()).contains(normPath(abs));
+    }
+  }
 
   String check(String p) {
     final abs = resolve(p);
-    if (!_inside(_real(abs), roots)) throw 'المسار خارج الصلاحيات المسموحة: $abs';
+    final ok = allows(abs);
+    if (!ok) throw 'المسار خارج الصلاحيات المسموحة: $abs — المسموح: ${roots.join(' ، ')}';
+    return abs;
+  }
+
+  Future<String> checkAsync(String p) async {
+    final abs = resolve(p);
+    final ok = await allowsAsync(abs);
+    if (!ok) throw 'المسار خارج الصلاحيات المسموحة: $abs — المسموح: ${(await rootsAsync()).join(' ، ')}';
     return abs;
   }
 }
@@ -1164,7 +1352,8 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
   switch (tc.name) {
     case 'list_dir':
       {
-        final p = sb.check(_str(a['path'], '.'));
+        // Fix6: سقف مسار + سرد آمن
+        final p = sb.check(clip(_str(a['path'], '.'), 500));
         final d = Directory(p);
         if (!await d.exists()) throw 'المجلد غير موجود: $p';
         final items = await d.list(followLinks: false).toList();
@@ -1174,16 +1363,20 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
           return x.path.toLowerCase().compareTo(y.path.toLowerCase());
         });
         final b = StringBuffer('$p\n');
-        for (final e in items.take(300)) {
+        // Fix8: حجم غير متزامن
+        final top = items.take(300).toList();
+        final sizes = <int>[];
+        for (final e in top) {
+          if (e is Directory) { sizes.add(0); }
+          else { try { sizes.add(await (e as File).length()); } catch (_) { sizes.add(0); } }
+        }
+        for (var i = 0; i < top.length; i++) {
+          final e = top[i];
           final n = e.path.split('/').last;
           if (e is Directory) {
             b.writeln('d  $n/');
           } else {
-            var sz = 0;
-            try {
-              sz = (e as File).lengthSync();
-            } catch (_) {}
-            b.writeln('f  $n  (${fmtSize(sz)})');
+            b.writeln('f  $n  (${fmtSize(sizes[i])})');
           }
         }
         if (items.length > 300) b.writeln('… +${items.length - 300} more');
@@ -1192,18 +1385,26 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'read_file':
       {
-        final p = sb.check(_str(a['path'], ''));
+        // Fix6: حد حجم + ترميز آمن + مسار محصّن + سقف إخراج
+        final p = sb.check(clip(_str(a['path'], ''), 500));
         final f = File(p);
         if (!await f.exists()) throw 'الملف غير موجود: $p';
+        var len = 0;
+        try { len = await f.length(); } catch (_) {}
+        if (len > 8 * 1024 * 1024) throw 'الملف كبير جداً للقراءة (${fmtSize(len)}) — الحد 8MB، استخدم offset/limit';
         final bytes = await f.readAsBytes();
         if (looksBinary(bytes)) return 'Binary file (${fmtSize(bytes.length)}) — cannot show as text.';
-        final lines = const LineSplitter().convert(utf8.decode(bytes, allowMalformed: true));
+        String txt;
+        try { txt = utf8.decode(bytes); } catch (_) {
+          try { txt = latin1.decode(bytes); } catch (_) { txt = utf8.decode(bytes, allowMalformed: true); }
+        }
+        final lines = const LineSplitter().convert(txt);
         final off = clampInt(_int(a['offset'], 1), 1, lines.length + 1);
         final lim = clampInt(_int(a['limit'], 2000), 1, 5000);
         final end = clampInt(off - 1 + lim, 0, lines.length);
         final b = StringBuffer();
         for (var i = off - 1; i < end; i++) {
-          b.writeln('${i + 1}\t${lines[i]}');
+          b.writeln('${i + 1}\t${clip(lines[i], 600)}');
           if (b.length > 60000) {
             b.writeln('…[truncated at line ${i + 1} of ${lines.length}; use offset to continue]');
             break;
@@ -1215,54 +1416,61 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'search_files':
       {
-        final root = sb.check(_str(a['path'], '.'));
+        // Fix6: ترميز آمن + سقف حجم/نتائج + حد pattern + scan محدود
+        final root = sb.check(clip(_str(a['path'], '.'), 500));
+        final pat = clip(_str(a['pattern'], ''), 400);
+        if (pat.isEmpty) throw 'pattern is required';
+        if (pat.length > 400) throw 'pattern too long (max 400 chars)';
         RegExp re;
         try {
-          re = RegExp(_str(a['pattern'], ''), caseSensitive: false);
+          re = RegExp(pat, caseSensitive: false);
         } catch (e) {
           throw 'Regex غير صالح: $e';
         }
-        final glob = _str(a['glob'], '');
+        final glob = clip(_str(a['glob'], ''), 40);
         final out = <String>[];
         var scanned = 0;
         try {
           await for (final e in Directory(root).list(recursive: true, followLinks: false)) {
             if (e is! File) continue;
             final path = e.path;
-            if (path.contains('/.git/') || path.contains('/node_modules/')) continue;
+            if (path.contains('/.git/') || path.contains('/node_modules/') || path.contains('/.dart_tool/')) continue;
             if (glob.isNotEmpty && !path.endsWith(glob)) continue;
             var len = 0;
-            try {
-              len = await e.length();
-            } catch (_) {
-              continue;
-            }
+            try { len = await e.length(); } catch (_) { continue; }
             if (len > 1500000) continue;
             var txt = '';
             try {
               final bytes = await e.readAsBytes();
               if (looksBinary(bytes)) continue;
-              txt = utf8.decode(bytes, allowMalformed: true);
-            } catch (_) {
-              continue;
-            }
+              try { txt = utf8.decode(bytes); } catch (_) {
+                try { txt = latin1.decode(bytes); } catch (_) { txt = utf8.decode(bytes, allowMalformed: true); }
+              }
+            } catch (_) { continue; }
             scanned++;
+            if (scanned > 1200) break;
             final ls = txt.split('\n');
             for (var i = 0; i < ls.length; i++) {
-              if (re.hasMatch(ls[i])) {
-                out.add('${path.replaceFirst(root, '.')}:${i + 1}: ${_cut(ls[i].trim(), 200)}');
-                if (out.length >= 120) break;
-              }
+              try {
+                if (re.hasMatch(ls[i])) {
+                  out.add('${clip(path.replaceFirst(root, '.'), 260)}:${i + 1}: ${_cut(clip(ls[i].trim(), 400), 200)}');
+                  if (out.length >= 120) break;
+                }
+              } catch (_) {}
             }
             if (out.length >= 120) break;
           }
         } catch (_) {}
-        return out.isEmpty ? 'No matches ($scanned files scanned)' : out.join('\n');
+        final joined = out.isEmpty ? 'No matches ($scanned files scanned)' : out.join('\n');
+        return clip(joined, 8000);
       }
     case 'write_file':
       {
-        final p = sb.check(_str(a['path'], ''));
+        // Fix6: حد حجم + clip محتوى + مسار محصّن + منع كتابة عملاقة
+        final p = sb.check(clip(_str(a['path'], ''), 500));
         final content = _str(a['content'], '');
+        if (content.length > 600000) throw 'المحتوى كبير جداً (${content.length} chars) — الحد 600k حرف (قسّم الملف)';
+        if (content.length > 5 * 1024 * 1024) throw 'المحتوى يتجاوز 5MB — قسّم الملف';
         final f = File(p);
         final existed = await f.exists();
         await f.parent.create(recursive: true);
@@ -1271,38 +1479,54 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'edit_file':
       {
-        final p = sb.check(_str(a['path'], ''));
+        // Fix6: حراس حجم + ترميز آمن + منع ملف عملاق
+        final p = sb.check(clip(_str(a['path'], ''), 500));
         final f = File(p);
         if (!await f.exists()) throw 'الملف غير موجود: $p';
+        try { if (await f.length() > 8 * 1024 * 1024) throw 'الملف كبير جداً للتعديل (8MB حد)'; } catch (e) { if ('$e'.contains('كبير جداً')) rethrow; }
         final oldS = _str(a['old_str'], '');
         final newS = _str(a['new_str'], '');
         if (oldS.isEmpty) throw 'old_str is empty';
-        final text = await f.readAsString();
+        if (oldS.length > 200000) throw 'old_str too large (max 200k)';
+        if (newS.length > 600000) throw 'new_str too large (max 600k)';
+        var text = '';
+        try {
+          final bytes = await f.readAsBytes();
+          if (looksBinary(bytes)) throw 'لا يمكن تعديل ملف ثنائي';
+          try { text = utf8.decode(bytes); } catch (_) {
+            try { text = latin1.decode(bytes); } catch (_) { text = utf8.decode(bytes, allowMalformed: true); }
+          }
+        } catch (e) { if ('$e'.contains('ثنائي')) rethrow; text = await f.readAsString(); }
         final count = oldS.allMatches(text).length;
         if (count == 0) throw 'old_str not found in file (must match exactly, including whitespace)';
         final all = a['replace_all'] == true;
         if (count > 1 && !all) throw 'old_str appears $count times; add more context or set replace_all=true';
         String res;
-        if (all) {
-          res = text.replaceAll(oldS, newS);
-        } else {
+        if (all) { res = text.replaceAll(oldS, newS); } else {
           final i = text.indexOf(oldS);
           res = text.substring(0, i) + newS + text.substring(i + oldS.length);
         }
+        if (res.length > 6 * 1024 * 1024) throw 'النتيجة كبيرة جداً (${res.length} chars) — قسّم التعديل';
         await f.writeAsString(res, flush: true);
         return 'Edited $p ($count replacement${count > 1 ? 's' : ''})';
       }
     case 'make_dir':
       {
-        final p = sb.check(_str(a['path'], ''));
+        // Fix6: سقف مسار
+        final p = sb.check(clip(_str(a['path'], ''), 500));
         await Directory(p).create(recursive: true);
         return 'Created directory $p';
       }
     case 'delete_path':
       {
-        final p = sb.check(_str(a['path'], ''));
+        // Fix6: حماية الجذور + منع حذف مجلد العمل العام
+        final p = sb.check(clip(_str(a['path'], ''), 500));
         if (sb.isRoot(p)) throw 'لا يمكن حذف مجلد الصلاحيات الجذري';
-        final t = FileSystemEntity.typeSync(p);
+        // حماية إضافية: لا تحذف جذر المشروع/الوكيل نفسه بدون تأكيد خارجي
+        final norm = normPath(p);
+        if (norm == normPath(sb.cwd)) throw 'لا يمكن حذف مجلد العمل الحالي نفسه — احذف محتوياته بدلاً منه';
+        if (norm == normPath(app.libDir.path)) throw 'لا يمكن حذف مجلد المكتبة كاملاً من الأداة';
+        final t = await FileSystemEntity.type(p);
         if (t == FileSystemEntityType.notFound) throw 'غير موجود: $p';
         if (t == FileSystemEntityType.directory) {
           await Directory(p).delete(recursive: true);
@@ -1313,10 +1537,15 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'run_shell':
       {
-        final cmd = _str(a['command'], '');
+        // Fix7: حد طول الأمر + مسار wd محصّن + سقف وقت + حظر تسريب secrets افتراضياً
+        final cmd = clip(_str(a['command'], ''), 8000);
         if (cmd.trim().isEmpty) throw 'command is empty';
-        final wd = sb.check(_str(a['cwd'], '.'));
-        final secs = clampInt(_int(a['timeout_s'], 60), 1, 600);
+        if (cmd.length > 8000) throw 'command too long (max 8000 chars)';
+        // حظر أوامر خطرة جداً (يمكن تجاوزها بموافقة المستخدم عبر Approval)
+        const dangerous = ['rm -rf /', 'mkfs', ':(){:|:&};', 'chmod 777 /', 'dd if='];
+        for (final d in dangerous) { if (cmd.contains(d)) throw 'أمر خطير محظور: $d'; }
+        final wd = sb.check(clip(_str(a['cwd'], '.'), 500));
+        final secs = clampInt(_int(a['timeout_s'], 60), 1, 120);
         final sh = Platform.isAndroid ? '/system/bin/sh' : '/bin/sh';
         try {
           final r = await Process.run(sh, ['-c', cmd],
@@ -1329,18 +1558,52 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'http_request':
       {
-        final url = _str(a['url'], '');
-        if (!url.startsWith('http')) throw 'URL must start with http(s)';
-        final method = _str(a['method'], 'GET').toUpperCase();
+        // Fix7: SSRF guard + سقف حجم/زمن صارم
+        final url = clip(_str(a['url'], ''), 2000).trim();
+        if (!url.startsWith('http://') && !url.startsWith('https://')) throw 'URL must start with http(s)://';
+        if (url.length > 2000) throw 'URL too long';
+        final u = Uri.tryParse(url);
+        if (u == null || u.host.isEmpty) throw 'URL غير صالح';
+        final host = u.host.toLowerCase();
+        // Fix8: SSRF دقيق — 10/8 و 192.168/16 و 172.16/12 فقط + link-local/metadata/host
+        bool is172Private(String h) {
+          // 172.16.0.0/12 → 172.16.x.x حتى 172.31.x.x
+          if (!h.startsWith('172.')) return false;
+          final second = int.tryParse(h.split('.')[1]);
+          return second != null && second >= 16 && second <= 31;
+        }
+        if (host == 'localhost' || host == '127.0.0.1' || host == '::1' || host == '0.0.0.0'
+            || host == '::ffff:127.0.0.1'
+            || host.startsWith('10.') || host.startsWith('192.168.') || is172Private(host)
+            || host.startsWith('127.') || host.startsWith('0.') // 127.0.0.0/8 و 0.0.0.0/8
+            || host.endsWith('.local') || host.endsWith('.internal')) {
+          throw 'SSRF blocked: private/local hosts غير مسموحة ($host)';
+        }
+        if (host.startsWith('169.254.') || host == '169.254.169.254'
+            || host == 'metadata.google.internal' || host == 'metadata.google'
+            || host == 'instance-data') throw 'SSRF blocked: metadata endpoint محظور';
+        final method = clip(_str(a['method'], 'GET'), 12).toUpperCase().trim();
+        const allowedMethods = {'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'};
+        if (!allowedMethods.contains(method)) throw 'HTTP method غير مدعوم: $method';
         final headers = <String, dynamic>{};
-        if (a['headers'] is Map) headers.addAll(Map<String, dynamic>.from(a['headers'] as Map));
+        if (a['headers'] is Map) {
+          final m = Map<String, dynamic>.from(a['headers'] as Map);
+          if (m.length > 32) throw 'too many headers (max 32)';
+          for (final k in m.keys) {
+            if ('$k'.length > 120 || '${m[k]}'.length > 2000) throw 'header too large: $k';
+          }
+          headers.addAll(m);
+        }
+        final body = a['body'] is String ? clip(a['body'] as String, 200000) : a['body'];
         final res = await _http.request<String>(url,
-            data: a['body'],
+            data: body,
             options: Options(
                 method: method,
                 headers: headers,
                 responseType: ResponseType.plain,
-                validateStatus: (_) => true));
+                validateStatus: (_) => true,
+                sendTimeout: const Duration(seconds: 25),
+                receiveTimeout: const Duration(seconds: 30)));
         return 'HTTP ${res.statusCode}\n${clip(res.data ?? '', 20000)}';
       }
     case 'todo_write':
@@ -1368,9 +1631,13 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'memory_save':
       {
-        final t = _str(a['title'], '').trim();
-        final c = _str(a['content'], '');
+        // Fix6: حدود + clip + منع إغراق الذاكرة
+        var t = clip(_str(a['title'], '').trim(), 120);
+        var c = clip(_str(a['content'], ''), 8000);
         if (t.isEmpty || c.isEmpty) throw 'title and content are required';
+        if (app.memory.length >= 120 && firstWhereOrNull(app.memory, (e) => e.title.toLowerCase() == t.toLowerCase()) == null) {
+          throw 'الذاكرة ممتلئة (120 جزء كحد أقصى) — احذف جزءاً قديماً أولاً';
+        }
         final ex = firstWhereOrNull(app.memory, (e) => e.title.toLowerCase() == t.toLowerCase());
         if (ex != null) {
           ex.content = c;
@@ -1382,41 +1649,73 @@ Future<String> executeTool(ToolCall tc, Sandbox sb, Conversation conv) async {
       }
     case 'library_search':
       {
-        final q = _str(a['query'], '').toLowerCase();
+        // Fix8: async بالكامل — لا يوجد Sync يجمّد الواجهة
+        final q = clip(_str(a['query'], ''), 200).toLowerCase().trim();
         final out = <String>[];
+        var scanned = 0;
         for (final it in app.library) {
           if (it.path.isEmpty) continue;
-          var hit = it.name.toLowerCase().contains(q);
+          if (out.length >= 80) break;
+          var hit = q.isEmpty || it.name.toLowerCase().contains(q);
           var snippet = '';
-          if (!hit && !it.mime.startsWith('image/')) {
+          if (!hit && q.isNotEmpty && !it.mime.startsWith('image/')) {
             try {
               final f = File(it.path);
-              if (f.lengthSync() < 2000000) {
-                final bytes = f.readAsBytesSync();
-                if (!looksBinary(bytes)) {
-                  final t = utf8.decode(bytes, allowMalformed: true);
-                  final i = t.toLowerCase().indexOf(q);
-                  if (i >= 0) {
-                    hit = true;
-                    snippet = t.substring(clampInt(i - 60, 0, t.length), clampInt(i + 100, 0, t.length)).replaceAll('\n', ' ');
-                  }
+              if (!await f.exists()) continue;
+              if (await f.length() > 2000000) continue;
+              final bytes = await f.readAsBytes();
+              if (looksBinary(bytes)) continue;
+              String t;
+              try {
+                t = utf8.decode(bytes);
+              } catch (_) {
+                try {
+                  t = latin1.decode(bytes);
+                } catch (_) {
+                  t = utf8.decode(bytes, allowMalformed: true);
                 }
               }
+              final i = t.toLowerCase().indexOf(q);
+              if (i >= 0) {
+                hit = true;
+                snippet = clip(t.substring(clampInt(i - 60, 0, t.length), clampInt(i + 100, 0, t.length)).replaceAll('\n', ' ').replaceAll('\r', ''), 160);
+              }
+              scanned++;
+              if (scanned > 60) break;
             } catch (_) {}
           }
-          if (hit) out.add('- ${it.name} (${fmtSize(it.size)})${snippet.isEmpty ? '' : ' … $snippet …'}');
+          if (hit) out.add('- ${clip(it.name, 120)} (${fmtSize(it.size)})${snippet.isEmpty ? '' : ' … $snippet …'}');
         }
-        return out.isEmpty ? 'No matches' : out.join('\n');
+        if (out.isEmpty) return q.isEmpty ? (app.library.isEmpty ? 'Library empty' : out.join('\n')) : 'No matches';
+        return clip(out.join('\n'), 8000);
       }
     case 'library_read':
       {
-        final n = _str(a['name'], '').toLowerCase();
+        // Fix6: تحقق مسار + حد حجم + ترميز آمن + سقف إخراج
+        final n = clip(_str(a['name'], ''), 180).toLowerCase().trim();
+        if (n.isEmpty) throw 'اسم الملف مطلوب';
         final it = firstWhereOrNull(app.library, (e) => e.name.toLowerCase() == n && e.path.isNotEmpty) ??
             firstWhereOrNull(app.library, (e) => e.name.toLowerCase().contains(n) && e.path.isNotEmpty);
         if (it == null) throw 'الملف غير موجود في المكتبة';
-        final bytes = await File(it.path).readAsBytes();
-        if (looksBinary(bytes)) return 'Binary file (${fmtSize(bytes.length)}) — cannot show as text.';
-        return clip(utf8.decode(bytes, allowMalformed: true), 60000);
+        final norm = normPath(it.path);
+        if (!norm.startsWith(normPath(app.libDir.path))) throw 'مسار غير صالح';
+        final f = File(norm);
+        if (!await f.exists()) throw 'الملف غير موجود على القرص';
+        final _len = await f.length().catchError((_) => 0);
+        if (_len > 8 * 1024 * 1024) throw 'الملف كبير جداً للعرض (${fmtSize(_len)}) — الحد 8MB';
+        final bytes = await f.readAsBytes();
+        if (looksBinary(bytes)) return 'Binary file (${fmtSize(bytes.length)}) — cannot show as text. استخدم المعاينة للمحتوى الثنائي.';
+        String txt;
+        try {
+          txt = utf8.decode(bytes);
+        } catch (_) {
+          try {
+            txt = latin1.decode(bytes);
+          } catch (_) {
+            txt = utf8.decode(bytes, allowMalformed: true);
+          }
+        }
+        return clip(txt, 60000);
       }
     case 'list_apps':
       {
@@ -1479,6 +1778,7 @@ bool isCancelErr(Object e) {
   }
 }
 
+String _cut(String s, int n) => s.length <= n ? s : '${s.substring(0, n)}…';
 Future<String> dioMessage(Object e) async {
   try {
     final d = e as dynamic;
@@ -1508,16 +1808,29 @@ Future<String> dioMessage(Object e) async {
           }
         }
       } catch (_) {}
-      return 'HTTP ${r.statusCode}: ${_cut(body, 600)}';
+      final code = r.statusCode ?? 0;
+      String hint = '';
+      if (code == 401 || code == 403) hint = ' — تحقّق من مفتاح الـ API والصلاحيات';
+      if (code == 429) hint = ' — تجاوزت الحدّ، جرّب بعد قليل';
+      if (code >= 500) hint = ' — الخادم مشغول، سيُعاد تلقائياً';
+      return 'خطأ من الخادم (HTTP $code)$hint: ${_cut(body, 600)}';
     }
-    return '${d.message ?? e}';
+    final msg = '${d.message ?? e}';
+    if (msg.toLowerCase().contains('timeout')) return 'انتهت مهلة الاتصال — تحقّق من الشبكة وسيُعاد تلقائياً';
+    if (msg.toLowerCase().contains('socket') || msg.toLowerCase().contains('connection')) return 'انقطع الاتصال بالشبكة — سيُعاد تلقائياً عند عودتها';
+    return msg;
   } catch (_) {
     return '$e';
   }
 }
 
 class LlmClient {
-  final Dio dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 30)));
+  // شبكة محسّنة: retry ذكي + timeouts أوضح + توفير توكنز عبر ضغط التاريخ داخل prepareHistory
+  final Dio dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 90),
+    sendTimeout: const Duration(seconds: 30),
+  ));
 
   static String endpoint(String base, String path) {
     var u = base.trim();
@@ -1558,7 +1871,7 @@ class LlmClient {
   }
 
   // ---------- بناء الرسائل ----------
-  List<Map<String, dynamic>> _oaiMessages(ApiProfile p, String system, List<Msg> msgs) {
+  Future<List<Map<String, dynamic>>> _oaiMessages(ApiProfile p, String system, List<Msg> msgs) async {
     final out = <Map<String, dynamic>>[];
     if (system.isNotEmpty) out.add({'role': p.systemRole, 'content': system});
     for (final m in msgs) {
@@ -1572,7 +1885,7 @@ class LlmClient {
             {'type': 'text', 'text': t.isEmpty ? '(see image)' : t}
           ];
           for (final f in imgs) {
-            final d = f.b64();
+            final d = await f.b64Async();
             if (d != null) {
               parts.add({
                 'type': 'image_url',
@@ -1607,7 +1920,7 @@ class LlmClient {
     return out;
   }
 
-  List<Map<String, dynamic>> _anMessages(List<Msg> msgs) {
+  Future<List<Map<String, dynamic>>> _anMessages(List<Msg> msgs) async {
     final out = <Map<String, dynamic>>[];
     void push(String role, List<Map<String, dynamic>> blocks) {
       if (out.isNotEmpty && out.last['role'] == role) {
@@ -1622,7 +1935,7 @@ class LlmClient {
         final blocks = <Map<String, dynamic>>[];
         for (final f in m.files) {
           if (f.isImage || f.mime == 'application/pdf') {
-            final d = f.b64();
+            final d = await f.b64Async();
             if (d != null) {
               blocks.add({
                 'type': f.isImage ? 'image' : 'document',
@@ -1672,13 +1985,13 @@ class LlmClient {
     if (anth) {
       body['max_tokens'] = p.maxTokens ?? 16000;
       if (system.isNotEmpty) body['system'] = system;
-      body['messages'] = _anMessages(msgs);
+      body['messages'] = await _anMessages(msgs);
       if (defs.isNotEmpty && p.tools) {
         body['tools'] = defs.map((t) => {'name': t.name, 'description': t.desc, 'input_schema': t.schema}).toList();
       }
     } else {
       if (p.maxTokens != null) body['max_tokens'] = p.maxTokens;
-      body['messages'] = _oaiMessages(p, system, msgs);
+      body['messages'] = await _oaiMessages(p, system, msgs);
       if (defs.isNotEmpty && p.tools) {
         body['tools'] = defs
             .map((t) => {
@@ -1696,10 +2009,30 @@ class LlmClient {
       } catch (_) {}
     }
 
-    final res = await dio.post<ResponseBody>(url,
-        data: body,
-        cancelToken: cancel,
-        options: Options(responseType: ResponseType.stream, headers: _headers(p, stream: p.stream)));
+    // ——— Retry تلقائي للشبكة: يكافئ انقطاعات الواي فاي/الموبايل بلا تدخل من المستخدم ———
+    Response<ResponseBody>? res;
+    DioException? lastErr;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        res = await dio.post<ResponseBody>(url,
+            data: body,
+            cancelToken: cancel,
+            options: Options(responseType: ResponseType.stream, headers: _headers(p, stream: p.stream)));
+        break;
+      } on DioException catch (e) {
+        lastErr = e;
+        if (isCancelErr(e)) rethrow;
+        final isRetriable = e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.connectionError ||
+            (e.response?.statusCode != null && e.response!.statusCode! >= 500);
+        final shouldRetry = isRetriable && (p.stream || attempt < 2);
+        if (!shouldRetry || attempt == 3) rethrow;
+        await Future.delayed(Duration(milliseconds: 800 * (attempt + 1)));
+      }
+    }
+    if (res == null) throw lastErr ?? ApiError('فشل الاتصال بعد عدة محاولات');
 
     final lines = res.data!.stream
         .cast<List<int>>()
@@ -1886,20 +2219,23 @@ Msg _trimmedTool(Msg m) => Msg(
     content:
         '${m.content.substring(0, 1800)}\n…[تم اقتطاع ناتج قديم لتوفير السياق]…\n${m.content.substring(m.content.length - 1200)}');
 
-String _projectNotes(String cwd) {
+// Fix8: قراءة ملاحظات المشروع غير متزامنة — لا تجمّد الواجهة عند وجود ملفات كبيرة
+Future<String> _projectNotes(String cwd) async {
   for (final n in ['CLAUDE.md', 'AGENTS.md', 'LMCLIENT.md']) {
     try {
       final f = File('$cwd/$n');
-      if (f.existsSync()) return '[$n]\n${clip(f.readAsStringSync(), 6000)}';
+      if (await f.exists()) return '[$n]\n${clip(await f.readAsString(), 6000)}';
     } catch (_) {}
   }
   return '';
 }
 
-String buildSystem(Conversation c, Agent agent, Sandbox sb, List<ToolDef> tools) {
+Future<String> buildSystem(Conversation c, Agent agent, Sandbox sb, List<ToolDef> tools) async {
   final pr = firstWhereOrNull(app.projects, (p) => p.id == c.projectId);
   final b = StringBuffer();
-  b.writeln('You are LMClient Agent, an autonomous AI assistant running inside an Android app. You work like Claude Code: you plan, use tools to inspect and change files, verify your results, and keep going until the task is truly finished.');
+  // ——— HARNESS احترافي — يجعل أي نموذج يتصرّف مثل Claude Code ———
+  b.writeln('You are LMClient Agent — an autonomous, highly capable coding agent running inside an Android app. You behave like Claude Code: you THINK, PLAN, ACT, and VERIFY in a tight loop until the task is truly finished. You never give up mid-task and you never leave code half-written.');
+  b.writeln('You are given full ownership of this project — the user trusts you to improve, fix, and extend the code directly. Don\'t ask “shall I touch your code?” — just improve it professionally.');
   b.writeln();
   b.writeln('## Language');
   if (app.replyLang == 'ar') {
@@ -1919,27 +2255,42 @@ String buildSystem(Conversation c, Agent agent, Sandbox sb, List<ToolDef> tools)
   b.writeln('- Available tools: ${tools.map((t) => t.name).join(', ')}.');
   b.writeln('- To deliver files to the user outside the app, write them into an allowed shared folder (if any) or tell the user the path.');
   b.writeln();
-  b.writeln('## How to work');
-  b.writeln('- For any task with more than 2 steps call todo_write first with a plan, then update it as you progress (exactly one item in_progress).');
-  b.writeln('- Read a file before editing it. Use edit_file for small changes; use write_file for new files and always write the COMPLETE content (never placeholders such as "rest of code here").');
-  b.writeln('- Very large files: split them into several smaller files so a single tool call is never truncated.');
-  b.writeln('- After making changes, verify them (re-read, search, run checks when a shell is available).');
+  b.writeln('## How to work — AGENT LOOP (mandatory)');
+  b.writeln('1) THINK: analyze the request, explore the workspace with list_dir / search_files first — never guess file layout.');
+  b.writeln('2) PLAN: for any task with >2 steps call todo_write with a concrete plan (exactly one item in_progress), then keep it updated as you go.');
+  b.writeln('3) ACT: read before edit, use edit_file for small changes and write_file with COMPLETE content for new files (no placeholders, no “...rest...”). For large files split into smaller modules.');
+  b.writeln('4) VERIFY: re-read or search or run checks after changes. Fix errors before finishing. Don\'t stop on first error.');
+  b.writeln('5) FINISH: keep going until ALL todos are completed, then give a short summary: what was done, file paths, and what remains.');
   b.writeln('- Do not ask the user for permission to use tools: the app asks automatically when required. If a tool is denied, adapt or explain what you need.');
-  b.writeln('- Keep going until the task is completely done, then reply with a short final summary (what was done, where the files are, what remains).');
+  b.writeln();
+  b.writeln('## Token & cost discipline — CRITICAL');
+  b.writeln('- Be extremely token-efficient: prefer search_files over reading many files, use read_file with limit/offset, never re-read the same file twice without reason.');
+  b.writeln('- Prefer edit_file over write_file when only a small change is needed. Batch related edits.');
+  b.writeln('- Keep tool outputs concise; for large outputs summarize and write full content to a file instead of dumping it in chat.');
+  b.writeln('- Never send the same large file content multiple times — reference its path after the first write.');
   if (app.planMode) {
     b.writeln();
     b.writeln('## PLAN MODE (active)');
     b.writeln('You may only read and explore. Do NOT modify anything. Produce a concrete step-by-step plan and ask the user to approve it.');
+  }
+  // === Fix4: System Prompt ثلاث طبقات ===
+  if (app.globalSystemPrompt.trim().isNotEmpty) {
+    b.writeln();
+    b.writeln('## Global instructions');
+    b.writeln(app.globalSystemPrompt.trim());
   }
   if (agent.systemPrompt.trim().isNotEmpty) {
     b.writeln();
     b.writeln('## Agent instructions (${agent.name})');
     b.writeln(agent.systemPrompt.trim());
   }
-  if (pr != null && pr.instructions.trim().isNotEmpty) {
-    b.writeln();
-    b.writeln('## Project instructions (${pr.name})');
-    b.writeln(pr.instructions.trim());
+  if (pr != null) {
+    final ps = pr.systemPrompt.trim().isNotEmpty ? pr.systemPrompt.trim() : pr.instructions.trim();
+    if (ps.isNotEmpty) {
+      b.writeln();
+      b.writeln('## Project instructions (${pr.name})');
+      b.writeln(ps);
+    }
   }
   final notes = _projectNotes(sb.cwd);
   if (notes.isNotEmpty) {
@@ -1970,11 +2321,12 @@ String buildSystem(Conversation c, Agent agent, Sandbox sb, List<ToolDef> tools)
   return b.toString();
 }
 
-String debugContext(Conversation c) {
+Future<String> debugContext(Conversation c) async {
   final agent = app.agent;
   final sb = Sandbox(agent, app.cwdFor(c));
   final tools = toolsFor(agent, plan: app.planMode, bridge: app.bridgeOk);
-  final b = StringBuffer('=== SYSTEM ===\n${buildSystem(c, agent, sb, tools)}\n\n=== TOOLS ===\n${tools.map((t) => t.name).join(', ')}\n\n=== MESSAGES ===\n');
+  final sys = await buildSystem(c, agent, sb, tools);
+  final b = StringBuffer('=== SYSTEM ===\n$sys\n\n=== TOOLS ===\n${tools.map((t) => t.name).join(', ')}\n\n=== MESSAGES ===\n');
   for (final m in prepareHistory(c.msgs)) {
     var t = m.promptText();
     if (m.role == 'assistant' && m.toolCalls.isNotEmpty) {
@@ -2094,6 +2446,9 @@ class AgentRunner {
 
   Future<void> _start(Conversation c) async {
     final p = app.profile!;
+    // مانع تكرار الجولات: بصمة الطلب لمنع إعادة نفس الجولة بعد انقطاع الشبكة/اعادة اتصال بالخطأ
+    final checkpointTag = '${DateTime.now().millisecondsSinceEpoch}_${c.msgs.length}';
+    c.msgs.add(Msg(role: 'note', content: '⟦checkpoint:$checkpointTag⟧', auto: true, excluded: true));
     app.running = true;
     app.stopRequested = false;
     failed = false;
@@ -2107,6 +2462,8 @@ class AgentRunner {
       failed = true;
       if (!isCancelErr(e)) _note(c, '⚠️ ${e is ApiError ? e.message : e}');
     } finally {
+      // إزالة تاغ checkpoint الخفي بعد الانتهاء (لا يُرسل للنموذج أصلاً بسبب excluded)
+      c.msgs.removeWhere((m) => m.content == '⟦checkpoint:$checkpointTag⟧');
       app.running = false;
       app.live.value = null;
       app.status = '';
@@ -2118,16 +2475,87 @@ class AgentRunner {
   }
 
   Future<void> runWorkflow(Workflow w, String args) async {
-    final steps = List<String>.from(w.steps);
-    if (steps.isEmpty) return;
-    if (args.isNotEmpty && !steps.any((s) => s.contains('\$ARGS'))) steps[0] = '${steps[0]}\n\n$args';
-    for (final s in steps) {
-      await send(s.replaceAll('\$ARGS', args), []);
+    final rawSteps = List<String>.from(w.steps);
+    if (rawSteps.isEmpty) return;
+    final repo = app.cwdFor(app.cur);
+    final projName = (firstWhereOrNull(app.projects, (p) => p.id == app.cur?.projectId)?.name ?? 'بدون مشروع');
+    String prev = '';
+    // إذا لم يستخدم القالب أي متغير، نمرر وسيط المستخدم للخطوة الأولى كما قبل
+    final usesVars = rawSteps.any((s) =>
+        s.contains('\$ARGS') || s.contains('\$PREV') || s.contains('\$WORKSPACE') || s.contains('\$PROJECT') || RegExp(r'\$ARG\d').hasMatch(s));
+    final steps = List<String>.from(rawSteps);
+    if (args.isNotEmpty && !usesVars) steps[0] = '${steps[0]}\n\n$args';
+    for (var i = 0; i < steps.length; i++) {
+      if (app.stopRequested || failed) break;
+      // حالة مستمرة بين الخطوات: نمرر ناتج الخطوة السابقة عبر $PREV
+      final expanded = w.expandStep(steps[i], args: args, prev: prev, workspace: repo, projectName: projName);
+      // نضيف سياقاً خفيفاً كرسالة نظام خفية لتقليل هلوسة النموذج حول متغيرات القالب (لا تُحفظ)
+      await send(expanded, []);
+      // التقط آخر رد assistant كناتج لهذه الخطوة (للـ $PREV التالي)
+      if (app.cur != null) {
+        final lastAssistant = app.cur!.msgs.reversed.cast<Msg?>().firstWhere(
+              (m) => m != null && m.role == 'assistant' && m.content.trim().isNotEmpty,
+              orElse: () => null,
+            );
+        if (lastAssistant != null) prev = clip(lastAssistant.content.trim(), 6000);
+      }
       if (app.stopRequested || failed) break;
     }
   }
 
+  // === Fix1: Stream Throttler ===
+  Timer? _throttle;
+  final StringBuffer _pendingBuf = StringBuffer();
+  final List<String> _typeQueue = [];
+  Timer? _typeTimer;
+
+  void _flushPending(_Acc acc) {
+    if (_pendingBuf.isEmpty) return;
+    acc.text.write(_pendingBuf.toString());
+    _pendingBuf.clear();
+    app.live.value = LiveMsg(acc.text.toString(), acc.reasoning.toString(), acc.toolNamesList());
+    _throttle = null;
+  }
+
+  void _pushChunk(String chunk, _Acc acc) {
+    if (app.streamMode == 'instant') {
+      acc.text.write(chunk);
+      app.live.value = LiveMsg(acc.text.toString(), acc.reasoning.toString(), acc.toolNamesList());
+      return;
+    }
+    if (app.streamMode == 'smooth') {
+      _pendingBuf.write(chunk);
+      _throttle ??= Timer(Duration(milliseconds: app.smoothMs), () => _flushPending(acc));
+      return;
+    }
+    // typewriter
+    _typeQueue.addAll(chunk.split(''));
+    _typeTimer ??= Timer.periodic(Duration(milliseconds: app.typewriterMs), (_) {
+      if (_typeQueue.isEmpty) { _typeTimer?.cancel(); _typeTimer = null; return; }
+      acc.text.write(_typeQueue.removeAt(0));
+      app.live.value = LiveMsg(acc.text.toString(), acc.reasoning.toString(), acc.toolNamesList());
+    });
+  }
+
+  void _drainThrottle(_Acc acc) {
+    _throttle?.cancel(); _throttle = null;
+    if (_pendingBuf.isNotEmpty) { acc.text.write(_pendingBuf.toString()); _pendingBuf.clear(); }
+    _typeTimer?.cancel(); _typeTimer = null;
+    if (_typeQueue.isNotEmpty) { acc.text.write(_typeQueue.join()); _typeQueue.clear(); }
+    app.live.value = LiveMsg(acc.text.toString(), acc.reasoning.toString(), acc.toolNamesList());
+  }
+
   void _tick(_Acc a, {bool force = false}) {
+    if (force) { _drainThrottle(a); return; }
+    // في وضع smooth/typewriter لا نستخدم tick القديمة للـ text، فقط للـ reasoning/tools
+    if (app.streamMode != 'instant') {
+      final now = DateTime.now();
+      if (now.difference(_lastTick).inMilliseconds < 70) return;
+      _lastTick = now;
+      // reasoning يُحدّث فورياً دائماً
+      if (a.reasoning.isNotEmpty) app.live.value = LiveMsg(a.text.toString(), a.reasoning.toString(), a.toolNamesList());
+      return;
+    }
     final now = DateTime.now();
     if (!force && now.difference(_lastTick).inMilliseconds < 70) return;
     _lastTick = now;
@@ -2137,16 +2565,16 @@ class AgentRunner {
   bool _retryable(Object e) {
     if (e is ApiError) {
       final m = e.message.toLowerCase();
-      return m.contains('overloaded') || m.contains('rate limit') || m.contains('temporarily');
+      return m.contains('overloaded') || m.contains('rate limit') || m.contains('temporarily') || m.contains('timeout') || m.contains('unavailable');
     }
     try {
       final d = e as dynamic;
       final code = d.response?.statusCode;
       if (code == null) {
-        final t = '${d.type}';
-        return t.contains('Timeout') || t.contains('connectionError') || t.contains('unknown');
+        final t = '${d.type}'.toLowerCase();
+        return t.contains('timeout') || t.contains('connectionerror') || t.contains('unknown') || t.contains('receive');
       }
-      return code == 429 || code >= 500;
+      return code == 408 || code == 429 || code >= 500;
     } catch (_) {
       return false;
     }
@@ -2154,20 +2582,28 @@ class AgentRunner {
 
   Future<void> _stream(ApiProfile p, String system, Conversation c, List<ToolDef> tools, _Acc acc) async {
     final hist = prepareHistory(c.msgs);
+    // حجر رحى توفير التوكنز: لو التاريخ ما يزال ضخماً بعد prepare/trim، نمرّره كما هو — الطبقة التالية compactIfNeeded ستضغطه
     for (var attempt = 0;; attempt++) {
       try {
         await for (final ch in llm.chat(p, system: system, msgs: hist, tools: tools, cancel: app.cancel)) {
-          acc.add(ch);
-          if (ch.text.isNotEmpty && app.status != 'يكتب…') {
-            app.status = 'يكتب…';
-            app.refresh();
+          if (ch.text.isNotEmpty) {
+            if (app.status != 'يكتب…') { app.status = 'يكتب…'; app.refresh(); }
+            // نتجنّب ازدواج الكتابة: لا نستخدم acc.add للنص، بل ندفع عبر الثروتل
+            if (ch.reasoning.isNotEmpty) acc.reasoning.write(ch.reasoning);
+            if (ch.toolCalls.isNotEmpty) acc.toolCalls.addAll(ch.toolCalls);
+            acc.truncated = acc.truncated || ch.truncated;
+            _pushChunk(ch.text, acc);
+            if (app.streamMode != 'instant') _tick(acc);
+          } else {
+            acc.add(ch);
+            _tick(acc);
           }
-          _tick(acc);
         }
         _tick(acc, force: true);
         return;
       } catch (e) {
         if (app.stopRequested || isCancelErr(e)) return;
+        // إعادة محاولة ذكية مع backoff أسي — ولا نعيد إرسال نفس الخطأ مرات عديدة عبثاً
         final retry = acc.isEmpty && attempt < 3 && _retryable(e);
         if (!retry) {
           if (e is ApiError) rethrow;
@@ -2175,7 +2611,7 @@ class AgentRunner {
         }
         app.status = 'مشكلة بالشبكة — إعادة المحاولة ${attempt + 1}/3…';
         app.refresh();
-        await Future.delayed(Duration(seconds: 2 << attempt));
+        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       }
     }
   }
@@ -2192,7 +2628,7 @@ class AgentRunner {
       final agent = app.agent;
       final sb = Sandbox(agent, app.cwdFor(c));
       final tools = toolsFor(agent, plan: app.planMode, bridge: app.bridgeOk);
-      final system = buildSystem(c, agent, sb, tools);
+      final system = await buildSystem(c, agent, sb, tools);
       final acc = _Acc();
       app.status = 'يفكر…';
       app.refresh();
@@ -2415,7 +2851,36 @@ class LMClientApp extends StatelessWidget {
       colorScheme: dark
           ? ColorScheme.dark(primary: p.accent, onPrimary: Colors.white, secondary: p.accent, surface: p.surface, onSurface: p.text)
           : ColorScheme.light(primary: p.accent, onPrimary: Colors.white, secondary: p.accent, surface: p.surface, onSurface: p.text),
-      appBarTheme: AppBarTheme(backgroundColor: p.bg, foregroundColor: p.text, elevation: 0, scrolledUnderElevation: 0, centerTitle: true),
+      appBarTheme: AppBarTheme(
+        backgroundColor: p.bg,
+        foregroundColor: p.text,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 16),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: p.text.withAlpha(230),
+        contentTextStyle: TextStyle(color: p.bg, fontSize: 13, fontWeight: FontWeight.w600),
+        actionTextColor: p.accent2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        behavior: SnackBarBehavior.floating,
+        elevation: 8,
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.dragged) ? p.accent : p.accent.withAlpha(90)),
+        trackColor: WidgetStateProperty.all(Colors.transparent),
+        thickness: WidgetStateProperty.all(6),
+        radius: const Radius.circular(20),
+        thumbVisibility: WidgetStateProperty.all(false),
+        interactive: true,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: p.accent, linearTrackColor: p.line, circularTrackColor: p.line),
+      textSelectionTheme: TextSelectionThemeData(cursorColor: p.accent, selectionColor: p.selection, selectionHandleColor: p.accent),
+      dialogBackgroundColor: p.surface,
+      cardColor: p.surface,
+      dividerColor: p.lineSoft,
     );
   }
 
@@ -2519,7 +2984,12 @@ void showContextViewer(BuildContext ctx, Conversation c) {
         child: SingleChildScrollView(
           child: Directionality(
             textDirection: TextDirection.ltr,
-            child: SelectableText(debugContext(c), style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+            child: FutureBuilder<String>(
+              future: debugContext(c),
+              builder: (fb, snap) => snap.hasData
+                  ? SelectableText(snap.data!, style: const TextStyle(fontSize: 12, fontFamily: 'monospace'))
+                  : const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator())),
+            ),
           ),
         ),
       ),
@@ -2838,18 +3308,25 @@ class Md extends StatelessWidget {
     final pal = Pal.of(context);
     final base = Directionality.of(context);
     final sheet = MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-      p: TextStyle(fontSize: 16, height: 1.6, color: pal.text),
-      h1: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: pal.text),
-      h2: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: pal.text),
-      h3: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: pal.text),
-      a: TextStyle(color: pal.accent, decoration: TextDecoration.underline),
-      code: TextStyle(fontFamily: 'monospace', fontSize: 13.5, color: pal.text, backgroundColor: pal.code),
-      blockquoteDecoration: BoxDecoration(color: pal.bubble, borderRadius: BorderRadius.circular(8)),
-      listBullet: TextStyle(fontSize: 16, color: pal.text),
-      tableHead: TextStyle(fontWeight: FontWeight.w600, color: pal.text),
-      tableBody: TextStyle(color: pal.text),
-      tableBorder: TableBorder.all(color: pal.line),
-      horizontalRuleDecoration: BoxDecoration(border: Border(top: BorderSide(color: pal.line))),
+      p: TextStyle(fontSize: 16, height: 1.65, color: pal.text),
+      h1: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: pal.text, height: 1.25),
+      h2: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: pal.text, height: 1.3),
+      h3: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: pal.text, height: 1.35),
+      a: TextStyle(color: pal.accent, decoration: TextDecoration.underline, fontWeight: FontWeight.w600),
+      code: TextStyle(fontFamily: 'monospace', fontSize: 13.2, color: pal.text, backgroundColor: pal.code),
+      blockquoteDecoration: BoxDecoration(
+        color: pal.bubble,
+        borderRadius: BorderRadius.circular(10),
+        border: Border(left: BorderSide(color: pal.accent.withAlpha(90), width: 3)),
+      ),
+      blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      listBullet: TextStyle(fontSize: 16, color: pal.accent),
+      listIndent: 20,
+      tableHead: TextStyle(fontWeight: FontWeight.w700, color: pal.text),
+      tableBody: TextStyle(color: pal.text, height: 1.45),
+      tableBorder: TableBorder.all(color: pal.line, width: 0.9),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      horizontalRuleDecoration: BoxDecoration(border: Border(top: BorderSide(color: pal.line, width: 1))),
     );
     final blocks = splitBlocks(text);
     return Column(
@@ -2881,38 +3358,131 @@ class Md extends StatelessWidget {
   }
 }
 
-class CodeBlock extends StatelessWidget {
+class CodeBlock extends StatefulWidget {
   final String code, lang;
   const CodeBlock({super.key, required this.code, required this.lang});
+  @override
+  State<CodeBlock> createState() => _CodeBlockState();
+}
+
+class _CodeBlockState extends State<CodeBlock> {
+  bool _copied = false;
+  bool _expanded = false;
+  static const _collapsedLines = 28;
+
+  String get _langLabel {
+    final l = widget.lang.trim().toLowerCase();
+    if (l.isEmpty) return 'code';
+    const known = {'dart': 'Dart', 'js': 'JS', 'ts': 'TS', 'py': 'Python', 'python': 'Python', 'json': 'JSON', 'yaml': 'YAML', 'sh': 'Shell', 'bash': 'Bash', 'sql': 'SQL', 'html': 'HTML', 'css': 'CSS', 'md': 'MD'};
+    return known[l] ?? widget.lang;
+  }
 
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
+    final lines = widget.code.split('\n');
+    final over = lines.length > _collapsedLines + 6;
+    final show = _expanded || !over ? widget.code : '${lines.take(_collapsedLines).join('\n')}\n… +${lines.length - _collapsedLines} سطر';
+    final lineCount = _expanded || !over ? lines.length : _collapsedLines;
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
-        decoration: BoxDecoration(color: pal.code, borderRadius: BorderRadius.circular(12), border: Border.all(color: pal.line)),
+        decoration: BoxDecoration(
+          color: pal.code,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: pal.lineSoft),
+          boxShadow: [BoxShadow(color: pal.shadow.withAlpha(18), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 2, 4, 0),
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+            decoration: BoxDecoration(
+              color: pal.bubble.withAlpha(pal.dark ? 90 : 140),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              border: Border(bottom: BorderSide(color: pal.lineSoft)),
+            ),
             child: Row(children: [
-              Text(lang.isEmpty ? 'code' : lang, style: TextStyle(fontSize: 11, color: pal.sub)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: pal.accentSoft, borderRadius: BorderRadius.circular(20), border: Border.all(color: pal.accent.withOpacity(0.14))),
+                child: Text(_langLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: pal.accent)),
+              ),
+              const SizedBox(width: 8),
+              Text('${fmtSize(widget.code.length)} • ${lines.length} سطر', style: TextStyle(fontSize: 11, color: pal.sub)),
               const Spacer(),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: Icon(Icons.content_copy, size: 16, color: pal.sub),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: code));
-                  app.toast('تم نسخ الكود');
-                },
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: _copied
+                    ? Container(
+                        key: const ValueKey('ok'),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: pal.ok.withAlpha(20),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: pal.ok.withOpacity(0.22)),
+                          boxShadow: [BoxShadow(color: pal.ok.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 3))],
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.check_rounded, size: 14, color: pal.ok),
+                          const SizedBox(width: 4),
+                          Text('تم النسخ', style: TextStyle(fontSize: 11, color: pal.ok, fontWeight: FontWeight.w800)),
+                        ]),
+                      )
+                    : Container(
+                        key: const ValueKey('cp'),
+                        decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: pal.lineSoft)),
+                        child: IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'نسخ الكود',
+                          icon: Icon(Icons.content_copy_rounded, size: 15, color: pal.sub),
+                          onPressed: () async {
+                            await Clipboard.setData(ClipboardData(text: widget.code));
+                            HapticFeedback.lightImpact();
+                            app.toast('تم نسخ الكود — ${fmtSize(widget.code.length)}');
+                            if (!mounted) return;
+                            setState(() => _copied = true);
+                            Future.delayed(const Duration(milliseconds: 1400), () {
+                              if (mounted) setState(() => _copied = false);
+                            });
+                          },
+                        ),
+                      ),
               ),
             ]),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: SelectableText(code, style: TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.45, color: pal.text)),
-          ),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+              decoration: BoxDecoration(border: Border(right: BorderSide(color: pal.lineSoft))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(lineCount, (i) => Text('${i + 1}', style: TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.45, color: pal.sub.withAlpha(150)))),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: SelectableText(show, style: TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5, color: pal.text)),
+              ),
+            ),
+          ]),
+          if (over)
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: pal.line))),
+                child: Center(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 16, color: pal.accent),
+                    const SizedBox(width: 4),
+                    Text(_expanded ? 'طي الكود' : 'عرض كامل (${lines.length} سطر)', style: TextStyle(fontSize: 12, color: pal.accent, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            ),
         ]),
       ),
     );
@@ -2937,7 +3507,12 @@ class _ReasoningTileState extends State<ReasoningTile> {
     final pal = Pal.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: pal.bubble.withAlpha(120), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: pal.bubble.withAlpha(120),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: open ? pal.accent.withOpacity(0.14) : pal.lineSoft),
+        boxShadow: open ? [BoxShadow(color: pal.starGlow.withOpacity(0.5), blurRadius: 14, offset: const Offset(0, 4))] : null,
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -2976,6 +3551,19 @@ class ToolCard extends StatefulWidget {
 
 class _ToolCardState extends State<ToolCard> {
   bool open = false;
+  void _copyToolArgs() {
+    final s = widget.call.args.isEmpty ? '' : const JsonEncoder.withIndent('  ').convert(widget.call.args);
+    Clipboard.setData(ClipboardData(text: s.isEmpty ? widget.call.name : '${widget.call.name}\n$s'));
+    app.toast('تم نسخ مُدخلات الأداة');
+  }
+
+  void _copyToolResult() {
+    final r = widget.result;
+    if (r == null) return;
+    Clipboard.setData(ClipboardData(text: r.content));
+    app.toast('تم نسخ ناتج الأداة — ${fmtSize(r.content.length)}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
@@ -2993,9 +3581,16 @@ class _ToolCardState extends State<ToolCard> {
       statusIcon = Icon(Icons.error_outline, size: 18, color: pal.bad);
     }
     final args = const JsonEncoder.withIndent('  ').convert(widget.call.args);
+    final bool ok = r != null && r.status == 'ok';
+    final bool err = r != null && r.status != 'ok' && r.status != 'denied';
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: pal.line)),
+      decoration: BoxDecoration(
+        color: pal.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ok ? pal.ok.withOpacity(0.22) : err ? pal.bad.withOpacity(0.18) : r == null && widget.running ? pal.accent.withOpacity(0.16) : pal.lineSoft),
+        boxShadow: open ? [BoxShadow(color: pal.starGlow.withOpacity(0.5), blurRadius: 14, offset: const Offset(0, 4))] : null,
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -3003,14 +3598,18 @@ class _ToolCardState extends State<ToolCard> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(children: [
-              Icon(toolIcon(widget.call.name), size: 18, color: pal.accent),
+              Container(
+                width: 30, height: 30,
+                decoration: BoxDecoration(color: pal.accentSoft, borderRadius: BorderRadius.circular(8), border: Border.all(color: pal.accent.withOpacity(0.14))),
+                child: Icon(toolIcon(widget.call.name), size: 16, color: pal.accent),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(toolTitle(widget.call),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textDirection: dirOf(toolTitle(widget.call), fallback: Directionality.of(context)),
-                    style: const TextStyle(fontSize: 13.5)),
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: pal.text)),
               ),
               const SizedBox(width: 8),
               statusIcon,
@@ -3022,15 +3621,29 @@ class _ToolCardState extends State<ToolCard> {
             textDirection: TextDirection.ltr,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('args', style: TextStyle(fontSize: 11, color: pal.sub)),
-                SelectableText(clip(args, 1500), style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                if (r != null) ...[
-                  const SizedBox(height: 8),
-                  Text('result', style: TextStyle(fontSize: 11, color: pal.sub)),
-                  SelectableText(clip(r.content, 3000), style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                ],
-              ]),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: pal.code.withOpacity(0.85), borderRadius: BorderRadius.circular(10), border: Border.all(color: pal.lineSoft)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text('args', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: pal.sub))),
+                    InkWell(onTap: _copyToolArgs, child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.content_copy_rounded, size: 13, color: pal.sub))),
+                  ]),
+                  const SizedBox(height: 4),
+                  SelectableText(clip(args, 1500), style: TextStyle(fontFamily: 'monospace', fontSize: 11.5, height: 1.5, color: pal.text)),
+                  if (r != null) ...[
+                    const SizedBox(height: 10),
+                    Divider(height: 1, color: pal.lineSoft),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: Text('result', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: pal.sub))),
+                      InkWell(onTap: _copyToolResult, child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.content_copy_rounded, size: 13, color: pal.sub))),
+                    ]),
+                    const SizedBox(height: 4),
+                    SelectableText(clip(r.content, 3000), style: TextStyle(fontFamily: 'monospace', fontSize: 11.5, height: 1.5, color: pal.text)),
+                  ],
+                ]),
+              ),
             ),
           ),
       ]),
@@ -3251,8 +3864,10 @@ class _ChatViewState extends State<ChatView> {
   void dispose() {
     app.live.removeListener(_stick);
     app.removeListener(_onApp);
-    ctrl.dispose();
+    try { ctrl.dispose(); } catch (_) {}
     scroll.dispose();
+    _focus.dispose();
+    tts.stop(); stt.cancel();
     super.dispose();
   }
 
@@ -3266,6 +3881,11 @@ class _ChatViewState extends State<ChatView> {
     if (d != inputDir && mounted) setState(() => inputDir = d);
   }
 
+  // === Fix2+3: Composer focus + keyboard inset + history ===
+  final FocusNode _focus = FocusNode();
+  final _history = <String>[]; int _hIdx = -1;
+  bool _kbdVisible = false;
+
   void _stick() {
     if (!scroll.hasClients) return;
     final pos = scroll.position;
@@ -3276,6 +3896,27 @@ class _ChatViewState extends State<ChatView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scroll.hasClients) scroll.jumpTo(scroll.position.maxScrollExtent);
     });
+  }
+
+  void _pushHistory(String t) {
+    final s = t.trim(); if (s.isEmpty) return;
+    _history.remove(s); _history.insert(0, s); if (_history.length > 80) _history.removeLast(); _hIdx = -1;
+  }
+  void _historyNav(bool up) {
+    if (_history.isEmpty) return;
+    if (up) { if (_hIdx < _history.length - 1) { _hIdx++; ctrl.text = _history[_hIdx]; ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length); setState(() {}); } }
+    else { if (_hIdx > 0) { _hIdx--; ctrl.text = _history[_hIdx]; ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length); setState(() {}); } else if (_hIdx == 0) { _hIdx = -1; ctrl.clear(); setState(() {}); } }
+  }
+
+  KeyEventResult _handleKey(FocusNode n, KeyEvent e) {
+    if (e is! KeyDownEvent) return KeyEventResult.ignored;
+    final isEnter = e.logicalKey == LogicalKeyboardKey.enter;
+    final isUp = e.logicalKey == LogicalKeyboardKey.arrowUp, isDown = e.logicalKey == LogicalKeyboardKey.arrowDown;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    if (isEnter && !shift) { _send(); return KeyEventResult.handled; }
+    if (isUp) { if (ctrl.text.trim().isEmpty || ctrl.selection.baseOffset == 0) { _historyNav(true); return KeyEventResult.handled; } }
+    if (isDown) { if (_hIdx != -1) { _historyNav(false); return KeyEventResult.handled; } }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _attach() async {
@@ -3298,9 +3939,11 @@ class _ChatViewState extends State<ChatView> {
   void _send() {
     final t = ctrl.text.trim();
     if (t.isEmpty && pending.isEmpty) return;
+    _pushHistory(t);
     final files = List<Attachment>.from(pending);
     ctrl.clear();
     setState(() => pending = []);
+    _focus.requestFocus();
     runner.send(t, files);
     _toBottom();
   }
@@ -3465,27 +4108,70 @@ class _ChatViewState extends State<ChatView> {
       builder: (ctx, l, _) {
         if (l == null) return const SizedBox.shrink();
         final pal = Pal.of(ctx);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+        final liveTokens = (l.text.isEmpty ? 0 : estimateTokens(l.text)) + (l.reasoning.isEmpty ? 0 : estimateTokens(l.reasoning) ~/ 2);
+        return Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: pal.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Color(0x14D97757)),
+            boxShadow: [BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, 3))],
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(colors: [Color(0x08D97757), Colors.transparent], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+          ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (l.reasoning.isNotEmpty) ReasoningTile(text: l.reasoning, initiallyOpen: l.text.isEmpty),
-            if (l.text.isNotEmpty) Md(text: l.text),
-            for (final t in l.tools)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(children: [
-                  Icon(toolIcon(t), size: 16, color: pal.accent),
-                  const SizedBox(width: 6),
-                  Text('يجهّز أداة: $t', style: TextStyle(fontSize: 12, color: pal.sub)),
-                ]),
-              ),
-            if (l.text.isEmpty && l.reasoning.isEmpty && l.tools.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(6),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: pal.accent)),
+            if (l.text.isNotEmpty)
+              Stack(children: [
+                Md(text: l.text),
+                if (app.running)
+                  PositionedDirectional(
+                    bottom: 0,
+                    end: dirOf(l.text) == TextDirection.rtl ? null : 0,
+                    start: dirOf(l.text) == TextDirection.rtl ? 0 : null,
+                    child: Container(width: 8, height: 16, decoration: BoxDecoration(color: pal.accent, borderRadius: BorderRadius.circular(2))),
+                  ),
+              ]),
+            if (l.tools.isNotEmpty)
+              for (final t in l.tools)
+                Container(
+                  margin: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(color: pal.accent.withAlpha(10), borderRadius: BorderRadius.circular(10), border: Border.all(color: pal.accent.withAlpha(14))),
+                  child: Row(children: [
+                    Icon(toolIcon(t), size: 14, color: pal.accent),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('يجهّز أداة: $t', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: pal.text))),
+                    if (liveTokens > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: pal.line)),
+                        child: Text('~$liveTokens tok', style: TextStyle(fontSize: 10, color: pal.sub)),
+                      ),
+                  ]),
                 ),
+            if (l.text.isEmpty && l.reasoning.isEmpty && l.tools.isEmpty)
+              Row(children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2.2, color: pal.accent)),
+                const SizedBox(width: 10),
+                Row(children: List.generate(3, (i) => Container(width: 6, height: 6, margin: EdgeInsets.only(left: i == 2 ? 0 : 4), decoration: BoxDecoration(color: pal.accent.withAlpha(190 - i * 40), shape: BoxShape.circle)))),
+                const SizedBox(width: 8),
+                Text('يفكّر…', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: pal.sub)),
+                const Spacer(),
+                if (liveTokens > 0)
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: pal.bubble, borderRadius: BorderRadius.circular(20)), child: Text('~$liveTokens', style: TextStyle(fontSize: 11, color: pal.sub))),
+              ]),
+            if (l.text.isNotEmpty && app.running)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: pal.ok, shape: BoxShape.circle, boxShadow: [BoxShadow(color: pal.ok.withAlpha(90), blurRadius: 6)])),
+                  const SizedBox(width: 6),
+                  Text('~$liveTokens tok · ستريمنغ حيّ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: pal.sub.withAlpha(190))),
+                ]),
               ),
           ]),
         );
@@ -3495,13 +4181,33 @@ class _ChatViewState extends State<ChatView> {
 
   Widget _statusBar(Pal pal) {
     if (!app.running) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [pal.surface, pal.bubble.withAlpha(150)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x24D97757)),
+        boxShadow: [BoxShadow(color: const Color(0x0A000000), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
       child: Row(children: [
-        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: pal.accent)),
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(color: pal.accent.withAlpha(18), shape: BoxShape.circle),
+          child: Padding(padding: const EdgeInsets.all(3), child: CircularProgressIndicator(strokeWidth: 2, color: pal.accent)),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: Text(app.status, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: pal.sub))),
-        if (app.planMode) Text('وضع التخطيط', style: TextStyle(fontSize: 11, color: pal.accent)),
+        Container(width: 7, height: 7, decoration: BoxDecoration(color: pal.ok, shape: BoxShape.circle, boxShadow: [BoxShadow(color: pal.ok.withAlpha(90), blurRadius: 6)])),
+        const SizedBox(width: 8),
+        Expanded(child: Text(app.status, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: pal.text))),
+        if (app.planMode)
+          Container(
+            margin: const EdgeInsetsDirectional.only(start: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: pal.accent.withAlpha(16), borderRadius: BorderRadius.circular(20), border: Border.all(color: pal.accent.withAlpha(28))),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.auto_awesome, size: 11, color: pal.accent), const SizedBox(width: 4), Text('وضع التخطيط', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: pal.accent))]),
+          ),
       ]),
     );
   }
@@ -3509,39 +4215,68 @@ class _ChatViewState extends State<ChatView> {
   Widget _approvalCard(Pal pal) {
     final a = app.pending;
     if (a == null) return const SizedBox.shrink();
+    final danger = a.title.contains('حذف') || a.title.contains('كتابة') || a.title.toLowerCase().contains('delete') || a.title.toLowerCase().contains('write');
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: pal.accent)),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      decoration: BoxDecoration(
+        color: pal.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: danger ? const Color(0x2EE57373) : const Color(0x2ED97757), width: 1.2),
+        boxShadow: [BoxShadow(color: (danger ? const Color(0xFFE57373) : pal.accent).withAlpha(16), blurRadius: 14, offset: const Offset(0, 3))],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Icon(Icons.shield_outlined, size: 18, color: pal.accent),
-          const SizedBox(width: 8),
-          Expanded(child: Text('طلب إذن: ${a.title}', style: const TextStyle(fontWeight: FontWeight.w600))),
-        ]),
-        const SizedBox(height: 6),
         Container(
-          constraints: const BoxConstraints(maxHeight: 130),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: pal.code, borderRadius: BorderRadius.circular(8)),
-          child: SingleChildScrollView(
-            child: Directionality(
-              textDirection: TextDirection.ltr,
-              child: SelectableText(a.detail, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: danger ? const Color(0xFFE57373).withAlpha(10) : pal.accent.withAlpha(10),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(bottom: BorderSide(color: danger ? const Color(0xFFE57373).withAlpha(18) : pal.accent.withAlpha(14))),
+          ),
+          child: Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(color: danger ? const Color(0xFFE57373).withAlpha(16) : pal.accent.withAlpha(14), shape: BoxShape.circle),
+              child: Icon(danger ? Icons.warning_amber_rounded : Icons.shield_outlined, size: 16, color: danger ? const Color(0xFFE57373) : pal.accent),
             ),
-          ),
+            const SizedBox(width: 10),
+            Expanded(child: Text('طلب إذن: ${a.title}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: pal.text))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(color: danger ? const Color(0xFFE57373) : pal.accent, borderRadius: BorderRadius.circular(20)),
+              child: Text(danger ? 'حساس' : 'إذن', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ]),
         ),
-        const SizedBox(height: 4),
-        Row(children: [
-          TextButton(onPressed: () => app.answerApproval(0), child: Text('رفض', style: TextStyle(color: pal.bad))),
-          const Spacer(),
-          TextButton(onPressed: () => app.answerApproval(2), child: const Text('دائماً (هذه الجلسة)')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: pal.accent),
-            onPressed: () => app.answerApproval(1),
-            child: const Text('سماح'),
-          ),
-        ]),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(
+              constraints: const BoxConstraints(maxHeight: 130),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: pal.code, borderRadius: BorderRadius.circular(10), border: Border.all(color: pal.line)),
+              child: SingleChildScrollView(
+                child: Directionality(textDirection: TextDirection.ltr, child: SelectableText(a.detail, style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: pal.text))),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFE57373), side: const BorderSide(color: Color(0x40E57373)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                onPressed: () => app.answerApproval(0),
+                child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.close, size: 14), SizedBox(width: 4), Text('رفض')]),
+              ),
+              const Spacer(),
+              TextButton(onPressed: () => app.answerApproval(2), child: Text('دائماً (هذه الجلسة)', style: TextStyle(color: pal.sub, fontSize: 12))),
+              const SizedBox(width: 6),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: danger ? const Color(0xFFE57373) : pal.ok, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
+                onPressed: () => app.answerApproval(1),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(danger ? Icons.warning_amber_rounded : Icons.check, size: 14, color: Colors.white), const SizedBox(width: 4), const Text('سماح')]),
+              ),
+            ]),
+          ]),
+        ),
       ]),
     );
   }
@@ -3549,9 +4284,15 @@ class _ChatViewState extends State<ChatView> {
   Widget _todoBar(Pal pal, Conversation c) {
     if (c.todos.isEmpty) return const SizedBox.shrink();
     final done = c.todos.where((t) => t.status == 'completed').length;
+    final remain = c.todos.length - done;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-      decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: pal.line)),
+      decoration: BoxDecoration(
+        color: pal.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: remain == 0 ? pal.ok.withAlpha(90) : pal.line),
+        boxShadow: remain == 0 ? [BoxShadow(color: pal.ok.withAlpha(18), blurRadius: 10)] : null,
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -3561,7 +4302,8 @@ class _ChatViewState extends State<ChatView> {
             child: Row(children: [
               Icon(Icons.checklist, size: 18, color: pal.accent),
               const SizedBox(width: 8),
-              Text('المهام  $done/${c.todos.length}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(remain == 0 ? 'اكتملت كل المهام ✓  $done/${c.todos.length}' : 'المهام  $done/${c.todos.length} — باقٍ $remain',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: remain == 0 ? pal.ok : null)),
               const SizedBox(width: 12),
               Expanded(
                 child: ClipRRect(
@@ -3604,68 +4346,114 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
+  // === Fix2+3: Composer أسطوري كامل ===
   Widget _composer(Pal pal) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-        child: Container(
-          decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(26), border: Border.all(color: pal.line)),
-          padding: const EdgeInsets.fromLTRB(14, 8, 8, 4),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (pending.isNotEmpty)
-              SizedBox(
-                height: 42,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: pending
-                      .map((f) => Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 6),
-                            child: Chip(
-                              visualDensity: VisualDensity.compact,
-                              avatar: Icon(f.isImage ? Icons.image : Icons.insert_drive_file, size: 16),
-                              label: Text(f.name, style: const TextStyle(fontSize: 11)),
-                              onDeleted: () => setState(() => pending.remove(f)),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-            TextField(
-              controller: ctrl,
-              minLines: 1,
-              maxLines: 8,
-              textDirection: inputDir,
-              keyboardType: TextInputType.multiline,
-              style: TextStyle(fontSize: 16, height: 1.4, color: pal.text),
-              decoration: InputDecoration(
-                hintText: 'اكتب رسالتك…',
-                hintStyle: TextStyle(color: pal.sub),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              ),
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset > 0 ? bottomInset : 0),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: pal.surface, borderRadius: BorderRadius.circular(26), border: Border.all(color: pal.line),
+              boxShadow: [BoxShadow(color: pal.shadow, blurRadius: 10, offset: const Offset(0, 3))],
             ),
-            Row(children: [
-              IconButton(icon: Icon(Icons.add, color: pal.sub), tooltip: 'إرفاق ملف', onPressed: _attach),
-              IconButton(icon: Icon(Icons.bolt, color: pal.sub), tooltip: 'Workflows', onPressed: _pickWorkflow),
-              IconButton(icon: Icon(listening ? Icons.mic : Icons.mic_none, color: listening ? pal.accent : pal.sub), tooltip: 'إملاء صوتي', onPressed: _toggleListen),
-              if (app.cursorKeys) ...[
-                IconButton(icon: Icon(Icons.arrow_back, size: 20, color: pal.sub), onPressed: () => _moveCursor(false)),
-                IconButton(icon: Icon(Icons.arrow_forward, size: 20, color: pal.sub), onPressed: () => _moveCursor(true)),
-              ],
-              const Spacer(),
-              Material(
-                color: pal.accent,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: app.running ? app.stop : _send,
-                  child: SizedBox(width: 40, height: 40, child: Icon(app.running ? Icons.stop : Icons.arrow_upward, color: Colors.white)),
+            padding: const EdgeInsets.fromLTRB(14, 8, 8, 4),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (pending.isNotEmpty)
+                SizedBox(
+                  height: 42,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: pending
+                        .map((f) => Padding(
+                              padding: const EdgeInsetsDirectional.only(end: 6),
+                              child: Chip(
+                                visualDensity: VisualDensity.compact,
+                                avatar: Icon(f.isImage ? Icons.image : Icons.insert_drive_file, size: 16),
+                                label: Text(f.name, style: const TextStyle(fontSize: 11)),
+                                onDeleted: () => setState(() => pending.remove(f)),
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
+              Focus(
+                onKeyEvent: _handleKey,
+                child: TextField(
+                  controller: ctrl,
+                  focusNode: _focus,
+                  autofocus: false,
+                  minLines: 1,
+                  maxLines: 8,
+                  textDirection: inputDir,
+                  cursorColor: pal.accent,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  onSubmitted: (_) => _send(),
+                  onTap: _toBottom,
+                  style: TextStyle(fontSize: 16, height: 1.4, color: pal.text),
+                  decoration: InputDecoration(
+                    hintTextDirection: inputDir,
+                    hintText: app.running
+                        ? (inputDir == TextDirection.rtl ? 'الوكيل يعمل… اكتب للمتابعة بعد الانتهاء' : 'Agent working… type to continue')
+                        : (inputDir == TextDirection.rtl ? 'اكتب رسالتك… (Enter إرسال • Shift+Enter سطر جديد  ↑↓ التاريخ)' : 'Type a message… (Enter send • Shift+Enter new line)'),
+                    hintStyle: TextStyle(color: pal.sub.withOpacity(0.7), fontSize: 13),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
               ),
+              Row(children: [
+                IconButton(icon: Icon(Icons.add, color: pal.sub), tooltip: 'إرفاق ملف', onPressed: _attach),
+                IconButton(icon: Icon(Icons.bolt, color: pal.sub), tooltip: 'Workflows', onPressed: _pickWorkflow),
+                IconButton(icon: Icon(listening ? Icons.mic : Icons.mic_none, color: listening ? pal.accent : pal.sub), tooltip: 'إملاء صوتي', onPressed: _toggleListen),
+                IconButton(
+                  icon: Icon(Icons.history, size: 18, color: _history.isEmpty ? pal.sub.withOpacity(0.35) : pal.sub),
+                  tooltip: _history.isEmpty ? 'لا يوجد تاريخ' : 'السابق ↑ (${_history.length})',
+                  onPressed: _history.isEmpty ? null : () => _historyNav(true),
+                ),
+                if (app.cursorKeys) ...[
+                  Container(width: 1, height: 20, color: pal.line, margin: const EdgeInsets.symmetric(horizontal: 4)),
+                  IconButton(icon: Icon(Icons.arrow_back, size: 18, color: pal.sub), tooltip: 'حرف للخلف', onPressed: () => _moveCursor(false)),
+                  IconButton(icon: Icon(Icons.arrow_forward, size: 18, color: pal.sub), tooltip: 'حرف للأمام', onPressed: () => _moveCursor(true)),
+                ],
+                const Spacer(),
+                ValueListenableBuilder<LiveMsg?>(
+                  valueListenable: app.live,
+                  builder: (_, l, __) {
+                    final hasText = ctrl.text.trim().isNotEmpty || pending.isNotEmpty;
+                    final canSend = hasText && !app.running;
+                    return Material(
+                      color: canSend ? pal.accent : (app.running ? pal.bad : pal.sub.withAlpha(90)),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: app.running ? app.stop : (canSend ? _send : null),
+                        child: SizedBox(
+                          width: 40, height: 40,
+                          child: Icon(app.running ? Icons.stop : (hasText ? Icons.arrow_upward : Icons.auto_awesome), color: Colors.white, size: app.running ? 22 : 20),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ]),
+              if (_history.isNotEmpty && _hIdx != -1)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text('↑↓ للتنقّل • ${_hIdx + 1}/${_history.length}', style: TextStyle(fontSize: 10, color: pal.sub.withOpacity(0.55))),
+                  ),
+                ),
             ]),
-          ]),
+          ),
         ),
       ),
     );
@@ -3682,35 +4470,107 @@ Widget _fab(BuildContext context, VoidCallback f) => FloatingActionButton(
       child: const Icon(Icons.add),
     );
 
-Widget _emptyMsg(String t) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(t, textAlign: TextAlign.center)));
+Widget _emptyMsg(String t) => Builder(builder: (context) {
+      final pal = Pal.of(context);
+      final parts = t.split('\n');
+      final title = parts.first.trim();
+      final sub = parts.length > 1 ? parts.skip(1).join('\n').trim() : '';
+      IconData icon = Icons.inbox_outlined;
+      if (t.contains('مشروع')) icon = Icons.folder_special_outlined;
+      else if (t.contains('ذاكرة')) icon = Icons.psychology_outlined;
+      else if (t.contains('مكتبة')) icon = Icons.library_books_outlined;
+      else if (t.contains('Workflow')) icon = Icons.bolt_outlined;
+      else if (t.contains('Agent') || t.contains('وكيل')) icon = Icons.smart_toy_outlined;
+      else if (t.contains('المجلد فارغ') || t.contains('فارغ')) icon = Icons.folder_open_rounded;
+      else if (t.contains('لا نتائج')) icon = Icons.search_off_rounded;
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                color: pal.accentSoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: pal.accent.withOpacity(0.18)),
+                boxShadow: [BoxShadow(color: pal.starGlow.withOpacity(0.6), blurRadius: 18, offset: const Offset(0, 6))],
+              ),
+              child: Icon(icon, size: 28, color: pal.accent),
+            ),
+            const SizedBox(height: 14),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: pal.text, height: 1.4)),
+            if (sub.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(sub, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, height: 1.6, color: pal.sub)),
+            ],
+          ]),
+        ),
+      );
+    });
 
 // ---------------- المشاريع ----------------
 Future<void> editProject(BuildContext ctx, Project? p) async {
   final n = TextEditingController(text: p?.name ?? '');
-  final ins = TextEditingController(text: p?.instructions ?? '');
+  final sys = TextEditingController(text: (p?.systemPrompt.isNotEmpty == true ? p!.systemPrompt : p?.instructions ?? ''));
   final ok = await showDialog<bool>(
     context: ctx,
-    builder: (d) => AlertDialog(
-      title: Text(p == null ? 'مشروع جديد' : 'تعديل المشروع'),
-      content: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: n, decoration: const InputDecoration(labelText: 'اسم المشروع')),
-          const SizedBox(height: 8),
-          TextField(controller: ins, minLines: 3, maxLines: 8, decoration: const InputDecoration(labelText: 'تعليمات المشروع (تُرسل لكل محادثة فيه)')),
+    builder: (d) {
+      final pal = Pal.of(d);
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(children: [
+          Icon(p == null ? Icons.folder_special_outlined : Icons.edit_outlined, color: pal.accent, size: 20),
+          const SizedBox(width: 8),
+          Text(p == null ? 'مشروع جديد' : 'تعديل المشروع', style: const TextStyle(fontSize: 16)),
         ]),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-        FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حفظ')),
-      ],
-    ),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            TextField(
+              controller: n,
+              textDirection: dirOf(n.text, fallback: TextDirection.rtl),
+              decoration: InputDecoration(
+                labelText: 'اسم المشروع',
+                hintText: 'مثلاً: متجر إلكتروني',
+                prefixIcon: const Icon(Icons.title, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: sys,
+              minLines: 3,
+              maxLines: 8,
+              textDirection: dirOf(sys.text, fallback: TextDirection.rtl),
+              decoration: InputDecoration(
+                labelText: 'تعليمات المشروع — System Prompt',
+                hintText: 'تُرسل قبل كل محادثة داخل هذا المشروع (3 طبقات: عام + مشروع + محادثة)',
+                prefixIcon: const Icon(Icons.psychology_outlined, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true,
+                filled: true,
+                fillColor: pal.surface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text('تُحفظ في Project.systemPrompt — مع ترحيل تلقائي من instructions القديم.', style: TextStyle(fontSize: 11, color: pal.sub)),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حفظ')),
+        ],
+      );
+    },
   );
   if (ok != true || n.text.trim().isEmpty) return;
+  final cleaned = clip(sys.text.trim(), 8000);
   if (p == null) {
-    app.projects.add(Project(id: newId(), name: n.text.trim(), instructions: ins.text));
+    app.projects.add(Project(id: newId(), name: clip(n.text.trim(), 120), instructions: cleaned, systemPrompt: cleaned));
   } else {
-    p.name = n.text.trim();
-    p.instructions = ins.text;
+    p.name = clip(n.text.trim(), 120);
+    p.instructions = cleaned;
+    p.systemPrompt = cleaned;
   }
   await app.saveProjects();
 }
@@ -3920,16 +4780,32 @@ class _WorkflowEditorState extends State<WorkflowEditor> {
         const SizedBox(height: 8),
         TextField(controller: desc, decoration: const InputDecoration(labelText: 'وصف قصير (اختياري)')),
         const SizedBox(height: 12),
-        Text('الخطوات — تُنفَّذ بالترتيب، كل خطوة تعمل حتى تنتهي ثم تبدأ التالية. استخدم \$ARGS لإدخال ما يكتبه المستخدم.',
+        Text('الخطوات — تُنفَّذ بالترتيب، كل خطوة تعمل حتى تنتهي ثم تبدأ التالية.',
             style: TextStyle(fontSize: 12, color: pal.sub)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: pal.bubble, borderRadius: BorderRadius.circular(10), border: Border.all(color: pal.line)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('متغيّرات القوالب المتاحة:', style: TextStyle(fontWeight: FontWeight.bold, color: pal.sub, fontSize: 11)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final chip in ['\$ARGS', '\$ARG1..\$ARG9', '\$PREV', '\$WORKSPACE', '\$PROJECT'])
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: pal.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: pal.line)), child: Text(chip, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+            ]),
+            const SizedBox(height: 6),
+            Text('• \$ARGS = كل وسائط المستخدم  • \$PREV = ناتج الخطوة السابقة (مختصر)  • \$WORKSPACE/\$PROJECT = مسار المشروع/اسمه',
+                style: TextStyle(fontSize: 10, color: pal.sub)),
+          ]),
+        ),
+        const SizedBox(height: 12),
         for (var i = 0; i < steps.length; i++)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               CircleAvatar(radius: 12, backgroundColor: pal.accent, child: Text('${i + 1}', style: const TextStyle(fontSize: 12, color: Colors.white))),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: steps[i], minLines: 2, maxLines: 8, decoration: const InputDecoration(border: OutlineInputBorder()))),
+              Expanded(child: TextField(controller: steps[i], minLines: 2, maxLines: 8, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'مثال: ابحث عن ... ثم عدّل ... استخدم \$ARGS للمتغيرات'))),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: steps.length > 1 ? () => setState(() => steps.removeAt(i)) : null,
@@ -4162,27 +5038,67 @@ class MemoryScreen extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: ctx,
       builder: (d) => StatefulBuilder(
-        builder: (d2, setSt) => AlertDialog(
-          title: Text(m == null ? 'إضافة جزء للذاكرة' : 'تعديل'),
-          content: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: t, decoration: const InputDecoration(labelText: 'العنوان', hintText: 'مثال: تفضيلات اللغة')),
-              const SizedBox(height: 8),
-              TextField(controller: c, minLines: 3, maxLines: 8, decoration: const InputDecoration(labelText: 'المحتوى', hintText: 'مثال: أفضل الرد بالعربي الفصيح')),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('تثبيت (يُرسل دائماً)'),
-                subtitle: const Text('غير المثبّت: يرى النموذج عنوانه فقط ويقرؤه عند الحاجة'),
-                value: pin,
-                onChanged: (v) => setSt(() => pin = v),
-              ),
+        builder: (d2, setSt) {
+          final pal = Pal.of(d2);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: Row(children: [
+              Icon(m == null ? Icons.add_circle_outline : Icons.edit_outlined, color: pal.accent, size: 20),
+              const SizedBox(width: 8),
+              Text(m == null ? 'ذكرى جديدة' : 'تعديل الذكرى', style: const TextStyle(fontSize: 16)),
             ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حفظ')),
-          ],
-        ),
+            content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                TextField(
+                  controller: t,
+                  textDirection: dirOf(t.text, fallback: TextDirection.rtl),
+                  decoration: InputDecoration(
+                    labelText: 'العنوان',
+                    hintText: 'مثلاً: تفضيلاتي في الكتابة',
+                    prefixIcon: const Icon(Icons.title, size: 18),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: c,
+                  minLines: 4,
+                  maxLines: 10,
+                  textDirection: dirOf(c.text, fallback: TextDirection.rtl),
+                  decoration: InputDecoration(
+                    labelText: 'المحتوى',
+                    hintText: 'اكتب ما تريد أن يتذكره الوكيل…',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(color: pal.bubble, borderRadius: BorderRadius.circular(10)),
+                  child: SwitchListTile(
+                    dense: true,
+                    title: Row(children: [
+                      Icon(Icons.push_pin, size: 16, color: pin ? pal.accent : pal.sub),
+                      const SizedBox(width: 6),
+                      const Text('مثبّت — يُرسل دائماً للنموذج', style: TextStyle(fontSize: 13)),
+                    ]),
+                    value: pin,
+                    activeThumbColor: pal.accent,
+                    onChanged: (v) => setSt(() => pin = v),
+                  ),
+                ),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: pal.accent),
+                onPressed: () => Navigator.pop(d, true),
+                child: const Text('حفظ'),
+              ),
+            ],
+          );
+        },
       ),
     );
     if (ok != true || t.text.trim().isEmpty || c.text.trim().isEmpty) return;
@@ -4198,43 +5114,93 @@ class MemoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _MemoryBody(edit: _edit);
+  }
+}
+
+class _MemoryBody extends StatefulWidget {
+  final Future<void> Function(BuildContext, MemoryPart?) edit;
+  const _MemoryBody({required this.edit});
+  @override
+  State<_MemoryBody> createState() => _MemoryBodyState();
+}
+
+class _MemoryBodyState extends State<_MemoryBody> {
+  String q = '';
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('الذاكرة')),
-      floatingActionButton: _fab(context, () => _edit(context, null)),
-      body: ListenableBuilder(
-        listenable: app,
-        builder: (ctx, _) {
-          if (app.memory.isEmpty) return _emptyMsg('لا توجد ذاكرة.\nيمكنك إضافة أجزاء هنا، ويستطيع الوكيل أيضاً حفظ وقراءة أجزاء بنفسه.');
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: app.memory.length,
-            itemBuilder: (c, i) {
-              final m = app.memory[i];
-              return Card(
-                child: ListTile(
-                  leading: IconButton(
-                    icon: Icon(m.pinned ? Icons.push_pin : Icons.push_pin_outlined, color: m.pinned ? Pal.of(ctx).accent : null),
-                    onPressed: () async {
-                      m.pinned = !m.pinned;
-                      await app.saveMemory();
-                    },
-                  ),
-                  title: Text(m.title),
-                  subtitle: Text(m.content, maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: dirOf(m.content, fallback: Directionality.of(ctx))),
-                  onTap: () => _edit(ctx, m),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () async {
-                      app.memory.remove(m);
-                      await app.saveMemory();
-                    },
-                  ),
-                ),
+      floatingActionButton: _fab(context, () => widget.edit(context, null)),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: 'ابحث في الذاكرة… (فوري)',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => q = v.toLowerCase()),
+          ),
+        ),
+        Expanded(
+          child: ListenableBuilder(
+            listenable: app,
+            builder: (ctx, _) {
+              final all = app.memory.where((e) => q.isEmpty || e.title.toLowerCase().contains(q) || e.content.toLowerCase().contains(q)).toList();
+              if (all.isEmpty) {
+                return q.isEmpty
+                    ? _emptyMsg('لا توجد ذاكرة.\nيمكنك إضافة أجزاء هنا، ويستطيع الوكيل أيضاً حفظ وقراءة أجزاء بنفسه.')
+                    : _emptyMsg('لا نتائج لـ «$q»');
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                itemCount: all.length,
+                itemBuilder: (c, i) {
+                  final m = all[i];
+                  return Card(
+                    child: ListTile(
+                      leading: IconButton(
+                        icon: Icon(m.pinned ? Icons.push_pin : Icons.push_pin_outlined, color: m.pinned ? pal.accent : null),
+                        tooltip: m.pinned ? 'مثبّت (يُرسل دائماً)' : 'تثبيت',
+                        onPressed: () async {
+                          m.pinned = !m.pinned;
+                          await app.saveMemory();
+                        },
+                      ),
+                      title: Text(m.title),
+                      subtitle: Text(m.content, maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: dirOf(m.content, fallback: Directionality.of(ctx))),
+                      onTap: () => widget.edit(ctx, m),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(
+                          icon: const Icon(Icons.content_copy, size: 18),
+                          tooltip: 'نسخ',
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: '${m.title}\n${m.content}'));
+                            app.toast('تم النسخ');
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'حذف',
+                          onPressed: () async {
+                            if (!await confirmDlg(ctx, 'حذف «${m.title}»؟')) return;
+                            app.memory.remove(m);
+                            await app.saveMemory();
+                          },
+                        ),
+                      ]),
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
-      ),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -4268,27 +5234,77 @@ class _LibraryScreenState extends State<LibraryScreen> {
       app.toast('هذا السجل قديم (بدون محتوى محفوظ)');
       return;
     }
+    final pal = Pal.of(context);
     Widget body;
-    if (it.mime.startsWith('image/')) {
-      body = Image.file(File(it.path));
+    bool isImg = it.mime.startsWith('image/');
+    if (isImg) {
+      body = ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(it.path), fit: BoxFit.contain));
     } else {
       try {
         final bytes = await File(it.path).readAsBytes();
         body = looksBinary(bytes)
-            ? const Text('ملف ثنائي — لا يمكن عرضه كنص')
-            : SelectableText(clip(utf8.decode(bytes, allowMalformed: true), 8000),
-                textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12, fontFamily: 'monospace'));
+            ? Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: pal.bubble, borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  Icon(Icons.inventory_2_outlined, color: pal.sub),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text('ملف ثنائي — ${fmtSize(bytes.length)} • ${it.mime}', style: TextStyle(color: pal.sub))),
+                ]),
+              )
+            : Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: pal.code, borderRadius: BorderRadius.circular(12), border: Border.all(color: pal.line)),
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: SelectableText(clip(utf8.decode(bytes, allowMalformed: true), 9000), style: TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.5, color: pal.text)),
+                ),
+              );
       } catch (e) {
-        body = Text('تعذر القراءة: $e');
+        body = Text('تعذر القراءة: $e', style: TextStyle(color: pal.bad));
       }
     }
     if (!mounted) return;
+    final name = it.name;
     showDialog(
       context: context,
-      builder: (d) => AlertDialog(
-        title: Text(it.name, style: const TextStyle(fontSize: 15)),
-        content: SizedBox(width: double.maxFinite, height: 360, child: SingleChildScrollView(child: body)),
-        actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('إغلاق'))],
+      builder: (d) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 560),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+              child: Row(children: [
+                Icon(isImg ? Icons.image : Icons.article_outlined, color: pal.accent, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(d)),
+              ]),
+            ),
+            Divider(height: 1, color: pal.line),
+            Flexible(child: SingleChildScrollView(padding: const EdgeInsets.all(14), child: body)),
+            Divider(height: 1, color: pal.line),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Row(children: [
+                Text('${fmtSize(it.size)} • ${it.mime}', style: TextStyle(fontSize: 11, color: pal.sub)),
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.content_copy, size: 16),
+                  label: const Text('نسخ المسار'),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: it.path));
+                    app.toast('تم نسخ المسار');
+                  },
+                ),
+                const SizedBox(width: 6),
+                FilledButton(onPressed: () => Navigator.pop(d), child: const Text('إغلاق')),
+              ]),
+            ),
+          ]),
+        ),
       ),
     );
   }
@@ -4310,8 +5326,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
           child: ListenableBuilder(
             listenable: app,
             builder: (ctx, _) {
-              final items = app.library.where((e) => e.name.toLowerCase().contains(q)).toList().reversed.toList();
-              if (items.isEmpty) return _emptyMsg('المكتبة فارغة.\nكل ملف ترفقه في الشات يُحفظ هنا، ويستطيع الوكيل البحث فيه وقراءته.');
+              final low = q.toLowerCase();
+              final items = app.library
+                  .where((e) => low.isEmpty || e.name.toLowerCase().contains(low) || e.mime.toLowerCase().contains(low))
+                  .toList()
+                  .reversed
+                  .toList();
+              if (items.isEmpty) {
+                return q.isEmpty
+                    ? _emptyMsg('المكتبة فارغة.\nكل ملف ترفقه في الشات يُحفظ هنا، ويستطيع الوكيل البحث فيه وقراءته.')
+                    : _emptyMsg('لا نتائج لـ «$q»');
+              }
               return ListView.builder(
                 itemCount: items.length,
                 itemBuilder: (c, i) {
@@ -4319,19 +5344,30 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   return ListTile(
                     leading: Icon(it.mime.startsWith('image/') ? Icons.image : Icons.insert_drive_file_outlined),
                     title: Text(it.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('${fmtSize(it.size)} · ${it.time.day}/${it.time.month}/${it.time.year}'),
+                    subtitle: Text('${fmtSize(it.size)} · ${it.time.day}/${it.time.month}/${it.time.year} · ${it.mime}'),
                     onTap: () => _preview(it),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () async {
-                        if (!await confirmDlg(ctx, 'حذف «${it.name}»؟')) return;
-                        try {
-                          if (it.path.isNotEmpty) await File(it.path).delete();
-                        } catch (_) {}
-                        app.library.remove(it);
-                        await app.saveLibrary();
-                      },
-                    ),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      IconButton(
+                        icon: const Icon(Icons.content_copy, size: 18),
+                        tooltip: 'نسخ المسار',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: it.path.isEmpty ? it.name : it.path));
+                          app.toast('تم النسخ');
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'حذف',
+                        onPressed: () async {
+                          if (!await confirmDlg(ctx, 'حذف «${it.name}»؟')) return;
+                          try {
+                            if (it.path.isNotEmpty) await File(it.path).delete();
+                          } catch (_) {}
+                          app.library.remove(it);
+                          await app.saveLibrary();
+                        },
+                      ),
+                    ]),
                   );
                 },
               );
@@ -4354,6 +5390,7 @@ class PhoneFilesScreen extends StatefulWidget {
 class _PhoneFilesScreenState extends State<PhoneFilesScreen> {
   late String currentPath = widget.initialPath ?? app.workspace.path;
   List<FileSystemEntity> files = [];
+  Map<String, int> sizes = {}; // مسار → حجم (غير متزامن)
   bool loading = true;
   String? err;
 
@@ -4384,8 +5421,14 @@ class _PhoneFilesScreenState extends State<PhoneFilesScreen> {
         return x.path.toLowerCase().compareTo(y.path.toLowerCase());
       });
       files = l;
+      sizes = {};
+      // أحجام غير متزامنة — لا تجمّد الواجهة
+      for (final e in l.where((x) => x is! Directory)) {
+        try { sizes[e.path] = await (e as File).length(); } catch (_) { sizes[e.path] = 0; }
+      }
     } catch (e) {
       files = [];
+      sizes = {};
       err = '$e';
     }
     if (mounted) setState(() => loading = false);
@@ -4526,12 +5569,7 @@ class _PhoneFilesScreenState extends State<PhoneFilesScreen> {
                           itemBuilder: (c, i) {
                             final f = files[i];
                             final isDir = f is Directory;
-                            var size = 0;
-                            if (!isDir) {
-                              try {
-                                size = (f as File).lengthSync();
-                              } catch (_) {}
-                            }
+                            final size = isDir ? 0 : (sizes[f.path] ?? 0);
                             return ListTile(
                               dense: true,
                               leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file_outlined, color: isDir ? const Color(0xFFE0A526) : null),
@@ -4659,6 +5697,47 @@ class SettingsScreen extends StatelessWidget {
               app.compactAt = v;
               app.saveSettings();
             }),
+            _h('التعليمات العامة (System Prompt) — تُرسل قبل كل محادثة'),
+            Builder(builder: (_) {
+              final c = TextEditingController(text: app.globalSystemPrompt);
+              // نحافظ على المؤشر في النهاية عند كل بناء
+              c.selection = TextSelection.collapsed(offset: c.text.length);
+              return TextField(
+                controller: c,
+                minLines: 3,
+                maxLines: 6,
+                textDirection: dirOf(c.text, fallback: TextDirection.rtl),
+                decoration: InputDecoration(
+                  hintText: 'مثال: أجب دائماً بالعربية الفصحى، كن مختصراً ومباشراً...',
+                  hintStyle: TextStyle(color: pal.sub.withOpacity(0.7), fontSize: 13),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.psychology_outlined, size: 18),
+                  isDense: true,
+                  filled: true,
+                  fillColor: pal.surface,
+                ),
+                onChanged: (v) {
+                  app.globalSystemPrompt = v;
+                  app.saveSettings();
+                },
+              );
+            }),
+            _h('نمط الكتابة المتدفقة'),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'instant', label: Text('فوري'), icon: Icon(Icons.bolt_outlined, size: 16)),
+                ButtonSegment(value: 'smooth', label: Text('سلس'), icon: Icon(Icons.water_drop_outlined, size: 16)),
+                ButtonSegment(value: 'typewriter', label: Text('آلة كاتبة'), icon: Icon(Icons.keyboard_outlined, size: 16)),
+              ],
+              selected: {app.streamMode},
+              onSelectionChanged: (s) {
+                app.streamMode = s.first;
+                app.saveSettings();
+                app.toast(s.first == 'instant' ? 'فوري — بدون تأخير' : s.first == 'smooth' ? 'سلس — 35ms/حرف' : 'آلة كاتبة — 70ms/حرف');
+              },
+            ),
+            const SizedBox(height: 4),
+            Text('الفوري: يظهر النص كاملاً فور وصوله. السلس والآلة الكاتبة يستخدمان throttle ذكي.', style: TextStyle(fontSize: 11, color: pal.sub)),
             Row(children: [
               const Expanded(child: Text('بروفايلات الـ API', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
               FilledButton.icon(
