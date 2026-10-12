@@ -1778,7 +1778,6 @@ bool isCancelErr(Object e) {
   }
 }
 
-String _cut(String s, int n) => s.length <= n ? s : '${s.substring(0, n)}…';
 Future<String> dioMessage(Object e) async {
   try {
     final d = e as dynamic;
@@ -2292,7 +2291,7 @@ Future<String> buildSystem(Conversation c, Agent agent, Sandbox sb, List<ToolDef
       b.writeln(ps);
     }
   }
-  final notes = _projectNotes(sb.cwd);
+  final notes = await _projectNotes(sb.cwd);
   if (notes.isNotEmpty) {
     b.writeln();
     b.writeln('## Project notes file');
@@ -2477,7 +2476,7 @@ class AgentRunner {
   Future<void> runWorkflow(Workflow w, String args) async {
     final rawSteps = List<String>.from(w.steps);
     if (rawSteps.isEmpty) return;
-    final repo = app.cwdFor(app.cur);
+    final repo = app.cur != null ? app.cwdFor(app.cur!) : app.workspace.path;
     final projName = (firstWhereOrNull(app.projects, (p) => p.id == app.cur?.projectId)?.name ?? 'بدون مشروع');
     String prev = '';
     // إذا لم يستخدم القالب أي متغير، نمرر وسيط المستخدم للخطوة الأولى كما قبل
@@ -2588,10 +2587,23 @@ class AgentRunner {
         await for (final ch in llm.chat(p, system: system, msgs: hist, tools: tools, cancel: app.cancel)) {
           if (ch.text.isNotEmpty) {
             if (app.status != 'يكتب…') { app.status = 'يكتب…'; app.refresh(); }
-            // نتجنّب ازدواج الكتابة: لا نستخدم acc.add للنص، بل ندفع عبر الثروتل
+            // نتجنّب ازدواج الكتابة: النص عبر الثروتل، وباقي الحقول نحدّثها يدوياً
             if (ch.reasoning.isNotEmpty) acc.reasoning.write(ch.reasoning);
-            if (ch.toolCalls.isNotEmpty) acc.toolCalls.addAll(ch.toolCalls);
-            acc.truncated = acc.truncated || ch.truncated;
+            if (ch.toolIndex != null) {
+              var idx = ch.toolIndex!;
+              final id = ch.toolId ?? '';
+              final ex = acc.tools[idx];
+              if (id.isNotEmpty && ex != null && ex.id.isNotEmpty && ex.id != id) {
+                idx = acc.tools.keys.fold<int>(0, (m, k) => k > m ? k : m) + 1;
+              }
+              final t = acc.tools.putIfAbsent(idx, () => _TcAcc());
+              if (id.isNotEmpty) t.id = id;
+              if (ch.toolName != null && ch.toolName!.isNotEmpty) t.name = ch.toolName!;
+              if (ch.toolArgs != null) t.args.write(ch.toolArgs!);
+            }
+            if (ch.finish != null) acc.finish = ch.finish;
+            if (ch.inTok != null) acc.inTok = ch.inTok!;
+            if (ch.outTok != null) acc.outTok = ch.outTok!;
             _pushChunk(ch.text, acc);
             if (app.streamMode != 'instant') _tick(acc);
           } else {
@@ -5083,7 +5095,7 @@ class MemoryScreen extends StatelessWidget {
                       const Text('مثبّت — يُرسل دائماً للنموذج', style: TextStyle(fontSize: 13)),
                     ]),
                     value: pin,
-                    activeThumbColor: pal.accent,
+                    activeColor: pal.accent,
                     onChanged: (v) => setSt(() => pin = v),
                   ),
                 ),
