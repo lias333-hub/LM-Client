@@ -9,6 +9,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -5718,7 +5719,7 @@ class MemoryScreen extends StatelessWidget {
                       const Text('مثبّت — يُرسل دائماً للنموذج', style: TextStyle(fontSize: 13)),
                     ]),
                     value: pin,
-                    activeThumbColor: pal.accent,
+                    activeColor: pal.accent,
                     onChanged: (v) => setSt(() => pin = v),
                   ),
                 ),
