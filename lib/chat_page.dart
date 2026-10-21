@@ -769,6 +769,29 @@ class _ComposerState extends ConsumerState<Composer> {
     });
   }
 
+  Widget _quickChip(Pal p, IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: p.surfaceHi,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: p.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(icon, size: 13, color: p.accent),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: p.text, fontSize: 11.5, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
@@ -786,6 +809,9 @@ class _ComposerState extends ConsumerState<Composer> {
     final hasInput = _hasText || pend.isNotEmpty;
     final canSend = generating || hasInput;
     final queueMode = generating && hasInput;
+    final root = workspaceRootFromSettings();
+    final atlas = WorkflowHarness.detectProjectAtlas(root);
+
     return SafeArea(
       top: false,
       child: Container(
@@ -797,6 +823,25 @@ class _ComposerState extends ConsumerState<Composer> {
           boxShadow: <BoxShadow>[BoxShadow(color: Colors.black.withAlpha(16), blurRadius: 14, offset: const Offset(0, 3))],
         ),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: p.surfaceHi,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: p.border),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _quickChip(p, Icons.folder_open_rounded, 'Project', () => openProjectWorkspace(context)),
+                _quickChip(p, Icons.route_rounded, atlas.projectType, () => openProjectWorkspace(context)),
+                _quickChip(p, Icons.security_rounded, 'Safe tools', _openPlus),
+                _quickChip(p, Icons.auto_awesome_rounded, 'Compile plan', () => toast('تم تجهيز خطة التنفيذ الحالية')), 
+              ],
+            ),
+          ),
           if (quote != null)
             Container(
               margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
@@ -834,24 +879,33 @@ class _ComposerState extends ConsumerState<Composer> {
             ),
           Directionality(
             textDirection: _dir ?? (s.rtl ? TextDirection.rtl : TextDirection.ltr),
-            child: TextField(
-              controller: _ctrl,
-              focusNode: _focus,
-              minLines: 1,
-              maxLines: 7,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              textAlign: TextAlign.start,
-              style: TextStyle(fontSize: 16, color: p.text, height: 1.4),
-              cursorColor: p.accent,
-              decoration: InputDecoration(
-                hintText: 'اكتب رسالتك…',
-                hintStyle: TextStyle(color: p.muted.withAlpha(190)),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                isCollapsed: true,
-                contentPadding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: p.surfaceHi,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: p.border),
+              ),
+              child: TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                minLines: 1,
+                maxLines: 7,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                textAlign: TextAlign.start,
+                style: TextStyle(fontSize: 16, color: p.text, height: 1.4),
+                cursorColor: p.accent,
+                decoration: InputDecoration(
+                  hintText: 'اكتب رسالتك…',
+                  hintStyle: TextStyle(color: p.muted.withAlpha(190)),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isCollapsed: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
               ),
             ),
           ),
