@@ -80,6 +80,9 @@ class WorkflowTask {
     this.decisions = const <String>[],
   });
 
+  String get statusSummary =>
+      '${currentPhase.toUpperCase()} · read ${readsUsed}/${TaskBudget().maxReadOps} · write ${writesUsed}/${TaskBudget().maxWriteOps} · verify ${verifyRuns}/${TaskBudget().maxVerifyRuns}';
+
   WorkflowTask copyWith({
     String? id,
     String? title,
@@ -262,7 +265,7 @@ class WorkflowHarness {
   }) {
     final now = DateTime.now();
     return WorkflowTask(
-      id: const Uuid().v4(),
+      id: '${now.microsecondsSinceEpoch}',
       title: title,
       objective: objective,
       rootPath: rootPath,
@@ -407,4 +410,71 @@ class WorkflowHarness {
       allowedRoots: <String>[normalized],
     );
   }
+}
+
+class TaskExecutionPlan {
+  final WorkflowTask task;
+  final ProjectAtlas atlas;
+  final String phase;
+  final List<String> nextSteps;
+  final String reason;
+
+  const TaskExecutionPlan({
+    required this.task,
+    required this.atlas,
+    required this.phase,
+    required this.nextSteps,
+    required this.reason,
+  });
+
+  factory TaskExecutionPlan.fromTask(WorkflowTask task, ProjectAtlas atlas) {
+    final decision = WorkflowHarness.decideNextPhase(task);
+    return TaskExecutionPlan(
+      task: task,
+      atlas: atlas,
+      phase: decision.phase,
+      nextSteps: decision.remainingSteps,
+      reason: decision.reason,
+    );
+  }
+
+  String get summary =>
+      '${task.title} · ${atlas.projectType} · ${phase} · remaining: ${nextSteps.join(', ')}';
+}
+
+class ProjectExecutionContext {
+  final ProjectAtlas atlas;
+  final ProjectScope scope;
+  final ProjectToolProfile profile;
+  final WorkflowTask task;
+  final TaskBudget budget;
+
+  const ProjectExecutionContext({
+    required this.atlas,
+    required this.scope,
+    required this.profile,
+    required this.task,
+    required this.budget,
+  });
+
+  factory ProjectExecutionContext.create(String rootPath, String title, String objective) {
+    final atlas = WorkflowHarness.detectProjectAtlas(rootPath);
+    final scope = ProjectScope.fromAtlas(atlas);
+    final profile = ProjectToolProfile.fromAtlas(atlas);
+    final task = WorkflowHarness.createTask(
+      title: title,
+      objective: objective,
+      rootPath: rootPath,
+    );
+    return ProjectExecutionContext(
+      atlas: atlas,
+      scope: scope,
+      profile: profile,
+      task: task,
+      budget: const TaskBudget(),
+    );
+  }
+
+  TaskExecutionPlan get plan => TaskExecutionPlan.fromTask(task, atlas);
+  bool get isInScope => scope.containsPath(task.rootPath) || scope.isAllowed(task.rootPath);
 }
