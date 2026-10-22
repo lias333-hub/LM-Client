@@ -1,3 +1,5 @@
+part of 'main.dart';
+
 class AppDrawer extends ConsumerStatefulWidget {
   const AppDrawer({super.key});
   @override
