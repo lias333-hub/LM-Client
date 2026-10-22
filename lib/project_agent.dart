@@ -280,7 +280,7 @@ class ProjectExecutor {
       final relative = entity.path.substring(root.length).replaceAll('\\', '/');
       if (glob != '*' && !globMatches(relative, glob)) continue;
       try {
-        final text = await entity.readAsString(encoding: utf8, flush: false);
+        final text = await entity.readAsString(encoding: utf8);
         final hay = ignoreCase ? text.toLowerCase() : text;
         if (hay.contains(lower)) {
           matches.add(relative);
@@ -595,7 +595,7 @@ class _ProjectWorkspaceScreenState extends ConsumerState<ProjectWorkspaceScreen>
               const SizedBox(height: 18),
               TextField(
                 controller: _searchController,
-                decoration: fieldDeco(context, hint: 'أدخل كلمة/نمط للبحث', prefixIcon: const Icon(Icons.search)),
+                decoration: fieldDeco(context, hint: 'أدخل كلمة/نمط للبحث', prefix: const Icon(Icons.search)),
               ),
               const SizedBox(height: 8),
               Align(

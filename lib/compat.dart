@@ -53,13 +53,6 @@ class ToolSecurityPolicy {
   }
 }
 
-class RuntimeTaskState {
-  final dynamic budget;
-  final dynamic phase;
-
-  const RuntimeTaskState({this.budget, this.phase});
-}
-
 enum TaskRuntimePhase {
   intake,
   scope,
@@ -71,35 +64,73 @@ enum TaskRuntimePhase {
   blocked,
 }
 
+/// Mutable per-task budget tracker (tokens / reads / tool calls).
+class RuntimeBudget {
+  final int tokenCap;
+  final int readCap;
+  final int toolCallCap;
+
+  int tokensUsed = 0;
+  int readsUsed = 0;
+  int toolCalls = 0;
+
+  RuntimeBudget({this.tokenCap = 70000, this.readCap = 8, this.toolCallCap = 40});
+
+  void recordTokens(int n) => tokensUsed += n;
+  void recordRead() => readsUsed += 1;
+  void recordToolCall() => toolCalls += 1;
+
+  bool get isExhausted => tokensUsed >= tokenCap || readsUsed >= readCap || toolCalls >= toolCallCap;
+}
+
+class RuntimeTaskState {
+  final WorkflowTask workflow;
+  final RuntimeBudget budget;
+  final TaskRuntimePhase phase;
+
+  const RuntimeTaskState({
+    required this.workflow,
+    required this.budget,
+    this.phase = TaskRuntimePhase.intake,
+  });
+}
+
 class RuntimeTaskHarness {
-  static WorkflowTask createTask({
+  static RuntimeTaskState createTask({
     required String title,
     required String objective,
     String rootPath = '/',
     int tokenBudget = 70000,
   }) {
-    return WorkflowHarness.createTask(
+    final wf = WorkflowHarness.createTask(
       title: title,
       objective: objective,
       rootPath: rootPath,
       tokenBudget: tokenBudget,
     );
+    return RuntimeTaskState(workflow: wf, budget: RuntimeBudget(tokenCap: tokenBudget));
   }
 
-  static WorkflowDecision decideNextPhase(WorkflowTask task, {int extraReads = 0, int extraWrites = 0}) {
-    return WorkflowHarness.decideNextPhase(task, extraReads: extraReads, extraWrites: extraWrites);
+  static TaskRuntimePhase decideNextPhase(RuntimeTaskState task, {int extraReads = 0, int extraWrites = 0}) {
+    final d = WorkflowHarness.decideNextPhase(task.workflow, extraReads: extraReads, extraWrites: extraWrites);
+    for (final p in TaskRuntimePhase.values) {
+      if (p.name == d.phase) return p;
+    }
+    return TaskRuntimePhase.blocked;
   }
 }
 
 class RuntimeContextManager {
-  static List<String> compactHistory(dynamic history, {int limit = 256}) {
-    if (history == null) return const <String>[];
-    if (history is Iterable) {
-      final items = history.map((item) => item.toString()).toList();
-      if (limit > 0 && items.length > limit) return items.sublist(items.length - limit);
-      return items;
+  /// Keeps only the most recent [limit] messages.
+  static List<String> compactHistory({
+    required RuntimeTaskState task,
+    required List<String> recentMessages,
+    int limit = 24,
+  }) {
+    if (limit > 0 && recentMessages.length > limit) {
+      return recentMessages.sublist(recentMessages.length - limit);
     }
-    return <String>[history.toString()];
+    return List<String>.of(recentMessages);
   }
 }
 
@@ -205,8 +236,7 @@ class SegPicker<T> extends StatelessWidget {
   }
 }
 
-BoxDecoration cardDeco(BuildContext context, {bool selected = false}) {
-  final p = pal(context);
+BoxDecoration cardDeco(Pal p, {bool selected = false}) {
   return BoxDecoration(
     color: selected ? p.surfaceHi : p.surface,
     borderRadius: BorderRadius.circular(18),
@@ -246,16 +276,26 @@ class PhoneFilesScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Phone Files')));
 }
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Settings')));
+Future<List<PendingAtt>> pickAttachments({bool images = false}) async {
+  final out = <PendingAtt>[];
+  try {
+    if (images) {
+      final files = await ImagePicker().pickMultiImage();
+      for (final x in files) {
+        final bytes = await x.readAsBytes();
+        out.add(PendingAtt(id: newId(), name: x.name, mime: mimeFromName(x.name), size: bytes.length, bytes: bytes, path: x.path));
+      }
+    } else {
+      final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true, type: FileType.any);
+      if (res == null) return out;
+      for (final f in res.files) {
+        Uint8List? b = f.bytes;
+        if (b == null && f.path != null) b = await File(f.path!).readAsBytes();
+        out.add(PendingAtt(id: newId(), name: f.name, mime: mimeFromName(f.name), size: f.size, bytes: b, path: f.path));
+      }
+    }
+  } catch (e) {
+    toast('تعذر اختيار الملف: $e');
+  }
+  return out;
 }
-
-Future<void> pickAttachments({bool images = false}) async {}
-
-Future<void> pickAttachmentsWrapper({bool images = false}) async => pickAttachments(images: images);
-
-class _ChatPageState {}
-
-class _ComposerState {}

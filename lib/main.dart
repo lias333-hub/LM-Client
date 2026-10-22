@@ -19,6 +19,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 
 part 'chat_page.dart';
+part 'compat.dart';
 part 'core.dart';
 part 'llm.dart';
 part 'messages.dart';

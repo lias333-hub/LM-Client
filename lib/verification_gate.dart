@@ -20,6 +20,9 @@ class VerificationResult {
     required this.stderr,
     required this.exitCode,
   });
+
+  bool get passed => status == VerifyStatus.pass;
+  bool get failed => status == VerifyStatus.fail;
 }
 
 class VerificationGate {
