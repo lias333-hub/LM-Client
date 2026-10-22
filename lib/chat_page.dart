@@ -9,12 +9,13 @@ class ProjectRuntimeBanner extends ConsumerWidget {
     final p = pal(context);
     final root = workspaceRootFromSettings();
     final atlas = WorkflowHarness.detectProjectAtlas(root);
-    final task = WorkflowHarness.createTask(
+
+    final task = RuntimeTaskHarness.createTask(
       title: session?.meta.title.isNotEmpty == true ? session!.meta.title : 'Current task',
       objective: 'Project-aware execution in the active workspace.',
       rootPath: root,
     );
-    final decision = WorkflowHarness.decideNextPhase(task);
+    final decision = RuntimeTaskHarness.decideNextPhase(task);
     final tools = ToolRegistry.namesForProjectType(atlas.projectType).take(5).toList();
 
     return Container(
@@ -73,33 +74,11 @@ class ProjectRuntimeBanner extends ConsumerWidget {
             spacing: 8,
             runSpacing: 8,
             children: <Widget>[
-              _statusChip(p, Icons.route, decision.phase),
-              _statusChip(p, Icons.bolt, '${task.tokensUsed}/${task.tokensBudget} tokens'),
+              _statusChip(p, Icons.route, decision.name),
+              _statusChip(p, Icons.bolt, '${task.budget.tokensUsed}/${task.budget.tokenCap} tokens'),
               _statusChip(p, Icons.check_circle_outline, '${tools.length} tools'),
+              _statusChip(p, Icons.folder_open, '${task.budget.readsUsed}/${task.budget.readCap} reads'),
             ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            decision.reason,
-            style: TextStyle(color: p.muted, fontSize: 12.3, height: 1.55),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: tools
-                .map((name) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: p.surfaceHi,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        name,
-                        style: TextStyle(color: p.muted, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                    ))
-                .toList(),
           ),
         ],
       ),
@@ -676,15 +655,46 @@ class _ComposerState extends ConsumerState<Composer> {
     final pend = ref.read(pendingProvider);
     final text = _ctrl.text;
     if (text.trim().isEmpty && pend.isEmpty) return;
+
     final quote = ref.read(quoteProvider);
     if (_listening) {
       try { await _stt.stop(); } catch (_) {}
       _listening = false;
     }
+
+    final root = workspaceRootFromSettings();
+    final task = RuntimeTaskHarness.createTask(
+      title: session.meta.title.isEmpty ? 'Current task' : session.meta.title,
+      objective: 'Project-aware execution in the active workspace.',
+      rootPath: root,
+    );
+
+    final compactPayload = RuntimeContextManager.compactHistory(
+      task: task,
+      recentMessages: <String>[
+        'User: $text',
+        'Agent: I will inspect the active workspace and act within the allowed project scope.',
+      ],
+    );
+
+    task.budget.recordTokens(text.length);
+    task.budget.recordToolCall();
+
+    if (task.budget.isExhausted) {
+      final msg = 'Task budget exhausted. Reduce context and continue with a compact summary.';
+      _ctrl.clear();
+      ref.read(pendingProvider.notifier).clear();
+      ref.read(quoteProvider.notifier).set(null);
+      widget.onSent();
+      await session.send(msg, pend, quote: quote);
+      return;
+    }
+
     _ctrl.clear();
     ref.read(pendingProvider.notifier).clear();
     ref.read(quoteProvider.notifier).set(null);
     widget.onSent();
+
     if (session.generating && session.enqueue(text, pend, quote: quote)) return;
     await session.send(text, pend, quote: quote);
   }
@@ -993,42 +1003,6 @@ class _ComposerState extends ConsumerState<Composer> {
           Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 13))),
           Icon(Icons.expand_more, size: 16, color: p.muted),
         ]),
-      ),
-    );
-  }
-}
-
-class SegPicker<T> extends StatelessWidget {
-  final List<T> values;
-  final List<String> labels;
-  final T value;
-  final ValueChanged<T> onChanged;
-  const SegPicker({super.key, required this.values, required this.labels, required this.value, required this.onChanged});
-  @override
-  Widget build(BuildContext context) {
-    final p = pal(context);
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: p.surfaceHi, borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: List<Widget>.generate(values.length, (i) {
-          final sel = values[i] == value;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(values[i]),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: sel ? p.accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                alignment: Alignment.center,
-                child: Text(labels[i], style: TextStyle(color: sel ? p.onAccent : p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          );
-        }),
       ),
     );
   }
