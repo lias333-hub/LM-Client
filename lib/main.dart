@@ -1,3 +1,23 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:uuid/uuid.dart';
+
 part 'chat_page.dart';
 part 'core.dart';
 part 'llm.dart';
