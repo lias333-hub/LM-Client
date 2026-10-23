@@ -5,7 +5,7 @@ part of 'main.dart';
 //  Globals
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
-const String kAppVersion = '2.3.0';
+const String kAppVersion = '2.5.0';
 const String kOpenAI = 'openai';
 const String kAnthropic = 'anthropic';
 const String kGemini = 'gemini';
@@ -205,40 +205,10 @@ const Pal darkPal = Pal(
   codeText: Color(0xFFE6E4DC),
 );
 
-// ثيم Terminal: أسود دافئ، حدود رفيعة، نفس لون Claude البرتقالي.
-const Pal termPal = Pal(
-  bg: Color(0xFF111110),
-  surface: Color(0xFF181817),
-  surfaceHi: Color(0xFF232321),
-  border: Color(0xFF34332F),
-  text: Color(0xFFE6E4DC),
-  muted: Color(0xFF8C8A82),
-  accent: Color(0xFFD97757),
-  onAccent: Color(0xFF111110),
-  danger: Color(0xFFF2766B),
-  success: Color(0xFF6CC48F),
-  codeBg: Color(0xFF0A0A09),
-  codeText: Color(0xFFE6E4DC),
-);
+Pal pal(BuildContext c) => Theme.of(c).brightness == Brightness.dark ? darkPal : lightPal;
 
-class PalExt extends ThemeExtension<PalExt> {
-  final Pal pal;
-  const PalExt(this.pal);
-  @override
-  PalExt copyWith({Pal? pal}) => PalExt(pal ?? this.pal);
-  @override
-  PalExt lerp(ThemeExtension<PalExt>? other, double t) => (t >= 0.5 && other is PalExt) ? other : this;
-}
-
-Pal pal(BuildContext c) {
-  final t = Theme.of(c);
-  final ext = t.extension<PalExt>();
-  if (ext != null) return ext.pal;
-  return t.brightness == Brightness.dark ? darkPal : lightPal;
-}
-
-ThemeData buildTheme(Brightness b, {Pal? custom, bool mono = false}) {
-  final p = custom ?? (b == Brightness.dark ? darkPal : lightPal);
+ThemeData buildTheme(Brightness b) {
+  final p = b == Brightness.dark ? darkPal : lightPal;
   // fromSeed يعطي ألواناً دافئة متناسقة لكل ما لا نحدده يدوياً (بدل البنفسجي الافتراضي).
   final scheme = ColorScheme.fromSeed(seedColor: p.accent, brightness: b).copyWith(
     primary: p.accent,
@@ -256,8 +226,6 @@ ThemeData buildTheme(Brightness b, {Pal? custom, bool mono = false}) {
   return ThemeData(
     useMaterial3: true,
     brightness: b,
-    fontFamily: mono ? 'monospace' : null,
-    extensions: <ThemeExtension<dynamic>>[PalExt(p)],
     colorScheme: scheme,
     scaffoldBackgroundColor: p.bg,
     canvasColor: p.bg,

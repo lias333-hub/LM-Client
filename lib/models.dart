@@ -35,7 +35,7 @@ class AppSettings {
   }
 
   // appearance
-  int get themeMode => _i('themeMode', 0); // 0 system, 1 light, 2 dark, 3 terminal
+  int get themeMode => _i('themeMode', 0); // 0 system, 1 light, 2 dark
   bool get rtl => _b('rtl', true);
   bool get serif => _b('serif', true);
   double get fontScale => _d('fontScale', 1.0);
@@ -58,6 +58,8 @@ class AppSettings {
   // behaviour
   bool get tools => _b('tools', true);
   bool get confirm => _b('confirm', true);
+  /// موافقة أوامر bash: 'ask' (اسأل) أو 'auto' (تلقائي عدا الأوامر الخطرة).
+  String get bashApproval => _s('bashApproval', 'ask');
   bool get autoTitle => _b('autoTitle', false);
   bool get includeDate => _b('includeDate', true);
   bool get memoryOn => _b('memoryOn', true);
@@ -329,7 +331,6 @@ class Agent {
   final bool canRead;
   final bool canWrite;
   final bool canExecute;
-  final bool canShell;
   const Agent({
     required this.id,
     required this.name,
@@ -338,7 +339,6 @@ class Agent {
     this.canRead = true,
     this.canWrite = false,
     this.canExecute = false,
-    this.canShell = false,
   });
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -348,7 +348,6 @@ class Agent {
         'canRead': canRead,
         'canWrite': canWrite,
         'canExecute': canExecute,
-        'canShell': canShell,
       };
   factory Agent.fromJson(Map<String, dynamic> j) => Agent(
         id: asStr(j['id'], newId()),
@@ -358,7 +357,6 @@ class Agent {
         canRead: j['canRead'] != false,
         canWrite: j['canWrite'] == true,
         canExecute: j['canExecute'] == true,
-        canShell: j['canShell'] == true,
       );
 }
 
