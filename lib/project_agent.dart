@@ -509,58 +509,6 @@ class _ProjectWorkspaceScreenState extends ConsumerState<ProjectWorkspaceScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: p.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: p.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Icon(Icons.workspaces_outline, color: p.accent),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text('Active Project', style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600))),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: p.surfaceHi, borderRadius: BorderRadius.circular(999)),
-                          child: Text(atlas.projectType.toUpperCase(), style: TextStyle(color: p.text, fontSize: 11, fontWeight: FontWeight.w700)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(scope.root, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        _toolPill(p, Icons.route, 'Phase: $phase'),
-                        _toolPill(p, Icons.bolt, 'Budget: ${task.tokensUsed}/${task.tokensBudget}'),
-                        _toolPill(p, Icons.folder_open, 'Scope: ${scope.allowedRoots.length} root(s)'),
-                        _toolPill(p, Icons.check_circle_outline, 'Tools: ${allowedTools.length}'),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: allowedTools.map((name) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: p.surfaceHi,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(name, style: TextStyle(color: p.muted, fontSize: 11, fontWeight: FontWeight.w600)),
-                      )).toList(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
               Text('مساحة المشروع', style: TextStyle(color: p.text, fontSize: 22, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               TextField(

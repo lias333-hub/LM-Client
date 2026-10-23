@@ -148,6 +148,17 @@ List<ToolDef> availableTools(AppSettings s, Agent? agent, {required bool hasLibr
         _obj(<String, dynamic>{'url': _pStr('http(s) URL')}, <String>['url']),
       ));
     }
+    if (agent.canShell) {
+      t.add(ToolDef(
+        kToolShell,
+        'Run a bash command in Termux on the user phone (node, npm, git, python and more if installed there). Non-interactive only: there is no TTY, so commands waiting for input hang until the timeout. The user approves commands. Omit cwd unless you need another directory.',
+        _obj(<String, dynamic>{
+          'command': _pStr('Bash command line'),
+          'cwd': _pStr('Absolute working directory; defaults to the first folder allowed for the agent'),
+          'timeout_seconds': _pInt('Max run time in seconds, 5 to 300 (default 60)'),
+        }, <String>['command']),
+      ));
+    }
   }
   return t;
 }
@@ -400,6 +411,8 @@ Future<ToolOutcome> runTool(ToolCall c, Agent? agent, AppSettings s, {String con
         return await _toolWriteFile(c.args, agent, s, convId);
       case kToolFetchUrl:
         return await _toolFetchUrl(c.args, agent, s);
+      case kToolShell:
+        return await _toolShell(c.args, agent, s);
     }
     return ToolOutcome('Unknown tool: ${c.name}', true);
   } on ToolError catch (e) {

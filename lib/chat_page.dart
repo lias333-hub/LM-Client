@@ -1,104 +1,31 @@
 part of 'main.dart';
 
-class ProjectRuntimeBanner extends ConsumerWidget {
-  final ChatSession? session;
-  const ProjectRuntimeBanner({super.key, this.session});
+class ProjectStrip extends ConsumerWidget {
+  const ProjectStrip({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final raw = asStr(ref.watch(settingsProvider).m['workspaceRoot']).trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
     final p = pal(context);
-    final root = workspaceRootFromSettings();
-    final atlas = WorkflowHarness.detectProjectAtlas(root);
-
-    final task = RuntimeTaskHarness.createTask(
-      title: session?.meta.title.isNotEmpty == true ? session!.meta.title : 'Current task',
-      objective: 'Project-aware execution in the active workspace.',
-      rootPath: root,
-    );
-    final decision = RuntimeTaskHarness.decideNextPhase(task);
-    final tools = ToolRegistry.namesForProjectType(atlas.projectType).take(5).toList();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: p.border),
-        boxShadow: <BoxShadow>[
-          BoxShadow(color: Colors.black.withAlpha(12), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: p.surfaceHi,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.smart_toy_outlined, color: p.accent, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Project runtime',
-                  style: TextStyle(color: p.muted, fontSize: 11.5, fontWeight: FontWeight.w600),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: p.surfaceHi,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  atlas.projectType.toUpperCase(),
-                  style: TextStyle(color: p.text, fontSize: 11, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
+    final parts = raw.split('/').where((e) => e.isNotEmpty).toList();
+    final name = parts.isEmpty ? raw : parts.last;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => openProjectWorkspace(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+              Icon(Icons.folder_open, size: 15, color: p.accent),
+              const SizedBox(width: 6),
+              Text(name, style: TextStyle(color: p.muted, fontSize: 12.5, fontFamily: 'monospace')),
+            ]),
           ),
-          const SizedBox(height: 12),
-          Text(
-            root,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              _statusChip(p, Icons.route, decision.name),
-              _statusChip(p, Icons.bolt, '${task.budget.tokensUsed}/${task.budget.tokenCap} tokens'),
-              _statusChip(p, Icons.check_circle_outline, '${tools.length} tools'),
-              _statusChip(p, Icons.folder_open, '${task.budget.readsUsed}/${task.budget.readCap} reads'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusChip(Pal p, IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: p.surfaceHi,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 12, color: p.accent),
-          const SizedBox(width: 5),
-          Text(text, style: TextStyle(color: p.text, fontSize: 11, fontWeight: FontWeight.w600)),
-        ],
+        ),
       ),
     );
   }
@@ -122,14 +49,15 @@ class LMClientApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(settingsProvider);
-    final mode = s.themeMode == 1 ? ThemeMode.light : (s.themeMode == 2 ? ThemeMode.dark : ThemeMode.system);
+    final mode = s.themeMode == 1 ? ThemeMode.light : ((s.themeMode == 2 || s.themeMode == 3) ? ThemeMode.dark : ThemeMode.system);
+    final term = s.themeMode == 3;
     return MaterialApp(
       title: kAppName,
       debugShowCheckedModeBanner: false,
       navigatorKey: navKey,
       scaffoldMessengerKey: messengerKey,
       theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
+      darkTheme: term ? buildTheme(Brightness.dark, custom: termPal, mono: true) : buildTheme(Brightness.dark),
       themeMode: mode,
       builder: (context, child) => Directionality(
         textDirection: s.rtl ? TextDirection.rtl : TextDirection.ltr,
@@ -289,7 +217,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with WidgetsBindingObserver
       appBar: _selecting ? _selectionBar(context, session, p) : _normalBar(context, session, p, projects),
       body: Column(
         children: [
-          ProjectRuntimeBanner(session: session),
+          const ProjectStrip(),
           Expanded(child: _body(context, session, p, boot)),
           Composer(session: session, onSent: _onSent),
         ],
@@ -833,25 +761,6 @@ class _ComposerState extends ConsumerState<Composer> {
           boxShadow: <BoxShadow>[BoxShadow(color: Colors.black.withAlpha(16), blurRadius: 14, offset: const Offset(0, 3))],
         ),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Container(
-            margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: p.surfaceHi,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: p.border),
-            ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                _quickChip(p, Icons.folder_open_rounded, 'Project', () => openProjectWorkspace(context)),
-                _quickChip(p, Icons.route_rounded, atlas.projectType, () => openProjectWorkspace(context)),
-                _quickChip(p, Icons.security_rounded, 'Safe tools', _openPlus),
-                _quickChip(p, Icons.auto_awesome_rounded, 'Compile plan', () => toast('تم تجهيز خطة التنفيذ الحالية')), 
-              ],
-            ),
-          ),
           if (quote != null)
             Container(
               margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),

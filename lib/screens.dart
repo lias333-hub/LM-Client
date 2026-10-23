@@ -110,17 +110,17 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
               ),
             ),
           ),
-          SizedBox(
-            height: 42,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Wrap(
+              runSpacing: 8,
               children: <Widget>[
                 _navChip(p, Icons.folder_outlined, 'المشاريع', () => _go(const ProjectsScreen())),
                 _navChip(p, Icons.desktop_windows_outlined, 'المساحة', () => openProjectWorkspace(context)),
                 _navChip(p, Icons.library_books_outlined, 'المكتبة', () => _go(const LibraryScreen())),
                 _navChip(p, Icons.bookmark_border, 'الذاكرة', () => _go(const MemoryScreen())),
                 _navChip(p, Icons.smart_toy_outlined, 'Agents', () => _go(const AgentsScreen())),
+                _navChip(p, Icons.terminal, 'Terminal', () => _go(const TerminalScreen())),
                 _navChip(p, Icons.phone_android, 'ملفات الهاتف', () => _go(const PhoneFilesScreen())),
               ],
             ),
@@ -223,11 +223,11 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: 8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(i, size: 17, color: p.accent),
             const SizedBox(width: 6),

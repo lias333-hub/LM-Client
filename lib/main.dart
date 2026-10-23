@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 
+part 'agents.dart';
 part 'chat_page.dart';
 part 'compat.dart';
 part 'core.dart';
@@ -31,6 +32,7 @@ part 'settings.dart';
 part 'store.dart';
 part 'task_harness.dart';
 part 'task_runtime.dart';
+part 'terminal.dart';
 part 'tool_registry.dart';
 part 'tools.dart';
 part 'verification_gate.dart';

@@ -393,7 +393,7 @@ class SettingsScreen extends ConsumerWidget {
         _Group(title: 'المظهر', children: <Widget>[
           _Block(
             title: 'السمة',
-            child: SegPicker<int>(values: const <int>[0, 1, 2], labels: const <String>['تلقائي', 'فاتح', 'داكن'], value: s.themeMode, onChanged: (v) => notifier.set('themeMode', v)),
+            child: SegPicker<int>(values: const <int>[0, 1, 2, 3], labels: const <String>['تلقائي', 'فاتح', 'داكن', 'Terminal'], value: s.themeMode, onChanged: (v) => notifier.set('themeMode', v)),
           ),
           _SwitchRow(title: 'الواجهة من اليمين لليسار', subtitle: 'اتجاه التطبيق العام. اتجاه كل رسالة يُكتشف تلقائياً من لغتها.', value: s.rtl, onChanged: (v) => notifier.set('rtl', v)),
           _SwitchRow(title: 'خط Serif لنص المحادثة', subtitle: 'مثل تطبيق Claude', value: s.serif, onChanged: (v) => notifier.set('serif', v)),

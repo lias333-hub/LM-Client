@@ -153,7 +153,6 @@ Future<void> showInspector(BuildContext context, dynamic session) async {}
 
 Future<void> showModelPicker(BuildContext context, [Object? profile]) async {}
 
-Future<void> showAgentPicker(BuildContext context) async {}
 
 Future<void> exportConversation(BuildContext context, dynamic session) async {}
 
@@ -239,7 +238,7 @@ class SegPicker<T> extends StatelessWidget {
 BoxDecoration cardDeco(Pal p, {bool selected = false}) {
   return BoxDecoration(
     color: selected ? p.surfaceHi : p.surface,
-    borderRadius: BorderRadius.circular(18),
+    borderRadius: BorderRadius.circular(12),
     border: Border.all(color: selected ? p.accent : p.border),
   );
 }
@@ -264,11 +263,6 @@ class MemoryScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Memory')));
 }
 
-class AgentsScreen extends StatelessWidget {
-  const AgentsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Agents')));
-}
 
 class PhoneFilesScreen extends StatelessWidget {
   const PhoneFilesScreen({super.key});
@@ -283,7 +277,7 @@ Future<List<PendingAtt>> pickAttachments({bool images = false}) async {
       final files = await ImagePicker().pickMultiImage();
       for (final x in files) {
         final bytes = await x.readAsBytes();
-        out.add(PendingAtt(id: newId(), name: x.name, mime: mimeFromName(x.name), size: bytes.length, bytes: bytes, path: x.path));
+        out.add(PendingAtt(id: newId(), name: x.name, mime: mimeFromName(x.name), size: bytes.length, bytes: bytes));
       }
     } else {
       final res = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true, type: FileType.any);
@@ -291,7 +285,8 @@ Future<List<PendingAtt>> pickAttachments({bool images = false}) async {
       for (final f in res.files) {
         Uint8List? b = f.bytes;
         if (b == null && f.path != null) b = await File(f.path!).readAsBytes();
-        out.add(PendingAtt(id: newId(), name: f.name, mime: mimeFromName(f.name), size: f.size, bytes: b, path: f.path));
+        if (b == null) continue;
+        out.add(PendingAtt(id: newId(), name: f.name, mime: mimeFromName(f.name), size: b.length, bytes: b));
       }
     }
   } catch (e) {
