@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.lmclient.termux">
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <queries>
+        <package android:name="com.termux" />
+    </queries>
+    <application>
+        <receiver
+            android:name="com.lmclient.termux.TermuxResultReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
