@@ -21,28 +21,21 @@ Preparing "Install Android SDK Platform 33 (revision: 3)".
 Installing Android SDK Platform 33 in /usr/local/lib/android/sdk/platforms/android-33
 "Install Android SDK Platform 33 (revision: 3)" complete.
 "Install Android SDK Platform 33 (revision: 3)" finished.
-../../../.pub-cache/hosted/pub.dev/meta-1.19.0/lib/meta.dart:1:1: Error: The specified language version is too high. The highest supported language version is 3.4.
-// Copyright (c) 2016, the Dart project authors. Please see the AUTHORS file
-^
-../../../.pub-cache/hosted/pub.dev/meta-1.19.0/lib/meta_meta.dart:1:1: Error: The specified language version is too high. The highest supported language version is 3.4.
-// Copyright (c) 2020, the Dart project authors. Please see the AUTHORS file
-^
-Target kernel_snapshot failed: Exception
-
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':app:compileFlutterBuildRelease'.
-> Process 'command '/opt/hostedtoolcache/flutter/stable-3.22.0-x64/flutter/bin/flutter'' finished with non-zero exit value 1
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-
-* Get more help at https://help.gradle.org
-
-BUILD FAILED in 2m 54s
-Running Gradle task 'assembleRelease'...                          175.3s
-Gradle task assembleRelease failed with exit code 1
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 13224 bytes (99.2% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Caught exception: Already watching path: /opt/hostedtoolcache/flutter/stable-3.22.0-x64/flutter/packages/flutter_tools/gradle
+e: /home/runner/.gradle/caches/transforms-3/84f9a2a8e90bc49cea8eb6f83b8fa2e7/transformed/jetified-activity-1.9.1/jars/classes.jar!/META-INF/activity_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/6aee316721cde10eee602b1ec4b1a4a6/transformed/lifecycle-livedata-core-2.6.2/jars/classes.jar!/META-INF/lifecycle-livedata-core_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/4ac619b9deba4a1fa8987b5cd7ce3b2f/transformed/lifecycle-livedata-2.6.2/jars/classes.jar!/META-INF/lifecycle-livedata_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/b44e82f04ca2fbbb378f070b4fb3afd1/transformed/lifecycle-viewmodel-2.6.2/jars/classes.jar!/META-INF/lifecycle-viewmodel_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/9284d5dbf531e8af2d4296bbf056c51a/transformed/jetified-lifecycle-viewmodel-savedstate-2.6.2/jars/classes.jar!/META-INF/lifecycle-viewmodel-savedstate_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/b977d140845cfa8829de711262a9ed75/transformed/jetified-core-ktx-1.13.1/jars/classes.jar!/META-INF/core-ktx_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/2f6a5506f4dac22f7ab67b13b215ea43/transformed/core-1.13.1/jars/classes.jar!/META-INF/core_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/7628447021ddaf60af1b9170edc954e9/transformed/lifecycle-runtime-2.6.2/jars/classes.jar!/META-INF/lifecycle-runtime_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/modules-2/files-2.1/androidx.lifecycle/lifecycle-common/2.6.2/10f354fdb64868baecd67128560c5a0d6312c495/lifecycle-common-2.6.2.jar!/META-INF/lifecycle-common.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/transforms-3/93b9d15e098df96a93b7a4fb1262fd3b/transformed/jetified-savedstate-1.2.1/jars/classes.jar!/META-INF/savedstate_release.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/1.8.22/636bf8b320e7627482771bbac9ed7246773c02bd/kotlin-stdlib-1.8.22.jar!/META-INF/kotlin-stdlib-jdk7.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/1.8.22/636bf8b320e7627482771bbac9ed7246773c02bd/kotlin-stdlib-1.8.22.jar!/META-INF/kotlin-stdlib.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/1.8.22/636bf8b320e7627482771bbac9ed7246773c02bd/kotlin-stdlib-1.8.22.jar!/META-INF/kotlin-stdlib-jdk8.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+e: /home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib-common/1.8.22/1a8e3601703ae14bb58757ea6b2d8e8e5935a586/kotlin-stdlib-common-1.8.22.jar!/META-INF/kotlin-stdlib-common.kotlin_module: Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 1.8.0, expected version is 1.6.0.
+Running Gradle task 'assembleRelease'...                          211.1s
+✓ Built build/app/outputs/flutter-apk/app-release.apk (26.2MB)
