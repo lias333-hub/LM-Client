@@ -1,0 +1,7 @@
+Resolving dependencies...
+Note: meta is pinned to version 1.12.0 by flutter from the flutter SDK.
+See https://dart.dev/go/sdk-version-pinning for details.
+
+
+Because every version of dartssh2 from git depends on meta ^1.16.0 and every version of flutter from sdk depends on meta 1.12.0, dartssh2 from git is incompatible with flutter from sdk.
+So, because LMClient depends on both flutter from sdk and dartssh2 from git, version solving failed.
