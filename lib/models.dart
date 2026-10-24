@@ -59,6 +59,8 @@ class AppSettings {
   // behaviour
   bool get tools => _b('tools', true);
   bool get confirm => _b('confirm', true);
+  /// موافقة أوامر bash: 'ask' (اسأل) أو 'auto' (تلقائي عدا الأوامر الخطرة).
+  String get bashApproval => _s('bashApproval', 'ask');
   bool get autoTitle => _b('autoTitle', false);
   bool get includeDate => _b('includeDate', true);
   bool get memoryOn => _b('memoryOn', true);

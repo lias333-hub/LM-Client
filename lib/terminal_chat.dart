@@ -46,6 +46,7 @@ const List<_Cmd> _kCmds = <_Cmd>[
   _Cmd('/retry', 'إعادة توليد آخر رد'),
   _Cmd('/copy', 'نسخ آخر رد'),
   _Cmd('/cd', 'تحديد مجلد المشروع', arg: true),
+  _Cmd('/env', 'اختيار بيئة التنفيذ (هذا الهاتف / SSH)'),
   _Cmd('/terminal', 'فتح شاشة الطرفية'),
   _Cmd('/chat', 'العودة لوضع المحادثة'),
 ];
@@ -271,6 +272,9 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
       case '/cd':
         _cd(arg);
         break;
+      case '/env':
+        showWorkspacePicker(context);
+        break;
       case '/terminal':
         Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TerminalScreen()));
         break;
@@ -327,7 +331,14 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
       _stick = true;
       final entry = TerminalEntry(cmd, false);
       setState(() => _runs.add(_ShellRun(s.messages.length, entry)));
-      final r = await TermuxBridge.run(cmd);
+      ShellResult? r = await runUserCommandInWorkspace(cmd, s.meta.id);
+      if (r == null) {
+        if (await TermuxBridge.isInstalled()) {
+          r = await TermuxBridge.run(cmd);
+        } else {
+          r = const ShellResult(ok: false, error: 'لا توجد بيئة تنفيذ. اكتب /env واختر «هذا الهاتف» (أو أضف بيئة SSH)');
+        }
+      }
       entry.result = r;
       if (mounted) setState(() {});
       return;

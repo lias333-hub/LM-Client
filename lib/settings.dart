@@ -483,6 +483,12 @@ class SettingsScreen extends ConsumerWidget {
         _Group(title: 'السلوك', children: <Widget>[
           _SwitchRow(title: 'الأدوات (Function calling)', subtitle: 'ذاكرة، مكتبة، وملفات/ويب عبر الـ Agent', value: s.tools, onChanged: (v) => notifier.set('tools', v)),
           _SwitchRow(title: 'طلب موافقتي قبل الكتابة وفتح الروابط', subtitle: 'يُنصح بإبقائه مفعّلاً', value: s.confirm, onChanged: (v) => notifier.set('confirm', v)),
+          _NavRow(
+            icon: Icons.terminal,
+            title: 'بيئات التنفيذ (هذا الهاتف / SSH)',
+            subtitle: 'طرفية لـ Claude مع موافقة على كل أمر، واختبار التنفيذ',
+            onTap: () => pushScreen(const WorkspacesScreen()),
+          ),
           _SwitchRow(title: 'تسمية المحادثات تلقائياً بالنموذج', subtitle: 'طلب إضافي صغير بعد أول رد (يستهلك توكنز)', value: s.autoTitle, onChanged: (v) => notifier.set('autoTitle', v)),
           _SwitchRow(
               title: 'التخزين المؤقت للـ prompt (Anthropic)',

@@ -57,6 +57,15 @@ Future<void> showAgentPicker(BuildContext context) {
                     ),
                   Divider(height: 1, color: p.border),
                   SheetAction(
+                    icon: Icons.terminal,
+                    title: 'بيئة التنفيذ (Bash)',
+                    subtitle: ref.watch(selectedWorkspaceProvider) == null ? 'غير مفعّلة' : 'مفعّلة',
+                    onTap: () {
+                      Navigator.pop(c);
+                      showWorkspacePicker(context);
+                    },
+                  ),
+                  SheetAction(
                     icon: Icons.tune,
                     title: 'إدارة الـ Agents',
                     onTap: () {

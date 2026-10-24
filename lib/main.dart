@@ -18,6 +18,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
+import 'package:dartssh2/dartssh2.dart' as ssh;
+import 'package:pinenacl/ed25519.dart' as nacl;
+import 'package:xterm/xterm.dart' as xt;
 
 part 'agents.dart';
 part 'chat_page.dart';
@@ -40,3 +43,7 @@ part 'tool_registry.dart';
 part 'ui_kit.dart';
 part 'tools.dart';
 part 'verification_gate.dart';
+part 'workspace.dart';
+part 'local_exec.dart';
+part 'exec_probe.dart';
+part 'workspace_ui.dart';

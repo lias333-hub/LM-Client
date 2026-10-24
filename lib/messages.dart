@@ -69,6 +69,12 @@ String toolLabel(String name) {
       return 'بحث في الملفات';
     case kToolOutline:
       return 'خريطة الملف';
+    case kToolBash:
+      return 'أمر Bash';
+    case kToolBashOut:
+      return 'مخرجات مهمة خلفية';
+    case kToolKillShell:
+      return 'إيقاف مهمة خلفية';
     case kToolTime:
       return 'الوقت الحالي';
   }
@@ -97,6 +103,10 @@ IconData toolIcon(String name) {
       return Icons.search;
     case kToolOutline:
       return Icons.account_tree_outlined;
+    case kToolBash:
+    case kToolBashOut:
+    case kToolKillShell:
+      return Icons.terminal;
     case kToolTime:
       return Icons.schedule;
   }
@@ -110,6 +120,10 @@ String toolSummary(ToolCall c) {
     final where = asStr(c.args['path']).trim().split('/').where((e) => e.isNotEmpty).toList();
     final tail = where.isEmpty ? '' : ' · ${where.last}';
     if (pt.isNotEmpty || gl.isNotEmpty) return '${pt.isNotEmpty ? pt : gl}$tail';
+  }
+  if (c.name == kToolBash) {
+    final cmd = asStr(c.args['command']).trim().split('\n').first;
+    if (cmd.isNotEmpty) return clip(cmd, 120);
   }
   if (c.name == kToolReadFile) {
     final off = c.args['offset'];

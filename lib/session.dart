@@ -266,6 +266,7 @@ class ChatSession extends ChangeNotifier {
   void stop() {
     final c = _cancel;
     if (c != null && !c.isCancelled) c.cancel('stopped');
+    BashRuntime.cancelAll();
   }
 
   Future<void> rename(String title) async {
@@ -829,7 +830,7 @@ class ChatSession extends ChangeNotifier {
     final project = c.read(projectsProvider.notifier).byId(meta.projectId);
     final mem = c.read(memoryProvider);
     final lib = c.read(libraryProvider);
-    final tools = availableTools(s, agent, hasLibrary: lib.isNotEmpty, hasMemory: mem.isNotEmpty);
+    final tools = availableTools(s, agent, hasLibrary: lib.isNotEmpty, hasMemory: mem.isNotEmpty, workspace: currentWorkspace());
     final system = await buildSystemPrompt(s: s, project: project, agent: agent, memory: mem, library: lib, tools: tools);
     final hist = _history(pending, s);
     if (hist.isEmpty) throw ApiException('لا توجد رسائل لإرسالها (كلها مستبعدة من السياق).');
@@ -963,6 +964,7 @@ class SessionHub {
     await LocalStorage.remove('chats', id);
     await CheckpointStore.purge(id);
     ReadLedger.forget(id);
+    BashRuntime.forget(id);
     await appContainer.read(convListProvider.notifier).remove(id);
     if (current.value.meta.id == id) {
       // جلسة جديدة فعلاً (وليس إعادة استخدام الجلسة المحذوفة بمعرّفها القديم).

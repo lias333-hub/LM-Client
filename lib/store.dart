@@ -464,6 +464,8 @@ Future<void> bootstrap() async {
     await c.read(projectsProvider.notifier).load();
     await c.read(memoryProvider.notifier).load();
     await c.read(agentsProvider.notifier).load();
+    await c.read(workspacesProvider.notifier).load();
+    await c.read(selectedWorkspaceProvider.notifier).load();
     await c.read(libraryProvider.notifier).load();
     await c.read(convListProvider.notifier).load();
     await c.read(selectedAgentProvider.notifier).load();
