@@ -273,7 +273,8 @@ class _Block extends StatelessWidget {
 }
 
 class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+  final String? section;
+  const SettingsScreen({super.key, this.section});
 
   Future<void> _askInt(BuildContext context, WidgetRef ref, String key, String title, String hint, int cur, {int min = 0, int fallback = 0}) async {
     final t = await askText(context, title, initial: cur > 0 ? '$cur' : '', hint: hint);
@@ -320,10 +321,8 @@ class SettingsScreen extends ConsumerWidget {
     String tempText = s.temperature < 0 ? 'افتراضي' : s.temperature.toStringAsFixed(1);
     String topText = s.topP < 0 ? 'افتراضي' : s.topP.toStringAsFixed(2);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
-        // ---- providers
+    final all = <String, List<Widget>>{
+      'providers': <Widget>[
         SectionLabel('مزوّدو الـ API'),
         if (ps.list.isEmpty)
           Container(
@@ -389,11 +388,12 @@ class SettingsScreen extends ConsumerWidget {
           child: OutlinedButton.icon(onPressed: () => openProfileEditor(context, null), icon: const Icon(Icons.add, size: 18), label: const Text('إضافة مزوّد')),
         ),
 
-        // ---- appearance
+      ],
+      'appearance': <Widget>[
         _Group(title: 'المظهر', children: <Widget>[
           _Block(
             title: 'السمة',
-            child: SegPicker<int>(values: const <int>[0, 1, 2, 3], labels: const <String>['تلقائي', 'فاتح', 'داكن', 'Terminal'], value: s.themeMode, onChanged: (v) => notifier.set('themeMode', v)),
+            child: SegPicker<int>(values: const <int>[0, 1, 2], labels: const <String>['تلقائي', 'فاتح', 'داكن'], value: s.themeMode, onChanged: (v) => notifier.set('themeMode', v)),
           ),
           _SwitchRow(title: 'الواجهة من اليمين لليسار', subtitle: 'اتجاه التطبيق العام. اتجاه كل رسالة يُكتشف تلقائياً من لغتها.', value: s.rtl, onChanged: (v) => notifier.set('rtl', v)),
           _SwitchRow(title: 'خط Serif لنص المحادثة', subtitle: 'مثل تطبيق Claude', value: s.serif, onChanged: (v) => notifier.set('serif', v)),
@@ -404,7 +404,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ]),
 
-        // ---- generation
+      ],
+      'generation': <Widget>[
         _Group(title: 'التوليد', children: <Widget>[
           _Block(
             title: 'مستوى التفكير',
@@ -477,7 +478,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ]),
 
-        // ---- behaviour
+      ],
+      'behaviour': <Widget>[
         _Group(title: 'السلوك', children: <Widget>[
           _SwitchRow(title: 'الأدوات (Function calling)', subtitle: 'ذاكرة، مكتبة، وملفات/ويب عبر الـ Agent', value: s.tools, onChanged: (v) => notifier.set('tools', v)),
           _SwitchRow(title: 'طلب موافقتي قبل الكتابة وفتح الروابط', subtitle: 'يُنصح بإبقائه مفعّلاً', value: s.confirm, onChanged: (v) => notifier.set('confirm', v)),
@@ -499,6 +501,11 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (v) => notifier.set('includeDate', v)),
           _SwitchRow(title: 'إرسال الذاكرة للنموذج', value: s.memoryOn, onChanged: (v) => notifier.set('memoryOn', v)),
           _SwitchRow(title: 'إظهار عدّاد التوكنز', value: s.showTokens, onChanged: (v) => notifier.set('showTokens', v)),
+          _SwitchRow(
+              title: 'تنسيق غني في الردود',
+              subtitle: 'مربعات تنبيه وألوان وتمييز. يُرسل للنموذج دليل صغير لاستخدامها',
+              value: s.richFormat,
+              onChanged: (v) => notifier.set('richFormat', v)),
           _SwitchRow(title: 'أزرار تحريك المؤشر في الإدخال', value: s.cursorBtns, onChanged: (v) => notifier.set('cursorBtns', v)),
           _NavRow(
             icon: Icons.content_cut,
@@ -508,7 +515,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ]),
 
-        // ---- voice
+      ],
+      'voice': <Widget>[
         _Group(title: 'الصوت', children: <Widget>[
           _Block(
             title: 'سرعة القراءة الصوتية',
@@ -523,7 +531,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ]),
 
-        // ---- data
+      ],
+      'data': <Widget>[
         _Group(title: 'البيانات', children: <Widget>[
           _NavRow(icon: Icons.backup_outlined, title: 'نسخة احتياطية', subtitle: 'تصدير الإعدادات والمزوّدين والمحادثات', onTap: () => showBackupSheet(context)),
           _NavRow(icon: Icons.restore, title: 'استعادة من ملف', onTap: () => importBackup(context)),
@@ -558,7 +567,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ]),
 
-        // ---- about
+      ],
+      'about': <Widget>[
         _Group(title: 'حول', children: <Widget>[
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -567,8 +577,54 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text('عميل API عام: Anthropic · OpenAI-compatible · Gemini. مفاتيحك تُحفظ على جهازك فقط، نصاً غير مشفّر داخل تخزين التطبيق.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
           ),
         ]),
-      ]),
+      ],
+    };
+    const titles = <String, String>{
+      'providers': 'مزوّدو الـ API',
+      'appearance': 'المظهر',
+      'generation': 'التوليد',
+      'behaviour': 'السلوك',
+      'voice': 'الصوت',
+      'data': 'البيانات',
+      'about': 'حول',
+    };
+    final sec = section;
+    if (sec == null) {
+      final sel = ps.selected;
+      final selName = sel == null ? '' : sel.name;
+      final rows = <Widget>[
+        NavRow(icon: Icons.key_outlined, title: titles['providers']!, subtitle: ps.list.isEmpty ? 'لم تُضف مزوّداً بعد' : '${ps.list.length} مزوّد${selName.isEmpty ? '' : ' · $selName'}', onTap: () => _open(context, 'providers')),
+        NavRow(icon: Icons.palette_outlined, title: titles['appearance']!, subtitle: 'السمة، الاتجاه، الخط', onTap: () => _open(context, 'appearance')),
+        NavRow(icon: Icons.tune, title: titles['generation']!, subtitle: 'التفكير، الحرارة، حدود السياق', onTap: () => _open(context, 'generation')),
+        NavRow(icon: Icons.toggle_on_outlined, title: titles['behaviour']!, subtitle: 'الأدوات، الموافقات، التلخيص', onTap: () => _open(context, 'behaviour')),
+        NavRow(icon: Icons.mic_none, title: titles['voice']!, subtitle: 'سرعة القراءة، لغة الإملاء', onTap: () => _open(context, 'voice')),
+        NavRow(icon: Icons.storage_outlined, title: titles['data']!, subtitle: 'نسخ احتياطي، الصلاحيات، الحذف', onTap: () => _open(context, 'data')),
+        NavRow(icon: Icons.info_outline, title: titles['about']!, subtitle: '$kAppName v$kAppVersion', onTap: () => _open(context, 'about')),
+      ];
+      final kids = <Widget>[];
+      for (int i = 0; i < rows.length; i++) {
+        if (i > 0) kids.add(Divider(height: 1, color: p.border));
+        kids.add(rows[i]);
+      }
+      return Scaffold(
+        appBar: AppBar(title: const Text('الإعدادات')),
+        body: ListView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 40), children: <Widget>[
+          Container(
+            decoration: cardDeco(p),
+            clipBehavior: Clip.antiAlias,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kids),
+          ),
+        ]),
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text(titles[sec] ?? 'الإعدادات')),
+      body: ListView(padding: const EdgeInsets.only(bottom: 40), children: all[sec] ?? <Widget>[]),
     );
+  }
+
+  void _open(BuildContext context, String key) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(section: key)));
   }
 }
 

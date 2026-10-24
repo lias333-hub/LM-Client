@@ -49,8 +49,8 @@ class LMClientApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(settingsProvider);
-    final mode = s.themeMode == 1 ? ThemeMode.light : ((s.themeMode == 2 || s.themeMode == 3) ? ThemeMode.dark : ThemeMode.system);
-    final term = s.themeMode == 3;
+    final term = s.uiMode == 1;
+    final mode = term ? ThemeMode.dark : (s.themeMode == 1 ? ThemeMode.light : (s.themeMode == 2 ? ThemeMode.dark : ThemeMode.system));
     return MaterialApp(
       title: kAppName,
       debugShowCheckedModeBanner: false,
@@ -197,19 +197,20 @@ class _ChatPageState extends ConsumerState<ChatPage> with WidgetsBindingObserver
     final boot = ref.watch(bootProvider);
     final ps = ref.watch(profilesProvider);
     final projects = ref.watch(projectsProvider);
+    final term = ref.watch(settingsProvider).uiMode == 1;
     return ValueListenableBuilder<ChatSession>(
       valueListenable: hub.current,
       builder: (context, session, _) {
         _attach(session);
         return AnimatedBuilder(
           animation: session,
-          builder: (context, _) => _scaffold(context, session, boot, ps, projects),
+          builder: (context, _) => _scaffold(context, session, boot, ps, projects, term),
         );
       },
     );
   }
 
-  Widget _scaffold(BuildContext context, ChatSession session, bool boot, ProfilesState ps, List<Project> projects) {
+  Widget _scaffold(BuildContext context, ChatSession session, bool boot, ProfilesState ps, List<Project> projects, bool term) {
     final p = pal(context);
     return Scaffold(
       key: _scaffoldKey,
@@ -217,9 +218,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with WidgetsBindingObserver
       appBar: _selecting ? _selectionBar(context, session, p) : _normalBar(context, session, p, projects),
       body: Column(
         children: [
-          const ProjectStrip(),
-          Expanded(child: _body(context, session, p, boot)),
-          Composer(session: session, onSent: _onSent),
+          const ChatTopStrip(),
+          Expanded(child: term ? TerminalChatView(session: session) : _body(context, session, p, boot)),
+          if (!term) Composer(session: session, onSent: _onSent),
         ],
       ),
     );

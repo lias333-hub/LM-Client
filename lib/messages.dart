@@ -323,7 +323,7 @@ class _CodeBlockState extends State<CodeBlock> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(14),
-            child: SelectableText.rich(TextSpan(style: mono, children: _spans), style: mono),
+            child: Text.rich(TextSpan(style: mono, children: _spans), style: mono),
           ),
         ]),
       ),
@@ -367,6 +367,155 @@ MarkdownStyleSheet buildMdSheet(BuildContext c, Pal p, AppSettings s) {
     tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     horizontalRuleDecoration: BoxDecoration(border: Border(top: BorderSide(color: p.border, width: 1))),
     blockSpacing: 12,
+  );
+}
+
+// ---- تنسيق غني: ألوان، تمييز، ومربعات تنبيه (GitHub alerts) ----------------
+Color mdColor(String name, bool dark) {
+  switch (name) {
+    case 'red':
+      return dark ? const Color(0xFFF2766B) : const Color(0xFFB3261E);
+    case 'green':
+      return dark ? const Color(0xFF6CC48F) : const Color(0xFF1E7A45);
+    case 'orange':
+      return dark ? const Color(0xFFF0A35E) : const Color(0xFFB45B09);
+    case 'violet':
+      return dark ? const Color(0xFFB69CF5) : const Color(0xFF6A3FC4);
+    case 'gray':
+      return dark ? const Color(0xFF9A988F) : const Color(0xFF5F5E5A);
+    case 'yellow':
+      return dark ? const Color(0xFFE6C84F) : const Color(0xFF8A6D00);
+    default:
+      return dark ? const Color(0xFF7DB1F5) : const Color(0xFF1F5FBF);
+  }
+}
+
+class ColorSyntax extends md.InlineSyntax {
+  ColorSyntax() : super(r':(blue|red|green|orange|violet|gray|yellow)\[([^\]\n]+)\]');
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final el = md.Element.text('lmcolor', match[2]!);
+    el.attributes['c'] = match[1]!;
+    parser.addNode(el);
+    return true;
+  }
+}
+
+class MarkSyntax extends md.InlineSyntax {
+  MarkSyntax() : super(r'==([^=\n]+)==');
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    parser.addNode(md.Element.text('lmmark', match[1]!));
+    return true;
+  }
+}
+
+class ColorBuilder extends MarkdownElementBuilder {
+  final bool dark;
+  ColorBuilder(this.dark);
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final c = mdColor(element.attributes['c'] ?? 'blue', dark);
+    return RichText(text: TextSpan(text: element.textContent, style: (preferredStyle ?? const TextStyle()).copyWith(color: c, fontWeight: FontWeight.w600)));
+  }
+}
+
+class MarkBuilder extends MarkdownElementBuilder {
+  final bool dark;
+  MarkBuilder(this.dark);
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final bg = dark ? const Color(0x55E6C84F) : const Color(0x88FFE680);
+    return RichText(text: TextSpan(text: element.textContent, style: (preferredStyle ?? const TextStyle()).copyWith(backgroundColor: bg)));
+  }
+}
+
+class _AlertSeg {
+  final String? kind;
+  final String text;
+  const _AlertSeg(this.kind, this.text);
+}
+
+List<_AlertSeg> splitAlerts(String s) {
+  if (!s.contains('[!')) return <_AlertSeg>[_AlertSeg(null, s)];
+  final re = RegExp(r'^\s*>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO)\]\s*(.*)$', caseSensitive: false);
+  final out = <_AlertSeg>[];
+  final buf = <String>[];
+  final lines = s.split('\n');
+  void flush() {
+    final t = buf.join('\n');
+    buf.clear();
+    if (t.trim().isNotEmpty) out.add(_AlertSeg(null, t));
+  }
+
+  var i = 0;
+  while (i < lines.length) {
+    final m = re.firstMatch(lines[i]);
+    if (m == null) {
+      buf.add(lines[i]);
+      i++;
+      continue;
+    }
+    flush();
+    final body = <String>[];
+    final first = (m.group(2) ?? '').trim();
+    if (first.isNotEmpty) body.add(first);
+    i++;
+    while (i < lines.length && lines[i].trimLeft().startsWith('>')) {
+      var l = lines[i].trimLeft().substring(1);
+      if (l.startsWith(' ')) l = l.substring(1);
+      body.add(l);
+      i++;
+    }
+    out.add(_AlertSeg(m.group(1)!.toUpperCase(), body.join('\n')));
+  }
+  flush();
+  return out;
+}
+
+Widget _alertBox(bool dark, String kind, Widget body) {
+  String label;
+  IconData icon;
+  String color;
+  switch (kind) {
+    case 'TIP':
+      label = 'نصيحة';
+      icon = Icons.lightbulb_outline;
+      color = 'green';
+      break;
+    case 'IMPORTANT':
+      label = 'مهم';
+      icon = Icons.priority_high;
+      color = 'violet';
+      break;
+    case 'WARNING':
+      label = 'تنبيه';
+      icon = Icons.warning_amber_rounded;
+      color = 'orange';
+      break;
+    case 'CAUTION':
+      label = 'تحذير';
+      icon = Icons.error_outline;
+      color = 'red';
+      break;
+    default:
+      label = 'ملاحظة';
+      icon = Icons.info_outline;
+      color = 'blue';
+  }
+  final c = mdColor(color, dark);
+  return Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(color: c.withAlpha(dark ? 30 : 22), borderRadius: BorderRadius.circular(10), border: Border.all(color: c.withAlpha(120))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+      Row(children: <Widget>[
+        Icon(icon, size: 18, color: c),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(color: c, fontWeight: FontWeight.w700, fontSize: 14)),
+      ]),
+      const SizedBox(height: 6),
+      body,
+    ]),
   );
 }
 
@@ -418,28 +567,50 @@ class _RichMarkdownState extends State<RichMarkdown> {
       _segData = widget.data;
     }
     final sheet = _sheet;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final rich = s.richFormat;
+    final syntaxes = rich ? <md.InlineSyntax>[ColorSyntax(), MarkSyntax()] : null;
+    final builders = rich ? <String, MarkdownElementBuilder>{'lmcolor': ColorBuilder(dark), 'lmmark': MarkBuilder(dark)} : <String, MarkdownElementBuilder>{};
+    Widget mdBody(String data, Key key) {
+      return MarkdownBody(
+        key: key,
+        data: data,
+        styleSheet: sheet,
+        inlineSyntaxes: syntaxes,
+        builders: builders,
+        onTapLink: (text, href, title) {
+          if (href != null && href.isNotEmpty) {
+            Clipboard.setData(ClipboardData(text: href));
+            toast('تم نسخ الرابط');
+          }
+        },
+        imageBuilder: (uri, title, alt) => _blockedImage(p, uri.toString(), alt),
+      );
+    }
+
     final kids = <Widget>[];
     for (int i = 0; i < _segs.length; i++) {
       final sg = _segs[i];
       if (kids.isNotEmpty) kids.add(const SizedBox(height: 8));
       if (sg.code) {
         kids.add(CodeBlock(key: ValueKey<String>('c$i'), lang: sg.lang, code: sg.text, open: sg.open && widget.streaming));
+      } else if (rich) {
+        final parts = splitAlerts(sg.text);
+        for (int j = 0; j < parts.length; j++) {
+          final pt = parts[j];
+          if (j > 0) kids.add(const SizedBox(height: 8));
+          final k = pt.kind;
+          if (k == null) {
+            kids.add(mdBody(pt.text, ValueKey<String>('t$i.$j')));
+          } else {
+            kids.add(_alertBox(dark, k, mdBody(pt.text, ValueKey<String>('a$i.$j'))));
+          }
+        }
       } else {
-        kids.add(MarkdownBody(
-          key: ValueKey<String>('t$i'),
-          data: sg.text,
-          styleSheet: sheet,
-          onTapLink: (text, href, title) {
-            if (href != null && href.isNotEmpty) {
-              Clipboard.setData(ClipboardData(text: href));
-              toast('تم نسخ الرابط');
-            }
-          },
-          imageBuilder: (uri, title, alt) => _blockedImage(p, uri.toString(), alt),
-        ));
+        kids.add(mdBody(sg.text, ValueKey<String>('t$i')));
       }
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kids);
+    return SelectionArea(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kids));
   }
 }
 

@@ -1359,6 +1359,10 @@ String isoWithOffset(DateTime t) {
   return '${fmtDate(t)} ${fmtClock(t)} (UTC$sign${two(h)}:${two(m)})';
 }
 
+const String kRichFormatGuide =
+    'Formatting: the app renders Markdown plus a few extras. For a boxed callout use a GitHub alert: a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION], followed by quoted lines. '
+    'For colored text use :blue[text] (also :red :green :orange :violet :gray :yellow). Highlight with ==text==. Use these sparingly, only for genuinely important points.';
+
 Future<String> buildSystemPrompt({
   required AppSettings s,
   required Project? project,
@@ -1370,6 +1374,7 @@ Future<String> buildSystemPrompt({
   final sec = <String>[];
   if (s.instructions.trim().isNotEmpty) sec.add(s.instructions.trim());
   if (agent != null && agent.systemPrompt.trim().isNotEmpty) sec.add(agent.systemPrompt.trim());
+  if (s.richFormat) sec.add(kRichFormatGuide);
   if (project != null) {
     final b = StringBuffer('<project name="${project.name}">');
     if (project.instructions.trim().isNotEmpty) b.write('\n${project.instructions.trim()}');

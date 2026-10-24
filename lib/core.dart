@@ -304,6 +304,14 @@ void toast(String msg) {
 }
 
 Future<bool> askConfirm(String title, String body, {String ok = 'موافقة', String cancel = 'رفض'}) async {
+  if (inlineApprovalHosts > 0) {
+    if (alwaysAllowed.contains('$title|$body')) return true;
+    return requestInlineApproval(title, body, ok, cancel);
+  }
+  return askConfirmDialog(title, body, ok: ok, cancel: cancel);
+}
+
+Future<bool> askConfirmDialog(String title, String body, {String ok = 'موافقة', String cancel = 'رفض'}) async {
   final ctx = navKey.currentContext;
   if (ctx == null) return false;
   final r = await showDialog<bool>(

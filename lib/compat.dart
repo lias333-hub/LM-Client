@@ -151,12 +151,9 @@ class CheckpointsSheet extends StatelessWidget {
 
 Future<void> showInspector(BuildContext context, dynamic session) async {}
 
-Future<void> showModelPicker(BuildContext context, [Object? profile]) async {}
 
 
-Future<void> exportConversation(BuildContext context, dynamic session) async {}
 
-Future<void> showExportSheet(BuildContext context, String title, String content) async {}
 
 String dateGroup(DateTime value, DateTime now) {
   final diff = now.difference(value);
@@ -245,30 +242,10 @@ BoxDecoration cardDeco(Pal p, {bool selected = false}) {
 
 Future<Map<String, String>> searchChats(String query) async => <String, String>{};
 
-class ProjectsScreen extends StatelessWidget {
-  const ProjectsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Projects')));
-}
-
-class LibraryScreen extends StatelessWidget {
-  const LibraryScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Library')));
-}
-
-class MemoryScreen extends StatelessWidget {
-  const MemoryScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Memory')));
-}
 
 
-class PhoneFilesScreen extends StatelessWidget {
-  const PhoneFilesScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Phone Files')));
-}
+
+
 
 Future<List<PendingAtt>> pickAttachments({bool images = false}) async {
   final out = <PendingAtt>[];

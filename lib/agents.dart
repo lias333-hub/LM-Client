@@ -354,3 +354,54 @@ class _AgentEditorScreenState extends ConsumerState<AgentEditorScreen> {
     );
   }
 }
+
+/// منتقي المزوّد والموديل (يُستدعى من خانة الكتابة ومن /model).
+Future<void> showModelPicker(BuildContext context, [Object? profile]) {
+  return showSheet<void>(context, (c) {
+    return Consumer(builder: (ctx, ref, _) {
+      final ps = ref.watch(profilesProvider);
+      final cur = ps.selected;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+          child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+            const SheetHandle(),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: <Widget>[
+                  if (ps.list.length > 1) ...<Widget>[
+                    const SectionLabel('المزوّد'),
+                    for (final pr in ps.list)
+                      SheetAction(
+                        icon: (cur != null && pr.id == cur.id) ? Icons.check_circle : Icons.circle_outlined,
+                        title: pr.name,
+                        subtitle: pr.selectedModel,
+                        onTap: () => ref.read(profilesProvider.notifier).select(pr.id),
+                      ),
+                  ],
+                  const SectionLabel('الموديل'),
+                  if (cur == null || cur.models.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('لا توجد موديلات. أضفها من الإعدادات > مزوّدو الـ API.', style: TextStyle(color: pal(ctx).muted, fontSize: 13.5)),
+                    )
+                  else
+                    for (final m in cur.models)
+                      SheetAction(
+                        icon: m == cur.selectedModel ? Icons.check_circle : Icons.circle_outlined,
+                        title: m,
+                        onTap: () {
+                          ref.read(profilesProvider.notifier).setModel(m);
+                          Navigator.pop(c);
+                        },
+                      ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
+    });
+  });
+}

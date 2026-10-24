@@ -110,21 +110,14 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              runSpacing: 8,
-              children: <Widget>[
-                _navChip(p, Icons.folder_outlined, 'المشاريع', () => _go(const ProjectsScreen())),
-                _navChip(p, Icons.desktop_windows_outlined, 'المساحة', () => openProjectWorkspace(context)),
-                _navChip(p, Icons.library_books_outlined, 'المكتبة', () => _go(const LibraryScreen())),
-                _navChip(p, Icons.bookmark_border, 'الذاكرة', () => _go(const MemoryScreen())),
-                _navChip(p, Icons.smart_toy_outlined, 'Agents', () => _go(const AgentsScreen())),
-                _navChip(p, Icons.terminal, 'Terminal', () => _go(const TerminalScreen())),
-                _navChip(p, Icons.phone_android, 'ملفات الهاتف', () => _go(const PhoneFilesScreen())),
-              ],
-            ),
-          ),
+          NavItem(icon: Icons.folder_outlined, label: 'المشاريع', onTap: () => _go(const ProjectsScreen())),
+          NavItem(icon: Icons.desktop_windows_outlined, label: 'المساحة', onTap: () => openProjectWorkspace(context)),
+          NavItem(icon: Icons.smart_toy_outlined, label: 'Agents', onTap: () => _go(const AgentsScreen())),
+          NavItem(icon: Icons.terminal, label: 'Terminal', onTap: () => _go(const TerminalScreen())),
+          Divider(height: 13, indent: 22, endIndent: 22, color: p.border),
+          NavItem(icon: Icons.library_books_outlined, label: 'المكتبة', onTap: () => _go(const LibraryScreen())),
+          NavItem(icon: Icons.bookmark_border, label: 'الذاكرة', onTap: () => _go(const MemoryScreen())),
+          NavItem(icon: Icons.phone_android, label: 'ملفات الهاتف', onTap: () => _go(const PhoneFilesScreen())),
           const SizedBox(height: 6),
           if (q.length >= 2 && _hits == null)
             Padding(
