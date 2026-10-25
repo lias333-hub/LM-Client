@@ -12,15 +12,14 @@
 - `data_screens.dart`: الذاكرة والمكتبة والمشاريع وملفات الهاتف والتصدير.
 - `messages.dart`: عرض الرسائل، `RichMarkdown` داخل `SelectionArea`، صيغ غنية (تنبيهات `[!NOTE]`، `:blue[..]`، `==..==`، `++..++`، `[[Ctrl]]`، `:::details`).
 - `settings.dart`: فهرس إعدادات بسبعة أقسام، كل قسم صفحة فرعية.
-- `packages/lm_termux`: plugin أندرويد (Kotlin) لـ Termux RUN_COMMAND. لا يعتمد على `.github`. (موجود في نسخة Claude A الأحدث؛ غير موجود بعد في `terminal-plus`.)
-- `compat.dart`: بقايا stubs. عند Claude A ما بقي فيه ما زال فارغاً عمداً (`showInspector`, `CheckpointsSheet`, `searchChats`). في `terminal-plus` نُقلت الثلاثة إلى `restored.dart` بتنفيذ حقيقي وأُزيلت من `compat.dart` (انظر "مفتوح").
+- `safety.dart` (Claude A): `searchChats` (بحث نصي في كل المحادثات)، `CheckpointsSheet` (تعديلات الملفات مع تراجع وتحذير إن تغيّر الملف)، `showInspector` (المزوّد والأدوات وتقدير التوكنز وتعليمات النظام؛ يمرّر `workspace: currentWorkspace()` ليُظهر أدوات bash أيضاً). الـ stubs الثلاثة غير موجودة في `compat.dart`.
+- `packages/lm_termux`: plugin أندرويد (Kotlin) لـ Termux RUN_COMMAND، ومرتبط في `pubspec.yaml` (`path: packages/lm_termux`). صلاحية `com.termux.permission.RUN_COMMAND` و`<queries>` تُحقَن في manifest من `.github/workflows/build.yml`.
 
 ملفات أضافها Claude B (بيئات التنفيذ):
-- `workspace.dart`: `WorkspaceConfig` (و`WorkspaceConfig.local()` = "هذا الهاتف"، معرّفه الثابت `'local'` ولا يُخزَّن في القائمة)، `SshExec` كواجهة تنفيذ واحدة (`run/startJob/readJob/killJob/probe`) تتفرع على `isLocal`، `BashRuntime` (cwd لكل محادثة)، `BashPolicy` و`approveBash` (الموافقات؛ تمر عبر `requestInlineApproval` حين يكون وضع Terminal ظاهراً)، `runUserCommandInWorkspace` لأوامر `!`. أدوات النموذج: `bash`, `bash_output`, `kill_shell`، وتظهر فقط عند اختيار بيئة (`availableTools(..., workspace)`)، وحينها تختفي `run_shell` الخاصة بـ Termux.
+- `workspace.dart`: `WorkspaceConfig` (و`WorkspaceConfig.local()` = "هذا الهاتف"، معرّفه الثابت `'local'` ولا يُخزَّن في القائمة)، `SshExec` كواجهة تنفيذ واحدة (`run/startJob/readJob/killJob/probe`) تتفرع على `isLocal`، `BashRuntime` (cwd لكل محادثة)، `BashPolicy` و`approveBash` (الموافقات؛ تمر عبر `requestInlineApproval` حين يكون وضع Terminal ظاهراً)، `runUserCommandInWorkspace` لأوامر `!`. أدوات النموذج: `bash`, `bash_output`, `kill_shell`، وتظهر فقط عند اختيار بيئة (`availableTools(..., workspace: ...)`)، وحينها تختفي `run_shell` الخاصة بـ Termux.
 - `local_exec.dart`: `LocalExec` يشغّل `/system/bin/sh` داخل التطبيق (HOME = `<app support>/lmhome`)، يقتل شجرة العمليات عبر /proc، ويدير المهام الخلفية بملفات سجل. بدون git أو npm أو أي أداة غير موجودة في نظام أندرويد.
 - `exec_probe.dart`: شاشة "اختبار التنفيذ" (7 فحوص، منها هل يسمح أندرويد بتشغيل ملفات كتبها التطبيق في مجلده، W^X). تُفتح من قائمة شاشة "بيئات التنفيذ". نتيجتها تقرر إن كانت طرفية محلية حقيقية ممكنة.
 - `workspace_ui.dart`: `showWorkspacePicker`، `WorkspacesScreen`، `WorkspaceEditor` (إضافة بيئة SSH)، `BashApprovalSheet`، و`SshTerminalScreen` (طرفية SSH؛ سُمّيت هكذا لتفادي التعارض مع `TerminalScreen` الخاصة بـ Termux).
-- `restored.dart`: `CheckpointsSheet`, `showInspector`, `searchChats`, `redactJson`, `maskKey`, `describeRequest` بتنفيذ حقيقي (مأخوذة من v2.3.0).
 - `pubspec.yaml`: `dartssh2` من git (v4.1.0) يتطلب `dependency_overrides: meta: 1.16.0` مع Flutter 3.22.0. لا تحذفه ولا ترفعه (1.19.0 يحتاج Dart 3.5+). `xterm` مثبّت على commit محدد.
 
 ## قرارات متفق عليها مع المستخدم
@@ -32,22 +31,38 @@
 - هدف بعيد: بناء أفضل Harness ممكن.
 - (2026-10-25) فرع `terminal-plus` هو الأساس: واجهة Terminal كما هي، ويُضاف إليها كل ما في النسخة الأخرى. لا تغيير على الواجهة دون موافقة المستخدم.
 - (2026-10-25) الهدف الجوهري: استخدام كل ميزات Claude Code على الهاتف، والطرفية داخل التطبيق نفسه دون تطبيقات أخرى.
-- (2026-10-25) لا وكلاء فرعيين (حد الاستخدام). التحقق من الترجمة عبر GitHub Actions لأن لا Dart SDK محلياً: دفع الفرع ثم قراءة `ci-logs/latest/2_analyze.txt` و`3_build.txt`.
+- (2026-10-25) لا وكلاء فرعيين (حد الاستخدام). التحقق من الترجمة عبر GitHub Actions لأن لا Dart SDK محلياً: دفع الفرع ثم قراءة `ci-logs/latest/2_analyze.txt` و`3_build.txt`. هذا يغطي اقتراح A بخطوة `flutter analyze` في CI: موجودة ومفعّلة لكل دفعة.
 
 ## قواعد التنسيق بين النسختين (مقترحة من Claude B، بانتظار موافقة المستخدم)
-- كل نسخة على فرعها، والدمج بـ 3-way merge، ولا يُنسخ ملف كامل فوق ملف الأخرى (يضيع عمل أحدهما بصمت).
-- ملكية مقترحة لتفادي تكرار العمل: Claude A = الواجهة (`terminal_chat`, `messages`, `settings`, `data_screens`, `ui_kit`, ثيمات `core`). Claude B = المحرك (`workspace*`, `local_exec`, `exec_probe`, `tools`, `session`, `llm`). الملفات المشتركة (`main.dart`, `models`, `store`) تعديلات صغيرة وتُسجَّل هنا.
+- كل نسخة على فرعها، والدمج بـ 3-way merge، ولا يُنسخ ملف كامل فوق ملف الأخرى (يضيع عمل أحدهما بصمت). الدمج الأخير (v2.6.0) تم هكذا: الأساس = قمة `Terminal` (daa8416) وهي نفسها أساس نسخة A.
+- ملكية مقترحة لتفادي تكرار العمل: Claude A = الواجهة (`terminal_chat`, `messages`, `settings`, `data_screens`, `ui_kit`, `safety`, ثيمات `core`). Claude B = المحرك (`workspace*`, `local_exec`, `exec_probe`, `tools`, `session`, `llm`) وملف CI. الملفات المشتركة (`main.dart`, `models`, `store`) تعديلات صغيرة وتُسجَّل هنا.
 - لا يُكتب سطر في السجل قبل أن يمر `flutter analyze` والبناء على CI بلا أخطاء، ويُذكر رقم التشغيل. ويُكتب بوضوح "لم يُختبر على جهاز" إن لم يجرّبه المستخدم.
-- قبل أي دمج: ترسل نسخة A الأحدث كاملة (`lib` + `packages` + `pubspec.yaml` + workflow).
+- A يرسل نسخته كاملة كل مرة (`lib` + `packages` + `pubspec.yaml` + workflow)، وB يدمجها ويعيدها للمستخدم.
 
 ## سجل التغييرات
 - 2026-10-25 (Claude A): إصلاح البناء الأول، الـ Agents، Terminal عبر Termux، وضع Terminal، نظام التصميم، فهرس الإعدادات، شاشات البيانات، التنسيق الغني، ثيم Terminal الأسود.
-- 2026-10-25 (Claude B): فرع `terminal-plus` (v2.5.1) فوق Terminal: بيئات التنفيذ (SSH + هذا الهاتف)، أدوات bash للنموذج، موافقات bash داخل السجل، `/env`، شاشة اختبار التنفيذ، وإعادة CheckpointsSheet/showInspector/searchChats بتنفيذ حقيقي. جديدة: workspace.dart, local_exec.dart, exec_probe.dart, workspace_ui.dart, restored.dart. معدّلة: main.dart, core.dart (الإصدار), models.dart, store.dart, tools.dart, session.dart, messages.dart, settings.dart, agents.dart, terminal_chat.dart, compat.dart, pubspec.yaml, build.yml. CI: analyze بلا أخطاء، APK 26.5MB (run 40147377820). لم يُختبر على جهاز بعد.
+- 2026-10-25 (Claude A): `safety.dart` (بحث المحادثات، نقاط الحفظ، فحص الطلب)، `packages/lm_termux`، `scrollPadding` لخانة الكتابة، ثيم Terminal كخيار ثالث للمظهر (`themeMode == 3`)، صيغ تنسيق إضافية في تعليمات النظام، زر الملفات في وضع Terminal يفتح `PhoneFilesScreen`.
+- 2026-10-25 (Claude B): فرع `terminal-plus` (v2.5.1) فوق Terminal: بيئات التنفيذ (SSH + هذا الهاتف)، أدوات bash للنموذج، موافقات bash داخل السجل، `/env`، شاشة اختبار التنفيذ. جديدة: workspace.dart, local_exec.dart, exec_probe.dart, workspace_ui.dart.
+- 2026-10-25 (Claude B): دمج نسخة A الأحدث في `terminal-plus` (v2.6.0) بـ 3-way merge: تعارض واحد فقط (`compat.dart`) وحُلّ. حُذف `restored.dart` الخاص بي لأن A أضاف `safety.dart` بنفس الدوال الثلاث (تُؤخذ نسخة A)، وعُدّل `showInspector` ليمرّر `workspace`. أُضيفت إلى `build.yml` صلاحية RUN_COMMAND و`<queries>` لـ Termux، وإلى `pubspec.yaml` اعتماد `lm_termux`. CI (run 115): analyze بلا أخطاء (ملاحظتان قديمتان فقط)، APK 26.5MB. لم يُختبر على جهاز بعد.
 
-## مفتوح
-- أمر `/env` (حُلّ توثيقه): أضافه Claude B. التعريف في `terminal_chat.dart` (`_kCmds` و`case '/env'`) ويفتح `showWorkspacePicker` في `workspace_ui.dart`. مدخلان آخران: Settings ← "بيئات التنفيذ"، وقائمة منتقي الـ Agent ("بيئة التنفيذ (Bash)"). "هذا الهاتف" يشغّل `sh` الخاص بأندرويد بدون git أو npm؛ لهما Termux فقط. "إنشاء بيئة جديدة" = `WorkspaceEditor` (SSH: مضيف ومنفذ ومستخدم ومفتاح ed25519 يُولَّد داخل التطبيق، مع تثبيت بصمة الخادم عند أول اتصال).
-- **دمج نسخة A الأحدث أولاً**: `terminal-plus` مبني على Terminal الأقدم ولا يحوي `packages/lm_termux`. لا عمل جديد على الواجهة أو الجسر قبل الدمج.
-- **تعارض متوقع عند الدمج**: إن كانت `compat.dart` عند A ما زالت تعرّف `showInspector` و`CheckpointsSheet` و`searchChats` فسيحدث تعريف مكرر وينكسر البناء. الحل: تُؤخذ `compat.dart` الخاصة بـ A بعد حذف هذه الثلاثة، وتبقى `restored.dart`. قرار A بإبقائها فارغة "عمداً" يحتاج تأكيداً: عناصر القوائم في `chat_page.dart` تستدعيها (السطران 314 و324) وكانت لا تفعل شيئاً.
-- **جسر Termux في CI**: workflow الحالي لا ينسخ `MainActivity.kt`. ملاحظة A أن plugin لا يعتمد على `.github` تعني أن نسخته الأحدث تحل ذلك؛ يُؤكَّد بعد الدمج.
-- **اختبار الجهاز**: شاشة اختبار التنفيذ ومسارات bash المحلية والموافقات لم تُجرَّب على هاتف. القرار بين طرفية محلية حقيقية (PTY) وSSH فقط ينتظر نتيجتها.
-- تنفيذ المشاريع على نمط Claude، وفهرس الذاكرة عند الطلب، وتحديد الأسطر بدل الكلمات.
+## مفتوح (جرد A بتاريخ 2026-10-25، مرتّب بالأولوية، مع ملاحظات B)
+### ميزات معطّلة أو فاضية الآن
+- `task_runtime.dart` و`verification_gate.dart` و`tool_registry.dart` لا يستدعيها أحد (شغل Copilot غير موصول). ميزانية المهمة تُنشأ من جديد مع كل رسالة فلا تُستنفد أبداً.
+### تصاميم موافق عليها ولم تُنفَّذ
+- خانة الكتابة وشكل الرسائل وبطاقات الأدوات في وضع المحادثة.
+- المشاريع على نمط Claude: صفحة مشروع، وصف، سعة المعرفة، محادثات داخله.
+- الذاكرة كفهرس: `read_memory` موجودة، لكن الفهرس لا يُستخدم إلا فوق 6000 حرف؛ المطلوب فهرس دائماً وشاشة كقائمة ملفات.
+- تحديد الأسطر بدل الكلمات.
+- شاشة المساحة (دمج مع Terminal)؛ وهي تشغّل `sh` أندرويد بدون git.
+- عناصر صفحات الإعدادات الداخلية بشكلها القديم، ومشكلة bidi في نص "حول".
+### Harness وتوكنز
+- ملفات معرفة المشروع تُحشر كاملة في كل رسالة (حتى `maxChars` لكل ملف). المطلوب فهرس + `read_library_file` عند الحاجة.
+- أدوات ناقصة: `web_search`، خطة/todo، `ask_user` بخيارات، أدوات الهاتف (منبه/تقويم/موقع).
+- اقتراحات قابلة للضغط، LaTeX.
+### بيئة التنفيذ
+- `/env` أضافه Claude B. التعريف في `terminal_chat.dart` (`_kCmds` و`case '/env'`) ويفتح `showWorkspacePicker` في `workspace_ui.dart`. مدخلان آخران: Settings ← "بيئات التنفيذ"، وقائمة منتقي الـ Agent ("بيئة التنفيذ (Bash)"). "هذا الهاتف" = `sh` أندرويد بدون git/npm. "إنشاء بيئة جديدة" = `WorkspaceEditor` (SSH: مضيف ومنفذ ومستخدم ومفتاح ed25519 يُولَّد داخل التطبيق، مع تثبيت بصمة الخادم عند أول اتصال).
+- **تعارض اتجاه (يحتاج قرار المستخدم)**: خطة A "Termux افتراضي، proot لاحقاً" تتعارض مع طلب المستخدم الصريح: طرفية داخل التطبيق دون أي تطبيق آخر. القرار ينتظر نتيجة شاشة اختبار التنفيذ على هاتفه (هل يسمح أندرويد بتشغيل ملفات من مجلد التطبيق؟). حتى ذلك الحين Termux خيار إضافي لا افتراضي.
+- جسر Termux لم يُختبر على جهاز المستخدم بعد (يحتاج `allow-external-apps` في Termux). ملاحظة B: بناء CI يطبع تحذيرات Kotlin عن إصدار البيانات الوصفية (1.8 مقابل 1.6) من مكتبات gradle ولا يفشل؛ إن ظهر "native bridge missing" على الجهاز فهذا أول ما يُفحص (`packages/lm_termux/android/build.gradle`).
+### جودة
+- A لا يبني ولا يختبر: كل كود A يُترجم على CI عند B (run 115 أخضر). الكود الميت: `ProjectStrip`, `_navChip`, `_quickChip`، واسم `compat.dart` مضلل.
+- اختبار الجهاز: شاشة اختبار التنفيذ ومسارات bash المحلية والموافقات لم تُجرَّب على هاتف. مخطط (B): خطوة في CI تشغّل التطبيق على محاكي أندرويد وتجري الفحوص تلقائياً.
