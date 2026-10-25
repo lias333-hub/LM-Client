@@ -294,6 +294,7 @@ class _AgentEditorScreenState extends ConsumerState<AgentEditorScreen> {
         ],
       ),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.only(bottom: 40),
         children: <Widget>[
           const SectionLabel('الاسم'),

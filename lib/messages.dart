@@ -405,11 +405,12 @@ Color mdColor(String name, bool dark) {
 }
 
 class ColorSyntax extends md.InlineSyntax {
-  ColorSyntax() : super(r':(blue|red|green|orange|violet|gray|yellow)\[([^\]\n]+)\]');
+  ColorSyntax() : super(r':(blue|red|green|orange|violet|gray|yellow)(-background|-badge)?\[([^\]\n]+)\]');
   @override
   bool onMatch(md.InlineParser parser, Match match) {
-    final el = md.Element.text('lmcolor', match[2]!);
+    final el = md.Element.text('lmcolor', match[3]!);
     el.attributes['c'] = match[1]!;
+    el.attributes['k'] = match[2] ?? '';
     parser.addNode(el);
     return true;
   }
@@ -424,13 +425,37 @@ class MarkSyntax extends md.InlineSyntax {
   }
 }
 
+class UnderlineSyntax extends md.InlineSyntax {
+  UnderlineSyntax() : super(r'\+\+([^+\n]+)\+\+');
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    parser.addNode(md.Element.text('lmu', match[1]!));
+    return true;
+  }
+}
+
+class KbdSyntax extends md.InlineSyntax {
+  KbdSyntax() : super(r'\[\[([^\]\n]+)\]\]');
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    parser.addNode(md.Element.text('lmkbd', match[1]!));
+    return true;
+  }
+}
+
 class ColorBuilder extends MarkdownElementBuilder {
   final bool dark;
   ColorBuilder(this.dark);
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
     final c = mdColor(element.attributes['c'] ?? 'blue', dark);
-    return RichText(text: TextSpan(text: element.textContent, style: (preferredStyle ?? const TextStyle()).copyWith(color: c, fontWeight: FontWeight.w600)));
+    final k = element.attributes['k'] ?? '';
+    final base = preferredStyle ?? const TextStyle();
+    if (k.isEmpty) {
+      return RichText(text: TextSpan(text: element.textContent, style: base.copyWith(color: c, fontWeight: FontWeight.w600)));
+    }
+    final bg = c.withAlpha(k == '-badge' ? 60 : 38);
+    return RichText(text: TextSpan(text: '\u00A0${element.textContent}\u00A0', style: base.copyWith(color: c, fontWeight: FontWeight.w600, backgroundColor: bg)));
   }
 }
 
@@ -444,15 +469,35 @@ class MarkBuilder extends MarkdownElementBuilder {
   }
 }
 
+class UnderlineBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    return RichText(text: TextSpan(text: element.textContent, style: (preferredStyle ?? const TextStyle()).copyWith(decoration: TextDecoration.underline)));
+  }
+}
+
+class KbdBuilder extends MarkdownElementBuilder {
+  final bool dark;
+  KbdBuilder(this.dark);
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final base = preferredStyle ?? const TextStyle();
+    final bg = dark ? const Color(0xFF3A3938) : const Color(0xFFE6E4DC);
+    return RichText(text: TextSpan(text: '\u00A0${element.textContent}\u00A0', style: base.copyWith(fontFamily: 'monospace', fontSize: (base.fontSize ?? 15) - 1.5, backgroundColor: bg)));
+  }
+}
+
 class _AlertSeg {
   final String? kind;
   final String text;
-  const _AlertSeg(this.kind, this.text);
+  final String title;
+  const _AlertSeg(this.kind, this.text, [this.title = '']);
 }
 
 List<_AlertSeg> splitAlerts(String s) {
-  if (!s.contains('[!')) return <_AlertSeg>[_AlertSeg(null, s)];
+  if (!s.contains('[!') && !s.contains(':::')) return <_AlertSeg>[_AlertSeg(null, s)];
   final re = RegExp(r'^\s*>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO)\]\s*(.*)$', caseSensitive: false);
+  final det = RegExp(r'^\s*:::\s*details\s*(.*)$', caseSensitive: false);
   final out = <_AlertSeg>[];
   final buf = <String>[];
   final lines = s.split('\n');
@@ -464,6 +509,19 @@ List<_AlertSeg> splitAlerts(String s) {
 
   var i = 0;
   while (i < lines.length) {
+    final d = det.firstMatch(lines[i]);
+    if (d != null) {
+      flush();
+      final body = <String>[];
+      i++;
+      while (i < lines.length && lines[i].trim() != ':::') {
+        body.add(lines[i]);
+        i++;
+      }
+      i++;
+      out.add(_AlertSeg('DETAILS', body.join('\n'), (d.group(1) ?? '').trim()));
+      continue;
+    }
     final m = re.firstMatch(lines[i]);
     if (m == null) {
       buf.add(lines[i]);
@@ -485,6 +543,41 @@ List<_AlertSeg> splitAlerts(String s) {
   }
   flush();
   return out;
+}
+
+class _DetailsBox extends StatefulWidget {
+  final String title;
+  final Widget child;
+  const _DetailsBox({required this.title, required this.child});
+
+  @override
+  State<_DetailsBox> createState() => _DetailsBoxState();
+}
+
+class _DetailsBoxState extends State<_DetailsBox> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return Container(
+      decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: p.border)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+        InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(children: <Widget>[
+              Expanded(child: Text(widget.title.isEmpty ? 'تفاصيل' : widget.title, style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w600))),
+              Icon(_open ? Icons.expand_less : Icons.expand_more, color: p.muted),
+            ]),
+          ),
+        ),
+        if (_open) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: widget.child),
+      ]),
+    );
+  }
 }
 
 Widget _alertBox(bool dark, String kind, Widget body) {
@@ -583,8 +676,8 @@ class _RichMarkdownState extends State<RichMarkdown> {
     final sheet = _sheet;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final rich = s.richFormat;
-    final syntaxes = rich ? <md.InlineSyntax>[ColorSyntax(), MarkSyntax()] : null;
-    final builders = rich ? <String, MarkdownElementBuilder>{'lmcolor': ColorBuilder(dark), 'lmmark': MarkBuilder(dark)} : <String, MarkdownElementBuilder>{};
+    final syntaxes = rich ? <md.InlineSyntax>[ColorSyntax(), MarkSyntax(), UnderlineSyntax(), KbdSyntax()] : null;
+    final builders = rich ? <String, MarkdownElementBuilder>{'lmcolor': ColorBuilder(dark), 'lmmark': MarkBuilder(dark), 'lmu': UnderlineBuilder(), 'lmkbd': KbdBuilder(dark)} : <String, MarkdownElementBuilder>{};
     Widget mdBody(String data, Key key) {
       return MarkdownBody(
         key: key,
@@ -616,6 +709,8 @@ class _RichMarkdownState extends State<RichMarkdown> {
           final k = pt.kind;
           if (k == null) {
             kids.add(mdBody(pt.text, ValueKey<String>('t$i.$j')));
+          } else if (k == 'DETAILS') {
+            kids.add(_DetailsBox(title: pt.title, child: mdBody(pt.text, ValueKey<String>('d$i.$j'))));
           } else {
             kids.add(_alertBox(dark, k, mdBody(pt.text, ValueKey<String>('a$i.$j'))));
           }
@@ -1208,10 +1303,12 @@ Future<void> showEditDialog(BuildContext context, ChatSession session, ChatMessa
     builder: (c) {
       final p = pal(c);
       return AlertDialog(
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         backgroundColor: p.surface,
         surfaceTintColor: Colors.transparent,
         title: Text('تعديل الرسالة', style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
-        content: TextField(controller: ctrl, autofocus: true, minLines: 3, maxLines: 12, decoration: fieldDeco(c)),
+        content: TextField(controller: ctrl, autofocus: true, minLines: 3, maxLines: 12, keyboardType: TextInputType.multiline, scrollPadding: const EdgeInsets.all(24), decoration: fieldDeco(c)),
         actionsOverflowButtonSpacing: 4,
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: Text('إلغاء', style: TextStyle(color: p.muted))),

@@ -117,7 +117,7 @@ class ChatTopStrip extends ConsumerWidget {
           const SizedBox(width: Sp.sm),
           InkWell(
             borderRadius: BorderRadius.circular(Rd.control),
-            onTap: () => openProjectWorkspace(context),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PhoneFilesScreen())),
             child: Container(
               height: 42,
               constraints: const BoxConstraints(maxWidth: 120),
@@ -692,6 +692,7 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
                 focusNode: _focus,
                 minLines: 1,
                 maxLines: 6,
+                scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 140),
                 autocorrect: false,
                 enableSuggestions: false,
                 keyboardType: TextInputType.multiline,

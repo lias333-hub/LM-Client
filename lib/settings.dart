@@ -124,7 +124,7 @@ Future<void> showBackupSheet(BuildContext context) {
                 try {
                   final data = await buildBackup(keys: keys, chats: chats);
                   final path = await exportTextFile('lmclient_backup_${fmtDate(DateTime.now())}.json', const JsonEncoder.withIndent(' ').convert(data));
-                  toast('تم الحفظ: $path');
+                  toast(savedMessage(path));
                 } catch (e) {
                   toast('فشل التصدير: $e');
                 }
@@ -393,7 +393,8 @@ class SettingsScreen extends ConsumerWidget {
         _Group(title: 'المظهر', children: <Widget>[
           _Block(
             title: 'السمة',
-            child: SegPicker<int>(values: const <int>[0, 1, 2], labels: const <String>['تلقائي', 'فاتح', 'داكن'], value: s.themeMode, onChanged: (v) => notifier.set('themeMode', v)),
+            hint: 'Terminal: أسود نقي بخط monospace على كل التطبيق',
+            child: SegPicker<int>(values: const <int>[0, 1, 2, 3], labels: const <String>['تلقائي', 'فاتح', 'داكن', 'Terminal'], value: s.themeMode, onChanged: (v) => notifier.set('themeMode', v)),
           ),
           _SwitchRow(title: 'الواجهة من اليمين لليسار', subtitle: 'اتجاه التطبيق العام. اتجاه كل رسالة يُكتشف تلقائياً من لغتها.', value: s.rtl, onChanged: (v) => notifier.set('rtl', v)),
           _SwitchRow(title: 'خط Serif لنص المحادثة', subtitle: 'مثل تطبيق Claude', value: s.serif, onChanged: (v) => notifier.set('serif', v)),
@@ -402,6 +403,12 @@ class SettingsScreen extends ConsumerWidget {
             value: '${(s.fontScale * 100).round()}%',
             child: Slider(value: s.fontScale.clamp(0.8, 1.5).toDouble(), min: 0.8, max: 1.5, divisions: 14, onChanged: (v) => notifier.set('fontScale', double.parse(v.toStringAsFixed(2)))),
           ),
+          _SwitchRow(
+              title: 'تنسيق غني في الردود',
+              subtitle: 'مربعات تنبيه وألوان وتمييز. يُرسل للنموذج دليل صغير لاستخدامها',
+              value: s.richFormat,
+              onChanged: (v) => notifier.set('richFormat', v)),
+          _SwitchRow(title: 'أزرار تحريك المؤشر في الإدخال', value: s.cursorBtns, onChanged: (v) => notifier.set('cursorBtns', v)),
         ]),
 
       ],
@@ -413,11 +420,6 @@ class SettingsScreen extends ConsumerWidget {
             child: SegPicker<int>(values: const <int>[0, 1, 2, 3], labels: const <String>['إيقاف', 'منخفض', 'متوسط', 'عالٍ'], value: s.thinkLevel, onChanged: (v) => notifier.set('thinkLevel', v)),
           ),
           _Block(
-            title: 'نمط التفكير (Anthropic)',
-            hint: 'تلقائي: يختاره التطبيق حسب إصدار Claude. غيّره فقط إن رفض الخادم الطلب.',
-            child: SegPicker<int>(values: const <int>[0, 1, 2], labels: const <String>['تلقائي', 'Adaptive', 'Budget'], value: s.thinkMode, onChanged: (v) => notifier.set('thinkMode', v)),
-          ),
-          _Block(
             title: 'Temperature',
             value: tempText,
             hint: 'Anthropic يقبل 0–1. بعض نماذج التفكير تتجاهله أو ترفضه (يُحذف تلقائياً عند الرفض).',
@@ -425,26 +427,6 @@ class SettingsScreen extends ConsumerWidget {
               Expanded(child: Slider(value: (s.temperature < 0 ? 1.0 : s.temperature).clamp(0.0, 2.0).toDouble(), min: 0, max: 2, divisions: 20, onChanged: (v) => notifier.set('temperature', double.parse(v.toStringAsFixed(1))))),
               TextButton(onPressed: s.temperature < 0 ? null : () => notifier.set('temperature', -1.0), child: const Text('افتراضي')),
             ]),
-          ),
-          _Block(
-            title: 'Top-P',
-            value: topText,
-            child: Row(children: [
-              Expanded(child: Slider(value: (s.topP < 0 ? 1.0 : s.topP).clamp(0.0, 1.0).toDouble(), min: 0, max: 1, divisions: 20, onChanged: (v) => notifier.set('topP', double.parse(v.toStringAsFixed(2))))),
-              TextButton(onPressed: s.topP < 0 ? null : () => notifier.set('topP', -1.0), child: const Text('افتراضي')),
-            ]),
-          ),
-          _NavRow(
-            icon: Icons.straighten,
-            title: 'الحد الأقصى للإخراج (max tokens)',
-            subtitle: s.maxTokens > 0 ? '${s.maxTokens}' : 'تلقائي (Anthropic يستخدم 8192، والبقية بلا حد من التطبيق)',
-            onTap: () => _askInt(context, ref, 'maxTokens', 'الحد الأقصى للإخراج', 'اتركه فارغاً للتلقائي', s.maxTokens),
-          ),
-          _NavRow(
-            icon: Icons.history,
-            title: 'حد السياق (عدد الرسائل المُرسلة)',
-            subtitle: s.contextLimit > 0 ? 'آخر ${s.contextLimit} رسالة' : 'كل الرسائل (قد تكلّف كثيراً في المحادثات الطويلة)',
-            onTap: () => _askInt(context, ref, 'contextLimit', 'حد السياق', 'اتركه فارغاً لإرسال كل الرسائل', s.contextLimit),
           ),
           _NavRow(
             icon: Icons.compress,
@@ -454,19 +436,6 @@ class SettingsScreen extends ConsumerWidget {
                 : 'بلا حد (المحادثات الطويلة تكلّف أكثر وقد تتجاوز نافذة النموذج)',
             onTap: () => _askInt(context, ref, 'contextBudget', 'ميزانية السياق', 'اتركه فارغاً لإلغاء الحد (الافتراضي 60000)', s.contextBudget),
           ),
-          _NavRow(
-            icon: Icons.speed,
-            title: 'ميزانية المهمة الواحدة (توكنز)',
-            subtitle: s.taskBudget > 0
-                ? '${s.taskBudget} — يتوقف الـ Agent إذا تجاوز مجموع ما عالجه في تشغيل واحد هذا الحد (اكتب «تابع» للمتابعة)'
-                : 'بلا حد (الحد الوحيد: ١٢ جولة أدوات)',
-            onTap: () => _askInt(context, ref, 'taskBudget', 'ميزانية المهمة', 'اتركه فارغاً لإلغاء الحد (الافتراضي 1000000)', s.taskBudget),
-          ),
-          _SwitchRow(
-              title: 'تلخيص السياق تلقائياً',
-              subtitle: 'عند تجاوز الميزانية: طلب إضافي واحد يلخّص القديم بدل حذفه، وتبقى الرسائل ظاهرة لك',
-              value: s.autoCompact,
-              onChanged: (v) => notifier.set('autoCompact', v)),
           _NavRow(
             icon: Icons.notes,
             title: 'تعليمات عامة (System prompt)',
@@ -490,35 +459,6 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => pushScreen(const WorkspacesScreen()),
           ),
           _SwitchRow(title: 'تسمية المحادثات تلقائياً بالنموذج', subtitle: 'طلب إضافي صغير بعد أول رد (يستهلك توكنز)', value: s.autoTitle, onChanged: (v) => notifier.set('autoTitle', v)),
-          _SwitchRow(
-              title: 'التخزين المؤقت للـ prompt (Anthropic)',
-              subtitle: 'السياق المتكرر يُقرأ من الكاش بسعر أقل بكثير. يتعطّل تلقائياً إن رفضه الخادم',
-              value: s.promptCache,
-              onChanged: (v) => notifier.set('promptCache', v)),
-          _SwitchRow(
-              title: 'قصّ نتائج الأدوات القديمة',
-              subtitle: 'المخرجات الطويلة (ملفات، صفحات) تُقصّ بعد دورين؛ يعيد النموذج استدعاء الأداة إن احتاجها',
-              value: s.trimOldResults,
-              onChanged: (v) => notifier.set('trimOldResults', v)),
-          _SwitchRow(
-              title: 'إرسال تاريخ اليوم',
-              subtitle: 'الساعة الدقيقة يجلبها النموذج بأداة عند الحاجة (كي لا ينكسر الكاش كل دقيقة)',
-              value: s.includeDate,
-              onChanged: (v) => notifier.set('includeDate', v)),
-          _SwitchRow(title: 'إرسال الذاكرة للنموذج', value: s.memoryOn, onChanged: (v) => notifier.set('memoryOn', v)),
-          _SwitchRow(title: 'إظهار عدّاد التوكنز', value: s.showTokens, onChanged: (v) => notifier.set('showTokens', v)),
-          _SwitchRow(
-              title: 'تنسيق غني في الردود',
-              subtitle: 'مربعات تنبيه وألوان وتمييز. يُرسل للنموذج دليل صغير لاستخدامها',
-              value: s.richFormat,
-              onChanged: (v) => notifier.set('richFormat', v)),
-          _SwitchRow(title: 'أزرار تحريك المؤشر في الإدخال', value: s.cursorBtns, onChanged: (v) => notifier.set('cursorBtns', v)),
-          _NavRow(
-            icon: Icons.content_cut,
-            title: 'حد حجم الملف النصي المُرسل',
-            subtitle: '${s.maxChars} حرف لكل ملف',
-            onTap: () => _askInt(context, ref, 'maxChars', 'الحد الأقصى للأحرف', '30000', s.maxChars, min: 1000, fallback: 30000),
-          ),
         ]),
 
       ],
@@ -541,6 +481,8 @@ class SettingsScreen extends ConsumerWidget {
       'data': <Widget>[
         _Group(title: 'البيانات', children: <Widget>[
           _NavRow(icon: Icons.backup_outlined, title: 'نسخة احتياطية', subtitle: 'تصدير الإعدادات والمزوّدين والمحادثات', onTap: () => showBackupSheet(context)),
+          _NavRow(icon: Icons.description_outlined, title: 'تصدير المحادثات (Markdown)', subtitle: 'ملف واحد في مجلد Download', onTap: () => exportAllChats(markdown: true)),
+          _NavRow(icon: Icons.data_object, title: 'تصدير المحادثات (JSON)', subtitle: 'ملف واحد في مجلد Download', onTap: () => exportAllChats(markdown: false)),
           _NavRow(icon: Icons.restore, title: 'استعادة من ملف', onTap: () => importBackup(context)),
           _NavRow(icon: Icons.folder_open, title: 'صلاحيات الملفات', subtitle: 'فتح إعدادات التطبيق في النظام', onTap: () => openAppSettings()),
           _NavRow(
@@ -914,7 +856,7 @@ class _ProfileEditorState extends ConsumerState<ProfileEditor> {
             const SizedBox(height: 12),
             Directionality(
               textDirection: TextDirection.ltr,
-              child: TextField(controller: _url, keyboardType: TextInputType.url, autocorrect: false, onChanged: (_) => setState(() {}), decoration: fieldDeco(context, label: 'Base URL', hint: 'https://api.example.com')),
+              child: TextField(controller: _url, minLines: 1, maxLines: 3, keyboardType: TextInputType.url, autocorrect: false, onChanged: (_) => setState(() {}), decoration: fieldDeco(context, label: 'Base URL', hint: 'https://api.example.com')),
             ),
             if (ep.isNotEmpty)
               Padding(

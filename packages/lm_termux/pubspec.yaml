@@ -1,0 +1,15 @@
+name: lm_termux
+description: Bridge to Termux RUN_COMMAND for LMClient (Android only).
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.3.0'
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.lmclient.termux
+        pluginClass: LmTermuxPlugin

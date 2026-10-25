@@ -49,7 +49,7 @@ class LMClientApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(settingsProvider);
-    final term = s.uiMode == 1;
+    final term = s.uiMode == 1 || s.themeMode == 3;
     final mode = term ? ThemeMode.dark : (s.themeMode == 1 ? ThemeMode.light : (s.themeMode == 2 ? ThemeMode.dark : ThemeMode.system));
     return MaterialApp(
       title: kAppName,
@@ -812,6 +812,7 @@ class _ComposerState extends ConsumerState<Composer> {
                 focusNode: _focus,
                 minLines: 1,
                 maxLines: 7,
+                scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 140),
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
                 textAlign: TextAlign.start,

@@ -5,7 +5,7 @@ part of 'main.dart';
 //  Globals
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
-const String kAppVersion = '2.5.1';
+const String kAppVersion = '2.6.0';
 const String kOpenAI = 'openai';
 const String kAnthropic = 'anthropic';
 const String kGemini = 'gemini';
@@ -207,17 +207,17 @@ const Pal darkPal = Pal(
 
 // ثيم Terminal: أسود دافئ، حدود رفيعة، نفس لون Claude البرتقالي.
 const Pal termPal = Pal(
-  bg: Color(0xFF111110),
-  surface: Color(0xFF181817),
-  surfaceHi: Color(0xFF232321),
-  border: Color(0xFF34332F),
+  bg: Color(0xFF000000),
+  surface: Color(0xFF0B0B0A),
+  surfaceHi: Color(0xFF181817),
+  border: Color(0xFF2B2A27),
   text: Color(0xFFE6E4DC),
   muted: Color(0xFF8C8A82),
   accent: Color(0xFFD97757),
-  onAccent: Color(0xFF111110),
+  onAccent: Color(0xFF000000),
   danger: Color(0xFFF2766B),
   success: Color(0xFF6CC48F),
-  codeBg: Color(0xFF0A0A09),
+  codeBg: Color(0xFF080807),
   codeText: Color(0xFFE6E4DC),
 );
 
@@ -342,14 +342,18 @@ Future<String?> askText(BuildContext context, String title, {String initial = ''
     builder: (c) {
       final p = pal(c);
       return AlertDialog(
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         backgroundColor: p.surface,
         surfaceTintColor: Colors.transparent,
         title: Text(title, style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          minLines: 1,
-          maxLines: multiline ? 8 : 1,
+          minLines: multiline ? 3 : 1,
+          maxLines: multiline ? 10 : 3,
+          keyboardType: multiline ? TextInputType.multiline : TextInputType.text,
+          scrollPadding: const EdgeInsets.all(24),
           decoration: fieldDeco(c, hint: hint),
         ),
         actions: [

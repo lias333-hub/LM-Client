@@ -337,7 +337,7 @@ class _ProjectEditorScreenState extends ConsumerState<ProjectEditorScreen> {
       appBar: _plainBar(p, widget.project == null ? 'مشروع جديد' : 'تعديل مشروع', actions: <Widget>[
         TextButton(onPressed: _save, child: Text('حفظ', style: TextStyle(color: p.accent, fontSize: 15, fontWeight: FontWeight.w600))),
       ]),
-      body: ListView(padding: const EdgeInsets.only(bottom: 40), children: <Widget>[
+      body: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.only(bottom: 40), children: <Widget>[
         const SectionLabel('الاسم'),
         pad(TextField(controller: _name, style: TextStyle(color: p.text), decoration: fieldDeco(context, hint: 'اسم المشروع'))),
         const SectionLabel('التعليمات'),
@@ -529,12 +529,8 @@ Future<void> showExportSheet(BuildContext context, String title, String content)
           onTap: () async {
             Navigator.pop(c);
             try {
-              await PhoneStorage.requestPermissions();
-              final dir = Directory('${PhoneStorage.root}/Download');
-              if (!await dir.exists()) await dir.create(recursive: true);
-              final f = File('${dir.path}/${safeFileName(title.isEmpty ? 'chat' : title)}.md');
-              await f.writeAsString(content);
-              toast('تم الحفظ: ${f.path}');
+              final path = await exportTextFile('${safeFileName(title.isEmpty ? 'chat' : title)}.md', content);
+              toast(savedMessage(path));
             } catch (e) {
               toast('تعذر الحفظ: $e');
             }
@@ -549,4 +545,37 @@ Future<void> exportConversation(BuildContext context, dynamic session) async {
   final md = conversationToMarkdown(session.meta as ConvMeta, session.messages as List<ChatMessage>);
   final t = (session.meta as ConvMeta).title;
   await showExportSheet(context, t.isEmpty ? 'chat' : t, md);
+}
+
+String savedMessage(String path) {
+  return path.contains('/Download') ? 'تم الحفظ في Download: $path' : 'حُفظ داخل التطبيق لأن صلاحية الملفات غير ممنوحة: $path';
+}
+
+Future<void> exportAllChats({required bool markdown}) async {
+  try {
+    final idx = appContainer.read(convListProvider);
+    if (idx.isEmpty) {
+      toast('لا توجد محادثات');
+      return;
+    }
+    String content;
+    if (markdown) {
+      final b = StringBuffer();
+      for (final cv in idx) {
+        final raw = await LocalStorage.load('chats', cv.id);
+        if (raw == null) continue;
+        final msgs = <ChatMessage>[for (final e in asList(jsonDecode(raw))) ChatMessage.fromJson(asMap(e))];
+        b.writeln(conversationToMarkdown(cv, msgs));
+        b.writeln('\n---\n');
+      }
+      content = b.toString();
+    } else {
+      final data = await buildBackup(keys: false, chats: true);
+      content = const JsonEncoder.withIndent(' ').convert(<String, dynamic>{'convIndex': data['convIndex'], 'chats': data['chats']});
+    }
+    final path = await exportTextFile('lmclient_chats_${fmtDate(DateTime.now())}.${markdown ? 'md' : 'json'}', content);
+    toast(savedMessage(path));
+  } catch (e) {
+    toast('فشل التصدير: $e');
+  }
 }

@@ -35,7 +35,7 @@ class AppSettings {
   }
 
   // appearance
-  int get themeMode => _i('themeMode', 0); // 0 system, 1 light, 2 dark
+  int get themeMode => _i('themeMode', 0); // 0 system, 1 light, 2 dark, 3 terminal (pure black)
   int get uiMode => _i('uiMode', 0); // 0 chat, 1 terminal
   bool get rtl => _b('rtl', true);
   bool get serif => _b('serif', true);

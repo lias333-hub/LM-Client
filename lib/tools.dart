@@ -1367,8 +1367,10 @@ String isoWithOffset(DateTime t) {
 }
 
 const String kRichFormatGuide =
-    'Formatting: the app renders Markdown plus a few extras. For a boxed callout use a GitHub alert: a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION], followed by quoted lines. '
-    'For colored text use :blue[text] (also :red :green :orange :violet :gray :yellow). Highlight with ==text==. Use these sparingly, only for genuinely important points.';
+    'Formatting: the app renders Markdown plus a few extras. Boxed callout: a GitHub alert, i.e. a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION]. '
+    'Colored text: :blue[text] (also :red :green :orange :violet :gray :yellow); add -background or -badge for a tinted background, e.g. :green-badge[done]. '
+    'Highlight: ==text==. Underline: ++text++. Keyboard key: [[Ctrl]]. Collapsible section: a line ":::details Title", the content, then a line ":::". '
+    'Use these sparingly, only for genuinely important points.';
 
 Future<String> buildSystemPrompt({
   required AppSettings s,

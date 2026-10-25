@@ -88,7 +88,7 @@ class TermuxBridge {
         exitCode: r['exitCode'] is int ? r['exitCode'] as int : -1,
       );
     } on MissingPluginException {
-      return const ShellResult(ok: false, error: 'native bridge missing (rebuild the APK with android_overlay)');
+      return const ShellResult(ok: false, error: 'native bridge missing: upload the packages/lm_termux folder and rebuild');
     } catch (e) {
       return ShellResult(ok: false, error: '$e');
     }
