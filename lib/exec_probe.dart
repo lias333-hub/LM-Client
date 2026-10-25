@@ -22,7 +22,10 @@ class _Check {
 class ExecProbeScreen extends StatefulWidget {
   /// autoRun: يشغّل كل الفحوص فور الفتح ويطبع التقرير في logcat بالبادئة LMPROBE| (يستعمله CI على المحاكي).
   final bool autoRun;
-  const ExecProbeScreen({super.key, this.autoRun = false});
+
+  /// إعداد اختبار SSH الذاتي (يمرّره CI عبر مسار البدء): host=127.0.0.1 عبر adb reverse.
+  final Map<String, dynamic>? sshCfg;
+  const ExecProbeScreen({super.key, this.autoRun = false, this.sshCfg});
   @override
   State<ExecProbeScreen> createState() => _ExecProbeScreenState();
 }
@@ -70,6 +73,8 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
         // ignore: avoid_print
         print('LMPROBE|$line');
       }
+      final Map<String, dynamic>? cfg = widget.sshCfg;
+      if (cfg != null) await runSshSelfTest(cfg);
     } catch (e) {
       // ignore: avoid_print
       print('LMPROBE|autoprobe exception: $e');
@@ -479,13 +484,139 @@ echo x > /storage/emulated/0/.lm_probe 2>&1 && echo SHARED_WRITE_OK && rm -f /st
 
 /// تطبيق مصغّر يفتح شاشة الاختبار مباشرة (مسار البدء `/probe` من adb). لا يمس بيانات المستخدم.
 class AutoProbeApp extends StatelessWidget {
-  const AutoProbeApp({super.key});
+  /// المسار كما وصل من adb: `/probe` أو `/probe?ssh=<base64url(json)>`.
+  final String route;
+  const AutoProbeApp({super.key, this.route = '/probe'});
+
+  Map<String, dynamic>? _sshCfg() {
+    try {
+      final String? b = Uri.parse(route).queryParameters['ssh'];
+      if (b == null || b.isEmpty) return null;
+      return asMap(jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(b)))));
+    } catch (e) {
+      // ignore: avoid_print
+      print('LMPROBE|bad ssh config in route: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      initialRoute: '/',
       theme: buildTheme(Brightness.dark),
-      home: const ExecProbeScreen(autoRun: true),
+      home: ExecProbeScreen(autoRun: true, sshCfg: _sshCfg()),
     );
   }
+}
+
+// ---------------------------------------------------------------------
+//  اختبار SSH ذاتي (CI فقط): يمرّ على نفس دوال الأدوات التي يستعملها النموذج، على sshd حقيقي.
+//  أهم ما يثبته: الملف الذي تكتبه write_file هو الذي يراه bash على السيرفر.
+// ---------------------------------------------------------------------
+Future<void> runSshSelfTest(Map<String, dynamic> cfg) async {
+  int fails = 0;
+  int total = 0;
+  // ignore: avoid_print
+  void out(String s) => print('LMPROBE|SSH $s');
+  void rec(String name, bool ok, String detail) {
+    total++;
+    if (!ok) fails++;
+    final String d = detail.replaceAll('\n', ' ⏎ ');
+    out('${ok ? 'OK  ' : 'FAIL'} $name${d.isEmpty ? '' : ' :: ${d.length > 260 ? d.substring(0, 260) : d}'}');
+  }
+
+  final String dir = asStr(cfg['dir'], '/tmp/lmci');
+  final WorkspaceConfig w = WorkspaceConfig(
+    id: 'ci-ssh',
+    name: 'ci-server',
+    host: '127.0.0.1',
+    port: toInt(cfg['port']) ?? 2222,
+    user: asStr(cfg['user']),
+    keyPem: asStr(cfg['key']),
+    startDir: dir,
+  );
+  try {
+    await appContainer.read(workspacesProvider.notifier).upsert(w);
+    await appContainer.read(selectedWorkspaceProvider.notifier).choose(w.id);
+    appContainer.read(settingsProvider.notifier).set('confirm', false);
+    appContainer.read(settingsProvider.notifier).set('bashApproval', 'auto');
+  } catch (e) {
+    rec('setup', false, '$e');
+    out('DONE fails=$fails total=$total');
+    return;
+  }
+  final AppSettings s = appContainer.read(settingsProvider);
+  const Agent ag = Agent(id: 'ci', name: 'ci', canRead: true, canWrite: true, canExecute: true, canShell: true);
+  const String cv = 'ci-conv';
+
+  Future<String> step(String name, Future<ToolOutcome> Function() f, bool Function(String t) check, {bool expectError = false}) async {
+    String text = '';
+    try {
+      final ToolOutcome o = await f().timeout(const Duration(seconds: 60));
+      text = o.text;
+      if (o.error && !expectError) {
+        rec(name, false, 'tool error: $text');
+        return text;
+      }
+    } catch (e) {
+      text = '$e';
+      if (!expectError) {
+        rec(name, false, 'exception: $text');
+        return text;
+      }
+    }
+    rec(name, check(text), text);
+    return text;
+  }
+
+  Future<ToolOutcome> bash(String cmd, {bool bg = false, int? timeoutMs}) =>
+      _toolBash(<String, dynamic>{'command': cmd, 'description': 'ci', 'run_in_background': bg, if (timeoutMs != null) 'timeout_ms': timeoutMs}, s, cv);
+
+  await step('bash echo/pwd/id', () => bash('echo hello-ssh; pwd; id -un'), (String t) => t.contains('hello-ssh') && t.contains(dir));
+  await step('write_file new (relative path)', () => _toolWriteFile(<String, dynamic>{'path': 'proj/hello.txt', 'content': 'line1\nline2\nline3\n'}, ag, s, cv), (String t) => t.contains('Wrote'));
+  await step('bash sees the file write_file wrote', () => bash('cat proj/hello.txt'), (String t) => t.contains('line2'));
+  await step('read_file', () => _toolReadFile(<String, dynamic>{'path': 'proj/hello.txt'}, ag, s, cv), (String t) => t.contains('2\tline2'));
+  await step('edit_file', () => _toolEditFile(<String, dynamic>{'path': 'proj/hello.txt', 'old_string': 'line2', 'new_string': 'LINE-TWO'}, ag, s, cv), (String t) => t.contains('Edited'));
+  await step('bash sees the edit', () => bash('cat proj/hello.txt'), (String t) => t.contains('LINE-TWO') && !t.contains('line2'));
+  await step('list_directory', () => _toolListDir(<String, dynamic>{'path': 'proj'}, ag, cv), (String t) => t.contains('f hello.txt'));
+  await step('search_files pattern+glob', () => _toolSearchFiles(<String, dynamic>{'path': '.', 'pattern': 'LINE-TWO', 'glob': '*.txt'}, ag, s, cv), (String t) => t.contains('proj/hello.txt:2'));
+  await step('search_files glob only', () => _toolSearchFiles(<String, dynamic>{'path': '.', 'glob': '*.txt'}, ag, s, cv), (String t) => t.contains('proj/hello.txt'));
+  await step('outline_file', () => _toolOutline(<String, dynamic>{'path': 'proj/hello.txt'}, ag, s, cv), (String t) => t.contains('3 lines'));
+  await bash("printf 'x\\nx\\nx\\n' > proj/other.txt");
+  await step('write_file overwrite guard (unread file)', () => _toolWriteFile(<String, dynamic>{'path': 'proj/other.txt', 'content': 'y'}, ag, s, cv), (String t) => t.contains('not read all'), expectError: true);
+  await step('write_file append', () => _toolWriteFile(<String, dynamic>{'path': 'proj/hello.txt', 'content': 'tail-line\n', 'append': true}, ag, s, cv), (String t) => t.contains('Appended'));
+  await step('bash sees the append', () => bash('tail -n 1 proj/hello.txt'), (String t) => t.contains('tail-line'));
+  await step('write_file creates parent dirs', () => _toolWriteFile(<String, dynamic>{'path': 'deep/a/b/c.txt', 'content': 'deep'}, ag, s, cv), (String t) => t.contains('Wrote'));
+  await step('bash sees deep file', () => bash('test -f deep/a/b/c.txt && echo found-deep'), (String t) => t.contains('found-deep'));
+  await step('blocked key path', () => _toolReadFile(<String, dynamic>{'path': '~/.ssh/id_ed25519'}, ag, s, cv), (String t) => t.contains('blocked'), expectError: true);
+  await step('read_file on missing file', () => _toolReadFile(<String, dynamic>{'path': 'nope/missing.txt'}, ag, s, cv), (String t) => t.contains('not found'), expectError: true);
+  await step('timeout kills the command', () => bash('sleep 30', timeoutMs: 1500), (String t) => t.contains('timed out'), expectError: true);
+  await step('non-zero exit code reported', () => bash('exit 3'), (String t) => t.contains('exit code: 3'), expectError: true);
+  await step('cd persists across calls', () async {
+    await bash('cd proj');
+    return bash('pwd');
+  }, (String t) => t.trim().endsWith('/proj'));
+  await step('relative path follows the new cwd', () => _toolReadFile(<String, dynamic>{'path': 'hello.txt'}, ag, s, cv), (String t) => t.contains('LINE-TWO'));
+
+  // مهمة خلفية: تبدأ، ثم نقرأ ناتجها حتى تنتهي.
+  String jobId = '';
+  final String started = await step('background job starts', () => bash('echo job-start; sleep 2; echo job-end', bg: true), (String t) => RegExp(r'job (j\w+)').hasMatch(t));
+  final Match? jm = RegExp(r'job (j\w+)').firstMatch(started);
+  if (jm != null) jobId = jm.group(1) ?? '';
+  if (jobId.isNotEmpty) {
+    String last = '';
+    for (int i = 0; i < 20; i++) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      try {
+        last = (await _toolBashOutput(<String, dynamic>{'id': jobId})).text;
+      } catch (e) {
+        last = '$e';
+      }
+      if (last.contains('job-end')) break;
+    }
+    rec('background job output', last.contains('job-start') && last.contains('job-end'), last);
+  }
+  out('DONE fails=$fails total=$total');
 }

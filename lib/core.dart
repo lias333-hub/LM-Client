@@ -5,7 +5,7 @@ part of 'main.dart';
 //  Globals
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
-const String kAppVersion = '2.6.1';
+const String kAppVersion = '2.6.2';
 const String kOpenAI = 'openai';
 const String kAnthropic = 'anthropic';
 const String kGemini = 'gemini';
@@ -23,8 +23,9 @@ final Dio httpClient = Dio(BaseOptions(
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   // مسار بدء خاص بالاختبار الآلي على المحاكي: adb shell am start ... --es route /probe
-  if (WidgetsBinding.instance.platformDispatcher.defaultRouteName == '/probe') {
-    runApp(const AutoProbeApp());
+  final String bootRoute = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+  if (bootRoute == '/probe' || bootRoute.startsWith('/probe?')) {
+    runApp(AutoProbeApp(route: bootRoute));
     return;
   }
   runApp(UncontrolledProviderScope(container: appContainer, child: const LMClientApp()));
