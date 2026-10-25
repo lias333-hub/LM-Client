@@ -303,6 +303,8 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
       return;
     }
     ref.read(settingsProvider.notifier).set('workspaceRoot', a);
+    final WorkspaceConfig? w = currentWorkspace();
+    if (w != null) BashRuntime.setCwd(widget.session.meta.id, w, a);
     toast('مجلد المشروع: $a');
   }
 

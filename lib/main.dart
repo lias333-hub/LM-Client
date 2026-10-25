@@ -31,6 +31,7 @@ part 'llm.dart';
 part 'messages.dart';
 part 'models.dart';
 part 'project_agent.dart';
+part 'restored.dart';
 part 'screens.dart';
 part 'session.dart';
 part 'settings.dart';

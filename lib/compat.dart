@@ -134,22 +134,6 @@ class RuntimeContextManager {
   }
 }
 
-class CheckpointsSheet extends StatelessWidget {
-  final String convId;
-  const CheckpointsSheet({super.key, required this.convId});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text('Checkpoints for $convId', style: TextStyle(color: pal(context).text)),
-      ),
-    );
-  }
-}
-
-Future<void> showInspector(BuildContext context, dynamic session) async {}
 
 
 
@@ -240,7 +224,6 @@ BoxDecoration cardDeco(Pal p, {bool selected = false}) {
   );
 }
 
-Future<Map<String, String>> searchChats(String query) async => <String, String>{};
 
 
 

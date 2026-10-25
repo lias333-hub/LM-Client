@@ -149,7 +149,7 @@ List<ToolDef> availableTools(AppSettings s, Agent? agent, {required bool hasLibr
         _obj(<String, dynamic>{'url': _pStr('http(s) URL')}, <String>['url']),
       ));
     }
-    if (agent.canShell) {
+    if (agent.canShell && workspace == null) {
       t.add(ToolDef(
         kToolShell,
         'Run a bash command in Termux on the user phone (node, npm, git, python and more if installed there). Non-interactive only: there is no TTY, so commands waiting for input hang until the timeout. The user approves commands. Omit cwd unless you need another directory.',
