@@ -5,11 +5,11 @@ part of 'main.dart';
 //  Globals
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
-const String kAppVersion = '2.6.0';
+const String kAppVersion = '2.6.1';
 const String kOpenAI = 'openai';
 const String kAnthropic = 'anthropic';
 const String kGemini = 'gemini';
-const int kMaxToolRounds = 12;
+const int kMaxToolRounds = 60; // القيمة الافتراضية؛ الفعلية من AppSettings.maxToolRounds
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();

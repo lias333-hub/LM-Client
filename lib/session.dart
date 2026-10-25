@@ -337,8 +337,9 @@ class ChatSession extends ChangeNotifier {
           }
           break;
         }
-        if (rounds >= kMaxToolRounds) {
-          msg.error = 'تم إيقاف حلقة الأدوات بعد $kMaxToolRounds جولات.';
+        final int maxRounds = appContainer.read(settingsProvider).maxToolRounds;
+        if (rounds >= maxRounds) {
+          msg.error = 'تم إيقاف حلقة الأدوات بعد $maxRounds جولات. اكتب «تابع» لإكمال العمل.';
           for (final c in msg.toolCalls) {
             c.status = 'error';
             c.isError = true;

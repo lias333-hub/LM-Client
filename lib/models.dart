@@ -54,6 +54,11 @@ class AppSettings {
   bool get autoCompact => _b('autoCompact', true);
   /// ميزانية توكنز التشغيل الواحد (مجموع ما عالجه النموذج في كل جولاته؛ 0 = بلا حد). شبكة أمان ضد الحلقات المكلفة.
   int get taskBudget => _i('taskBudget', 1000000);
+  /// سقف جولات الأدوات لكل رسالة (كان 12 ثابتاً؛ المشاريع الحقيقية تحتاج عشرات الجولات). إعداد مخفي.
+  int get maxToolRounds {
+    final int v = _i('maxToolRounds', 60);
+    return v < 5 ? 5 : (v > 500 ? 500 : v);
+  }
   bool get promptCache => _b('promptCache', true);
   bool get trimOldResults => _b('trimOldResults', true);
   // behaviour

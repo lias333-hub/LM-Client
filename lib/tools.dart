@@ -78,8 +78,8 @@ List<ToolDef> availableTools(AppSettings s, Agent? agent, {required bool hasLibr
     if (agent.canRead) {
       t.add(ToolDef(
         kToolListDir,
-        "List files and folders in a directory on the user's phone.",
-        _obj(<String, dynamic>{'path': _pStr('Directory path (absolute, or relative to /storage/emulated/0)')}, <String>['path']),
+        "List files and folders in a directory of the working environment (the selected workspace, or the user's phone when none is selected).",
+        _obj(<String, dynamic>{'path': _pStr('Directory path (absolute, or relative to the workspace working directory; on the phone: relative to /storage/emulated/0)')}, <String>['path']),
       ));
       t.add(ToolDef(
         kToolOutline,
@@ -397,13 +397,13 @@ Future<ToolOutcome> runTool(ToolCall c, Agent? agent, AppSettings s, {String con
       case kToolReadLib:
         return await _toolReadLib(c.args, s);
       case kToolListDir:
-        return await _toolListDir(c.args, agent);
+        return await _toolListDir(c.args, agent, convId);
       case kToolReadFile:
         return await _toolReadFile(c.args, agent, s, convId);
       case kToolOutline:
-        return await _toolOutline(c.args, agent, s);
+        return await _toolOutline(c.args, agent, s, convId);
       case kToolSearchFiles:
-        return await _toolSearchFiles(c.args, agent, s);
+        return await _toolSearchFiles(c.args, agent, s, convId);
       case kToolEditFile:
         return await _toolEditFile(c.args, agent, s, convId);
       case kToolTime:
@@ -513,28 +513,24 @@ Agent _needAgent(Agent? agent, String what) {
   return agent;
 }
 
-Future<ToolOutcome> _toolListDir(Map<String, dynamic> a, Agent? agent) async {
+Future<ToolOutcome> _toolListDir(Map<String, dynamic> a, Agent? agent, String convId) async {
   final ag = _needAgent(agent, 'file access');
   if (!ag.canRead) throw const ToolError('This agent has no read permission');
-  final p = PathGuard.resolve(asStr(a['path']), ag);
-  final d = Directory(p);
-  if (!await d.exists()) throw ToolError('Directory not found: $p');
-  final ents = await PhoneStorage.listFiles(p);
+  final FsBackend fs = currentFs();
+  final p = await fs.resolve(asStr(a['path']), ag, convId);
+  final FsStat st = await fs.stat(p);
+  if (!st.exists || !st.isDir) throw ToolError('Directory not found: $p');
+  final List<FsEntry> ents = await fs.list(p);
   final lines = <String>[];
-  for (final e in ents) {
+  for (final FsEntry e in ents) {
     if (lines.length >= 300) {
       lines.add('… (${ents.length} entries, showing 300)');
       break;
     }
-    final name = e.path.split('/').last;
-    if (e is Directory) {
-      lines.add('d $name/');
+    if (e.isDir) {
+      lines.add('d ${e.name}/');
     } else {
-      int size = 0;
-      try {
-        size = (e as File).lengthSync();
-      } catch (_) {}
-      lines.add('f $name (${fmtBytes(size)})');
+      lines.add('f ${e.name} (${fmtBytes(e.size)})');
     }
   }
   return ToolOutcome(lines.isEmpty ? '(empty directory)' : '$p\n${lines.join('\n')}', false);
@@ -543,14 +539,16 @@ Future<ToolOutcome> _toolListDir(Map<String, dynamic> a, Agent? agent) async {
 Future<ToolOutcome> _toolReadFile(Map<String, dynamic> a, Agent? agent, AppSettings s, String convId) async {
   final ag = _needAgent(agent, 'file access');
   if (!ag.canRead) throw const ToolError('This agent has no read permission');
-  final p = PathGuard.resolve(asStr(a['path']), ag);
-  final f = File(p);
-  if (!await f.exists()) throw ToolError('File not found: $p');
-  final len = await f.length();
+  final FsBackend fs = currentFs();
+  final p = await fs.resolve(asStr(a['path']), ag, convId);
+  final FsStat st = await fs.stat(p);
+  if (!st.exists || st.isDir) throw ToolError('File not found: $p');
+  final len = st.size;
   if (len > 8 * 1024 * 1024) throw ToolError('File too large (${fmtBytes(len)})');
-  final bytes = await f.readAsBytes();
+  final bytes = await fs.read(p);
   if (looksBinary(bytes)) throw ToolError('Binary file (${fmtBytes(len)}) — cannot be read as text');
-  final mt = (await f.lastModified()).millisecondsSinceEpoch;
+  final mt = st.mtimeMs;
+  final lk = fs.ledgerKey(p);
   final lines = utf8.decode(bytes, allowMalformed: true).split('\n');
   if (lines.isNotEmpty && lines.last.isEmpty) lines.removeLast();
   final total = lines.length;
@@ -577,12 +575,12 @@ Future<ToolOutcome> _toolReadFile(Map<String, dynamic> a, Agent? agent, AppSetti
   }
   final last = off + shown - 1;
   // نفس الأسطر قُرئت في هذا التشغيل والملف لم يتغيّر: نتيجتها ما زالت في السياق، فلا نُعيد إرسالها.
-  if (ReadLedger.seenThisRun(convId, p, mt, off, last)) {
+  if (ReadLedger.seenThisRun(convId, lk, mt, off, last)) {
     return ToolOutcome(
         '[unchanged · $p · lines $off-$last — you already read exactly these lines earlier in this run and the file has not changed since. Use that earlier result, or read a different range.]',
         false);
   }
-  ReadLedger.markRead(convId, p, mt, total, off, last);
+  ReadLedger.markRead(convId, lk, mt, total, off, last);
   final more = last < total ? '…[more lines: call read_file again with offset=${last + 1}]' : '';
   return ToolOutcome('[$p · lines $off-$last of $total]\n${b.toString()}$more', false);
 }
@@ -773,15 +771,16 @@ List<_Sym> _outlineSymbols(List<String> lines, int from0, int to0, String ext) {
   return out;
 }
 
-Future<ToolOutcome> _toolOutline(Map<String, dynamic> a, Agent? agent, AppSettings s) async {
+Future<ToolOutcome> _toolOutline(Map<String, dynamic> a, Agent? agent, AppSettings s, String convId) async {
   final ag = _needAgent(agent, 'file access');
   if (!ag.canRead) throw const ToolError('This agent has no read permission');
-  final p = PathGuard.resolve(asStr(a['path']), ag);
-  final f = File(p);
-  if (!await f.exists()) throw ToolError('File not found: $p');
-  final len = await f.length();
+  final FsBackend fs = currentFs();
+  final p = await fs.resolve(asStr(a['path']), ag, convId);
+  final FsStat st = await fs.stat(p);
+  if (!st.exists || st.isDir) throw ToolError('File not found: $p');
+  final len = st.size;
   if (len > 8 * 1024 * 1024) throw ToolError('File too large (${fmtBytes(len)})');
-  final bytes = await f.readAsBytes();
+  final bytes = await fs.read(p);
   if (looksBinary(bytes)) throw ToolError('Binary file (${fmtBytes(len)}) — no outline');
   final lines = utf8.decode(bytes, allowMalformed: true).split('\n');
   if (lines.isNotEmpty && lines.last.isEmpty) lines.removeLast();
@@ -894,7 +893,8 @@ String _applyEdit(String text, _EditOp op, String where) {
 Future<ToolOutcome> _toolEditFile(Map<String, dynamic> a, Agent? agent, AppSettings s, String convId) async {
   final ag = _needAgent(agent, 'file editing');
   if (!ag.canWrite) throw const ToolError('This agent has no write permission');
-  final p = PathGuard.resolve(asStr(a['path']), ag);
+  final FsBackend fs = currentFs();
+  final p = await fs.resolve(asStr(a['path']), ag, convId);
   final ops = <_EditOp>[];
   final raw = a['edits'];
   if (raw is List && raw.isNotEmpty) {
@@ -906,12 +906,12 @@ Future<ToolOutcome> _toolEditFile(Map<String, dynamic> a, Agent? agent, AppSetti
   } else {
     ops.add(_EditOp(asStr(a['old_string']), asStr(a['new_string']), a['replace_all'] == true));
   }
-  final f = File(p);
-  if (!await f.exists()) throw ToolError('File not found: $p');
-  final len = await f.length();
+  final FsStat st = await fs.stat(p);
+  if (!st.exists || st.isDir) throw ToolError('File not found: $p');
+  final len = st.size;
   if (len > 8 * 1024 * 1024) throw ToolError('File too large (${fmtBytes(len)})');
-  final oldMt = (await f.lastModified()).millisecondsSinceEpoch;
-  final bytes = await f.readAsBytes();
+  final oldMt = st.mtimeMs;
+  final bytes = await fs.read(p);
   if (looksBinary(bytes)) throw const ToolError('Binary file — cannot be edited as text');
   final tx = _tryUtf8(bytes);
   if (tx == null) throw const ToolError('File is not valid UTF-8; refusing to edit it to avoid corrupting it');
@@ -922,7 +922,7 @@ Future<ToolOutcome> _toolEditFile(Map<String, dynamic> a, Agent? agent, AppSetti
     updated = _applyEdit(updated, ops[i], ops.length > 1 ? 'edit ${i + 1}/${ops.length} in $p' : 'edit in $p');
   }
   if (s.confirm) {
-    final b = StringBuffer(p);
+    final b = StringBuffer(fs.isRemote ? '[${fs.label}] $p' : p);
     if (ops.length > 1) b.write('  (${ops.length} تعديلات)');
     for (int i = 0; i < ops.length && i < 8; i++) {
       b.write('\n\n${_miniDiff(ops[i].o, ops[i].n)}');
@@ -932,10 +932,10 @@ Future<ToolOutcome> _toolEditFile(Map<String, dynamic> a, Agent? agent, AppSetti
     if (!ok) throw const ToolError('The user denied this action');
   }
   final after = utf8.encode(updated);
-  await CheckpointStore.record(convId: convId, tool: kToolEditFile, path: p, existed: true, before: bytes, after: after);
-  await f.writeAsBytes(after, flush: true);
-  final newMt = (await f.lastModified()).millisecondsSinceEpoch;
-  ReadLedger.afterChange(convId, p, oldMt, newMt, _lineCount(after), force: false);
+  if (!fs.isRemote) await CheckpointStore.record(convId: convId, tool: kToolEditFile, path: p, existed: true, before: bytes, after: after);
+  await fs.write(p, after);
+  final newMt = (await fs.stat(p)).mtimeMs;
+  ReadLedger.afterChange(convId, fs.ledgerKey(p), oldMt, newMt, _lineCount(after), force: false);
   return ToolOutcome('Edited $p: ${ops.length} edit(s) applied', false);
 }
 
@@ -975,16 +975,24 @@ RegExp _globRe(String g) {
   return RegExp(b.toString(), caseSensitive: false);
 }
 
-Future<ToolOutcome> _toolSearchFiles(Map<String, dynamic> a, Agent? agent, AppSettings s) async {
+Future<ToolOutcome> _toolSearchFiles(Map<String, dynamic> a, Agent? agent, AppSettings s, String convId) async {
   final ag = _needAgent(agent, 'file access');
   if (!ag.canRead) throw const ToolError('This agent has no read permission');
-  final root = PathGuard.resolve(asStr(a['path']), ag);
+  final FsBackend fs = currentFs();
+  final root = await fs.resolve(asStr(a['path']), ag, convId);
   final pat = asStr(a['pattern']);
   final glob = asStr(a['glob']).trim();
   if (pat.isEmpty && glob.isEmpty) throw const ToolError('Provide a pattern and/or a glob');
   var max = toInt(a['max_results']) ?? 50;
   if (max < 1) max = 50;
   if (max > 200) max = 200;
+  if (fs.isRemote) {
+    final WorkspaceConfig? rw = currentWorkspace();
+    if (rw == null) throw const ToolError('No workspace is selected');
+    final FsStat rs = await fs.stat(root);
+    if (!rs.exists) throw ToolError('Path not found: $root');
+    return _remoteSearchFiles(rw, root, rs.isDir, pat, glob, a['ignore_case'] == true, max);
+  }
   final RegExp? re = pat.isEmpty ? null : _compileRe(pat, a['ignore_case'] == true);
   final RegExp? gre = glob.isEmpty ? null : _globRe(glob);
   final isDir = FileSystemEntity.isDirectorySync(root);
@@ -1088,21 +1096,24 @@ ToolOutcome _toolTime() {
 Future<ToolOutcome> _toolWriteFile(Map<String, dynamic> a, Agent? agent, AppSettings s, String convId) async {
   final ag = _needAgent(agent, 'file writing');
   if (!ag.canWrite) throw const ToolError('This agent has no write permission');
-  final p = PathGuard.resolve(asStr(a['path']), ag);
+  final FsBackend fs = currentFs();
+  final p = await fs.resolve(asStr(a['path']), ag, convId);
+  final lk = fs.ledgerKey(p);
   final content = asStr(a['content']);
   final append = a['append'] == true;
-  final f = File(p);
-  final existed = await f.exists();
+  final FsStat st = await fs.stat(p);
+  if (st.exists && st.isDir) throw ToolError('$p is a directory, not a file');
+  final existed = st.exists;
   int oldLen = 0;
   int oldMt = 0;
   if (existed) {
-    oldLen = await f.length();
-    oldMt = (await f.lastModified()).millisecondsSinceEpoch;
+    oldLen = st.size;
+    oldMt = st.mtimeMs;
   }
   final newBytes = utf8.encode(content);
   // حراس قبل أي نافذة موافقة: لا نسأل المستخدم عن كتابة سنرفضها.
   if (existed && !append && oldLen > 0) {
-    if (!ReadLedger.isFullyRead(convId, p, oldMt)) {
+    if (!ReadLedger.isFullyRead(convId, lk, oldMt)) {
       throw ToolError(
           'You have not read all of $p in this conversation (or it changed on disk since you read it), so overwriting it could destroy content you have not seen. Read it with read_file first, or change only what you need with edit_file. Nothing was written.');
     }
@@ -1115,33 +1126,34 @@ Future<ToolOutcome> _toolWriteFile(Map<String, dynamic> a, Agent? agent, AppSett
   if (s.confirm) {
     final ok = await askConfirm(
       append ? 'الـ Agent يريد الإضافة إلى ملف' : 'الـ Agent يريد كتابة ملف',
-      '$p\n\n${content.length} حرف\n\n${clip(content, 600)}',
+      '${fs.isRemote ? '[${fs.label}] ' : ''}$p\n\n${content.length} حرف\n\n${clip(content, 600)}',
     );
     if (!ok) throw const ToolError('The user denied this action');
   }
-  // نسخة احتياطية قبل الكتابة (تُستعاد من "تعديلات الملفات" في قائمة المحادثة).
+  // نسخة احتياطية قبل الكتابة على الهاتف (تُستعاد من "تعديلات الملفات" في قائمة المحادثة).
+  // على بيئة بعيدة: لا نقاط حفظ (التراجع عبر git على السيرفر)، ونقرأ الملف فقط عند الإلحاق.
   List<int>? before;
-  if (existed && oldLen <= kCheckpointMaxBytes) before = await f.readAsBytes();
+  if (existed && oldLen <= kCheckpointMaxBytes && (!fs.isRemote || append)) before = await fs.read(p);
   List<int>? after;
   if (!append || !existed) {
     after = newBytes;
   } else if (before != null) {
     after = <int>[...before, ...newBytes];
   }
-  await CheckpointStore.record(convId: convId, tool: kToolWriteFile, path: p, existed: existed, before: before, after: after);
-  await f.parent.create(recursive: true);
-  if (append) {
-    await f.writeAsString(content, mode: FileMode.append, flush: true);
+  if (!fs.isRemote) await CheckpointStore.record(convId: convId, tool: kToolWriteFile, path: p, existed: existed, before: before, after: after);
+  await fs.ensureParent(p);
+  if (append && existed) {
+    await fs.append(p, newBytes);
   } else {
-    await f.writeAsString(content, flush: true);
+    await fs.write(p, newBytes);
   }
-  final newMt = (await f.lastModified()).millisecondsSinceEpoch;
+  final newMt = (await fs.stat(p)).mtimeMs;
   if (after != null) {
-    ReadLedger.afterChange(convId, p, oldMt, newMt, _lineCount(after), force: !append || !existed);
+    ReadLedger.afterChange(convId, lk, oldMt, newMt, _lineCount(after), force: !append || !existed);
   } else {
-    ReadLedger.forgetFile(convId, p);
+    ReadLedger.forgetFile(convId, lk);
   }
-  return ToolOutcome('${append ? 'Appended' : 'Wrote'} ${content.length} chars to $p', false);
+  return ToolOutcome('${append ? 'Appended' : 'Wrote'} ${content.length} chars to ${fs.isRemote ? '[${fs.label}] ' : ''}$p', false);
 }
 
 Future<ToolOutcome> _toolFetchUrl(Map<String, dynamic> a, Agent? agent, AppSettings s) async {

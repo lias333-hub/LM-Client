@@ -778,6 +778,7 @@ String workspacePromptSection(WorkspaceConfig w) {
   if (w.startDir.trim().isNotEmpty) b.writeln('Starting directory: ${w.startDir.trim()}.');
   b.writeln('Every bash command is shown to the user for approval, so keep commands focused and explain them briefly. When a command is denied, do not retry the same thing: ask the user or take another approach.');
   b.writeln('Tool results end with the exit code when it is not 0. The working directory persists between bash calls.');
+  b.writeln('The file tools (read_file, write_file, edit_file, list_directory, search_files, outline_file) work on this same workspace: relative paths resolve against the bash working directory, so a file written with write_file is the file bash sees. ${w.isLocal ? '' : 'There are no file checkpoints (undo) on this workspace; use git for undo. Keys and credential folders (~/.ssh, ~/.gnupg, ~/.aws/credentials) are blocked for the file tools.'}');
   b.writeln('When you start work in a project folder you have not seen yet, first look at its root (ls) and its manifest (pubspec.yaml, package.json, pyproject.toml, Cargo.toml, go.mod, Makefile, README) to learn the project type and the right build/test commands; read CLAUDE.md or AGENTS.md there if present and follow it.');
   return b.toString().trimRight();
 }

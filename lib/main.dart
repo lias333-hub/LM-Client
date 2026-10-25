@@ -45,6 +45,7 @@ part 'ui_kit.dart';
 part 'tools.dart';
 part 'verification_gate.dart';
 part 'workspace.dart';
+part 'workspace_fs.dart';
 part 'local_exec.dart';
 part 'exec_probe.dart';
 part 'workspace_ui.dart';
