@@ -606,17 +606,19 @@ Future<void> runSshSelfTest(Map<String, dynamic> cfg) async {
   final Match? jm = RegExp(r'job (j\w+)').firstMatch(started);
   if (jm != null) jobId = jm.group(1) ?? '';
   if (jobId.isNotEmpty) {
-    String last = '';
+    // bash_output يعيد الجديد فقط في كل نداء، فنجمع النواتج.
+    final StringBuffer acc = StringBuffer();
     for (int i = 0; i < 20; i++) {
       await Future<void>.delayed(const Duration(seconds: 1));
       try {
-        last = (await _toolBashOutput(<String, dynamic>{'id': jobId})).text;
+        acc.writeln((await _toolBashOutput(<String, dynamic>{'id': jobId})).text);
       } catch (e) {
-        last = '$e';
+        acc.writeln('$e');
       }
-      if (last.contains('job-end')) break;
+      if (acc.toString().contains('job-end')) break;
     }
-    rec('background job output', last.contains('job-start') && last.contains('job-end'), last);
+    final String last = acc.toString();
+    rec('background job output (incremental)', last.contains('job-start') && last.contains('job-end'), last);
   }
   out('DONE fails=$fails total=$total');
 }
