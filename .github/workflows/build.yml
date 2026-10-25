@@ -102,3 +102,73 @@ jobs:
             v=$(cat "$f")
             if [ "$v" != "0" ]; then echo "failed: $f = $v"; exit 1; fi
           done
+  probe:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: LMClient-APK
+          path: apk
+      - name: enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: write probe script
+        run: |
+          cat > emu_probe.sh <<'EOF'
+          set +e
+          PKG=com.lmclient.lm_client
+          OUT=probe_out
+          mkdir -p $OUT
+          adb wait-for-device
+          adb shell getprop ro.build.version.sdk > $OUT/sdk.txt
+          adb install -r apk/app-release.apk > $OUT/install.txt 2>&1
+          adb shell appops set --uid $PKG MANAGE_EXTERNAL_STORAGE allow > $OUT/perm.txt 2>&1
+          adb logcat -c
+          adb shell am start -n $PKG/.MainActivity --es route /probe > $OUT/start.txt 2>&1
+          for i in $(seq 1 60); do
+            if adb logcat -d | grep -q 'LMPROBE|DONE'; then break; fi
+            sleep 3
+          done
+          adb logcat -d | grep 'LMPROBE|' | sed 's/^.*LMPROBE|//' > $OUT/probe.txt
+          adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime' | head -40 > $OUT/crash.txt
+          adb exec-out screencap -p > $OUT/screen.png
+          exit 0
+          EOF
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: bash ./emu_probe.sh
+      - name: publish probe
+        if: always()
+        run: |
+          set +e
+          git config --global user.name "ci-bot"
+          git config --global user.email "ci-bot@users.noreply.github.com"
+          REMOTE="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          rm -rf /tmp/logrepo
+          git clone -q --depth 1 --branch ci-logs "$REMOTE" /tmp/logrepo
+          mkdir -p /tmp/logrepo/latest
+          {
+            echo "run=${{ github.run_number }} sha=${{ github.sha }} branch=${{ github.ref_name }}"
+            echo "sdk=$(cat probe_out/sdk.txt 2>/dev/null)"
+            echo "--- install"; cat probe_out/install.txt 2>/dev/null
+            echo "--- perm"; cat probe_out/perm.txt 2>/dev/null
+            echo "--- start"; cat probe_out/start.txt 2>/dev/null
+            echo "--- probe"; cat probe_out/probe.txt 2>/dev/null
+            echo "--- crash"; cat probe_out/crash.txt 2>/dev/null
+          } > /tmp/logrepo/latest/4_probe.txt
+          cp probe_out/screen.png /tmp/logrepo/latest/4_screen.png 2>/dev/null
+          git -C /tmp/logrepo add -A
+          git -C /tmp/logrepo commit -q -m "probe run ${{ github.run_number }}"
+          git -C /tmp/logrepo pull -q --rebase origin ci-logs
+          git -C /tmp/logrepo push -q origin ci-logs
+          exit 0

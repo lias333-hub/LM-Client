@@ -20,7 +20,9 @@ class _Check {
 }
 
 class ExecProbeScreen extends StatefulWidget {
-  const ExecProbeScreen({super.key});
+  /// autoRun: يشغّل كل الفحوص فور الفتح ويطبع التقرير في logcat بالبادئة LMPROBE| (يستعمله CI على المحاكي).
+  final bool autoRun;
+  const ExecProbeScreen({super.key, this.autoRun = false});
   @override
   State<ExecProbeScreen> createState() => _ExecProbeScreenState();
 }
@@ -48,6 +50,33 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
   String _cwd = PhoneStorage.root;
   bool _busy = false;
   BashCancel? _cancel;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoRun) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _autoRun());
+    }
+  }
+
+  Future<void> _autoRun() async {
+    try {
+      await _runAll();
+      final StringBuffer out = StringBuffer();
+      out.writeln('LMClient autoprobe · v$kAppVersion');
+      out.writeln('os: ${Platform.operatingSystemVersion}');
+      out.writeln(_report());
+      for (final String line in out.toString().split('\n')) {
+        // ignore: avoid_print
+        print('LMPROBE|$line');
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('LMPROBE|autoprobe exception: $e');
+    }
+    // ignore: avoid_print
+    print('LMPROBE|DONE');
+  }
 
   @override
   void dispose() {
@@ -444,6 +473,19 @@ echo x > /storage/emulated/0/.lm_probe 2>&1 && echo SHARED_WRITE_OK && rm -f /st
           ),
         ],
       ),
+    );
+  }
+}
+
+/// تطبيق مصغّر يفتح شاشة الاختبار مباشرة (مسار البدء `/probe` من adb). لا يمس بيانات المستخدم.
+class AutoProbeApp extends StatelessWidget {
+  const AutoProbeApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.dark),
+      home: const ExecProbeScreen(autoRun: true),
     );
   }
 }

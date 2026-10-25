@@ -22,6 +22,11 @@ final Dio httpClient = Dio(BaseOptions(
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // مسار بدء خاص بالاختبار الآلي على المحاكي: adb shell am start ... --es route /probe
+  if (WidgetsBinding.instance.platformDispatcher.defaultRouteName == '/probe') {
+    runApp(const AutoProbeApp());
+    return;
+  }
   runApp(UncontrolledProviderScope(container: appContainer, child: const LMClientApp()));
 }
 
