@@ -49,3 +49,4 @@ part 'workspace_fs.dart';
 part 'local_exec.dart';
 part 'exec_probe.dart';
 part 'workspace_ui.dart';
+part 'skills.dart';

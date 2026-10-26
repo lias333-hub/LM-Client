@@ -25,7 +25,10 @@ class ExecProbeScreen extends StatefulWidget {
 
   /// إعداد اختبار SSH الذاتي (يمرّره CI عبر مسار البدء): host=127.0.0.1 عبر adb reverse.
   final Map<String, dynamic>? sshCfg;
-  const ExecProbeScreen({super.key, this.autoRun = false, this.sshCfg});
+
+  /// فرع المستودع الذي يُجرَّب عليه استيراد المهارات من GitHub (يمرّره CI؛ فارغ = لا اختبار شبكة).
+  final String ghBranch;
+  const ExecProbeScreen({super.key, this.autoRun = false, this.sshCfg, this.ghBranch = ''});
   @override
   State<ExecProbeScreen> createState() => _ExecProbeScreenState();
 }
@@ -73,6 +76,7 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
         // ignore: avoid_print
         print('LMPROBE|$line');
       }
+      await runSkillsSelfTest(ghBranch: widget.ghBranch);
       final Map<String, dynamic>? cfg = widget.sshCfg;
       if (cfg != null) await runSshSelfTest(cfg);
     } catch (e) {
@@ -500,13 +504,21 @@ class AutoProbeApp extends StatelessWidget {
     }
   }
 
+  String _ghBranch() {
+    try {
+      return Uri.parse(route).queryParameters['gh'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       theme: buildTheme(Brightness.dark),
-      home: ExecProbeScreen(autoRun: true, sshCfg: _sshCfg()),
+      home: ExecProbeScreen(autoRun: true, sshCfg: _sshCfg(), ghBranch: _ghBranch()),
     );
   }
 }
@@ -620,5 +632,21 @@ Future<void> runSshSelfTest(Map<String, dynamic> cfg) async {
     final String last = acc.toString();
     rec('background job output (incremental)', last.contains('job-start') && last.contains('job-end'), last);
   }
+
+  // Skills على بيئة SSH: اكتشاف .claude/skills (مجلد العمل الحالي + مجلد البدء) وتحميلها عبر use_skill.
+  await step(
+    'create workspace skills',
+    () => bash(
+        "mkdir -p .claude/skills/ci-proj && printf '%s\\n' '---' 'name: ci-proj' 'description: project skill from cwd' '---' 'PROJ-BODY' > .claude/skills/ci-proj/SKILL.md && "
+        "mkdir -p $dir/.claude/skills/ci-start && printf '%s\\n' '---' 'name: ci-start' 'description: skill from start dir' '---' 'START-BODY' > $dir/.claude/skills/ci-start/SKILL.md && "
+        "echo 'NOTE-OK' > $dir/.claude/skills/ci-start/notes.md && echo skills-made"),
+    (String t) => t.contains('skills-made'),
+  );
+  await step('use_skill lists workspace skills', () => _toolUseSkill(<String, dynamic>{}, cv), (String t) => t.contains('ci-proj') && t.contains('ci-start'));
+  await step('use_skill loads cwd skill', () => _toolUseSkill(<String, dynamic>{'name': 'ci-proj'}, cv), (String t) => t.contains('PROJ-BODY') && t.contains('Skill folder:'));
+  await step('use_skill loads start-dir skill', () => _toolUseSkill(<String, dynamic>{'name': 'ci-start'}, cv), (String t) => t.contains('START-BODY') && t.contains('notes.md'));
+  await step('use_skill reads a workspace skill file', () => _toolUseSkill(<String, dynamic>{'name': 'ci-start', 'file': 'notes.md'}, cv), (String t) => t.contains('NOTE-OK'));
+  await step('use_skill rejects path traversal', () => _toolUseSkill(<String, dynamic>{'name': 'ci-start', 'file': '../../etc/passwd'}, cv), (String t) => t.contains('relative path'), expectError: true);
+  await step('runTool dispatches use_skill on ssh', () => runTool(ToolCall(id: 'sk1', name: kToolUseSkill, args: <String, dynamic>{'name': 'ci-proj'}), ag, s, convId: cv), (String t) => t.contains('PROJ-BODY'));
   out('DONE fails=$fails total=$total');
 }

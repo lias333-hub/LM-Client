@@ -137,7 +137,7 @@ jobs:
           import json, base64, subprocess
           cfg = {'port': 2222, 'user': subprocess.check_output(['whoami']).decode().strip(), 'key': open('ci_key').read(), 'dir': '/tmp/lmci'}
           b = base64.urlsafe_b64encode(json.dumps(cfg).encode()).decode()
-          open('ssh_route.txt', 'w').write('/probe?ssh=' + b)
+          open('ssh_route.txt', 'w').write('/probe?gh=${{ github.ref_name }}&ssh=' + b)
           PY
       - name: write probe script
         run: |
@@ -152,7 +152,7 @@ jobs:
           adb shell appops set --uid $PKG MANAGE_EXTERNAL_STORAGE allow > $OUT/perm.txt 2>&1
           adb logcat -c
           adb reverse tcp:2222 tcp:2222 > $OUT/reverse.txt 2>&1
-          ROUTE=/probe
+          ROUTE='/probe?gh=${{ github.ref_name }}'
           if [ -f ssh_route.txt ]; then ROUTE=$(cat ssh_route.txt); fi
           adb shell "am start -n $PKG/.MainActivity --es route '$ROUTE'" > $OUT/start.txt 2>&1
           for i in $(seq 1 90); do

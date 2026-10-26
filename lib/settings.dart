@@ -458,6 +458,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'طرفية لـ Claude مع موافقة على كل أمر، واختبار التنفيذ',
             onTap: () => pushScreen(const WorkspacesScreen()),
           ),
+          _NavRow(
+            icon: Icons.auto_awesome,
+            title: 'المهارات (Skills)',
+            subtitle: 'تعليمات جاهزة يحمّلها النموذج عند الحاجة · استيراد من GitHub أو .claude/skills',
+            onTap: () => pushScreen(const SkillsScreen()),
+          ),
           _SwitchRow(title: 'تسمية المحادثات تلقائياً بالنموذج', subtitle: 'طلب إضافي صغير بعد أول رد (يستهلك توكنز)', value: s.autoTitle, onChanged: (v) => notifier.set('autoTitle', v)),
         ]),
 

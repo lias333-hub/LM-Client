@@ -77,6 +77,8 @@ String toolLabel(String name) {
       return 'إيقاف مهمة خلفية';
     case kToolTime:
       return 'الوقت الحالي';
+    case kToolUseSkill:
+      return 'تحميل مهارة';
   }
   return name;
 }
@@ -109,6 +111,8 @@ IconData toolIcon(String name) {
       return Icons.terminal;
     case kToolTime:
       return Icons.schedule;
+    case kToolUseSkill:
+      return Icons.auto_awesome;
   }
   return Icons.build_outlined;
 }
