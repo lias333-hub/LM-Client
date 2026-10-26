@@ -1507,6 +1507,21 @@ int fullResultsFrom(List<ChatMessage> h) {
   return 0;
 }
 
+/// فهرس أول رسالة مساعد (فيها أدوات) من آخر `keep` جولات أدوات في الدور الحالي؛ نتائج ما قبله تُقصّ.
+/// -1 = عدد الجولات لا يتجاوز keep فلا شيء يُقصّ.
+int trimBoundary(List<ChatMessage> h, int keep) {
+  int lastUser = 0;
+  for (int i = 0; i < h.length; i++) {
+    if (h[i].startsTurn) lastUser = i;
+  }
+  final List<int> idx = <int>[];
+  for (int i = lastUser; i < h.length; i++) {
+    if (h[i].role == 'assistant' && h[i].toolCalls.isNotEmpty) idx.add(i);
+  }
+  if (idx.length <= keep) return -1;
+  return idx[idx.length - keep];
+}
+
 String _cutSafe(String s, int n) {
   if (s.length <= n) return s;
   int e = n;
@@ -1530,8 +1545,8 @@ ToolCall _trimmedCall(ToolCall c) {
 }
 
 /// يحوّل رسائل المحادثة (بعد التصفية) إلى رسائل جاهزة للإرسال مع تحميل المرفقات.
-Future<List<RMsg>> resolveMessages(List<ChatMessage> history, ApiProfile profile, AppSettings s) async {
-  final ff = s.trimOldResults ? fullResultsFrom(history) : 0;
+Future<List<RMsg>> resolveMessages(List<ChatMessage> history, ApiProfile profile, AppSettings s, {int minFullFrom = 0}) async {
+  final int ff = math.max(s.trimOldResults ? fullResultsFrom(history) : 0, minFullFrom);
   int lastUser = -1;
   for (int i = 0; i < history.length; i++) {
     // الرسالة المحقونة أثناء حلقة الأدوات لا تبدأ دوراً جديداً: تفكير الجولات السابقة يبقى يُمرَّر.

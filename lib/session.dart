@@ -46,6 +46,9 @@ class ChatSession extends ChangeNotifier {
   bool deleted = false;
   /// أول رسالة داخل نافذة السياق. تتحرك دفعة واحدة (لا مع كل رسالة) كي يبقى مطلع الطلب ثابتاً فيعمل الكاش.
   String? _ctxStartId;
+
+  /// حدّ قصّ داخل الدور الحالي: نتائج الأدوات في الرسائل قبل هذه الرسالة تُقصّ (ثابت بين الجولات كي يعمل الكاش).
+  String? _trimBeforeId;
   /// عدد الرسائل القديمة المستبعدة من آخر طلب بسبب ميزانية السياق (للعرض فقط).
   int ctxDropped = 0;
   /// رسائل كُتبت أثناء التوليد: تُسلَّم بين جولات الأدوات، أو بعد انتهاء الرد كدور جديد.
@@ -422,6 +425,7 @@ class ChatSession extends ChangeNotifier {
     msg.model = req.model;
     int attempt = 0;
     int heals = 0;
+    int tooLong = 0;
     _thinkStart = 0;
     while (true) {
       try {
@@ -448,6 +452,16 @@ class ChatSession extends ChangeNotifier {
         }
         final ae = await toApiException(e);
         final bool partial = _hasOutput(msg);
+        if (!partial && tooLong < 3 && isContextTooLong(ae)) {
+          tooLong++;
+          if (await _shrinkContext(tooLong)) {
+            try {
+              req = await _buildRequest(msg);
+              toast('السياق أطول من نافذة الموديل: قُصّت نتائج الأدوات القديمة وأُعيدت المحاولة');
+              continue;
+            } catch (_) {}
+          }
+        }
         if (!partial && heals < 6 && req.tryHeal(ae)) {
           heals++;
           continue;
@@ -469,7 +483,7 @@ class ChatSession extends ChangeNotifier {
           continue;
         }
         _finishThink(msg);
-        msg.error = ae.message;
+        msg.error = isContextTooLong(ae) ? '${ae.message}\n\nالسياق أطول من نافذة الموديل حتى بعد القصّ والتلخيص. لخّص المحادثة من قائمتها أو ابدأ محادثة جديدة.' : ae.message;
         return false;
       }
     }
@@ -612,7 +626,7 @@ class ChatSession extends ChangeNotifier {
     for (final c in m.toolCalls) {
       n += jsonEncode(c.args).length;
       final r = c.result;
-      if (r != null) n += (old && s.trimOldResults && r.length > kTrimAt) ? kTrimKeep + 120 : r.length;
+      if (r != null) n += (old && (s.trimOldResults || _trimBeforeId != null) && r.length > kTrimAt) ? kTrimKeep + 120 : r.length;
     }
     return (n / 3).ceil();
   }
@@ -627,13 +641,25 @@ class ChatSession extends ChangeNotifier {
       if (i > 0) h = h.sublist(i);
       if (i < 0) _ctxStartId = null;
     }
-    final ff = fullResultsFrom(h);
-    final est = <int>[];
+    List<int> est = <int>[];
     int sum = 0;
-    for (int i = 0; i < h.length; i++) {
-      final e = _estMsg(h[i], s, i < ff);
-      est.add(e);
-      sum += e;
+    void measure() {
+      est = <int>[];
+      sum = 0;
+      final f = _ffFor(h);
+      for (int i = 0; i < h.length; i++) {
+        final e = _estMsg(h[i], s, i < f);
+        est.add(e);
+        sum += e;
+      }
+    }
+
+    measure();
+    if (sum <= s.contextBudget) return h;
+    // 1) داخل الدور الحالي: نقصّ نتائج الجولات القديمة (آخر 8 ثم 4 ثم 2 ثم 1 تبقى كاملة) قبل التفكير بحذف أدوار سابقة.
+    for (final k in const <int>[8, 4, 2, 1]) {
+      if (sum <= s.contextBudget) break;
+      if (_advanceTrim(h, k)) measure();
     }
     if (sum <= s.contextBudget) return h;
     final target = s.contextBudget ~/ 2;
@@ -653,6 +679,43 @@ class ChatSession extends ChangeNotifier {
     h = h.sublist(st);
     _ctxStartId = h.first.id;
     return h;
+  }
+
+  /// أول فهرس تبقى منه نتائج الأدوات كاملة: الدور الحالي والذي قبله، أو حدّ القصّ داخل الدور الحالي إن وُجد.
+  int _ffFor(List<ChatMessage> h) {
+    int ff = fullResultsFrom(h);
+    final id = _trimBeforeId;
+    if (id != null) {
+      final j = h.indexWhere((m) => m.id == id);
+      if (j < 0) {
+        _trimBeforeId = null;
+      } else if (j > ff) {
+        ff = j;
+      }
+    }
+    return ff;
+  }
+
+  /// يقدّم حدّ القصّ داخل الدور الحالي بحيث تبقى آخر `keep` جولات أدوات كاملة. دفعة واحدة ثم يثبت الحدّ
+  /// (لا ينزلق كل جولة) كي لا ينكسر الكاش في كل طلب. true = تقدّم الحدّ فعلاً.
+  bool _advanceTrim(List<ChatMessage> h, int keep) {
+    final b = trimBoundary(h, keep);
+    if (b < 0 || b <= _ffFor(h)) return false;
+    _trimBeforeId = h[b].id;
+    // ما قُصّ لم يعد في السياق: نسمح بإعادة قراءته (حارس الكتابة فوق ملف لم يُقرأ كاملاً يبقى كما هو).
+    ReadLedger.newRun(meta.id);
+    return true;
+  }
+
+  /// إصلاح ذاتي لخطأ «السياق أطول من النافذة»: قصّ أشدّ، ثم تلخيص الأدوار السابقة. false = لا شيء بقي ليُقصّ.
+  Future<bool> _shrinkContext(int step) async {
+    final h = _included();
+    if (step <= 1 && _advanceTrim(h, 3)) return true;
+    if (step <= 2 && _advanceTrim(h, 1)) return true;
+    status = 'compacting';
+    notifyListeners();
+    final n = await compact(appContainer.read(settingsProvider), manual: true);
+    return n > 0;
   }
 
   // ---- ضغط السياق بالتلخيص ---------------------------------------------
@@ -849,7 +912,7 @@ class ChatSession extends ChangeNotifier {
     final system = await buildSystemPrompt(s: s, project: project, agent: agent, memory: mem, library: lib, tools: tools);
     final hist = _history(pending, s);
     if (hist.isEmpty) throw ApiException('لا توجد رسائل لإرسالها (كلها مستبعدة من السياق).');
-    final msgs = await resolveMessages(hist, profile, s);
+    final msgs = await resolveMessages(hist, profile, s, minFullFrom: _ffFor(hist));
     return GenRequest(
       profile: profile,
       model: model,

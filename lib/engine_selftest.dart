@@ -114,6 +114,25 @@ Future<void> runEngineSelfTest() async {
     final String g4 = await run(kGemini, <String>['data: {"error":{"code":429,"status":"RESOURCE_EXHAUSTED","message":"quota"}}']);
     rec('gemini in-stream 429', g4.contains('status=429') && g4.contains('retriable=true'), g4);
 
+
+    // ---- السياق
+    rec(
+      'too-long detection',
+      isContextTooLong(ApiException('[400] prompt is too long: 215000 tokens > 200000 maximum', status: 400)) &&
+          isContextTooLong(ApiException("This model's maximum context length is 128000 tokens", status: 400)) &&
+          isContextTooLong(ApiException('The input token count (1100000) exceeds the maximum number of tokens allowed', status: 400)) &&
+          !isContextTooLong(ApiException('max_tokens is too large: 200000', status: 400)) &&
+          !isContextTooLong(ApiException('prompt is too long', status: 500)) &&
+          !isContextTooLong(ApiException('[401] invalid api key', status: 401)),
+      '',
+    );
+    final List<ChatMessage> h = <ChatMessage>[ChatMessage(id: 'u', role: 'user', content: 'go')];
+    for (int i = 0; i < 12; i++) {
+      h.add(ChatMessage(id: 'a$i', role: 'assistant', toolCalls: <ToolCall>[ToolCall(id: 't$i', name: 'read_file', result: 'x' * 5000)]));
+    }
+    rec('trim boundary inside the current turn', trimBoundary(h, 8) == 5 && trimBoundary(h, 1) == 12 && trimBoundary(h, 20) == -1, '${trimBoundary(h, 8)}/${trimBoundary(h, 1)}/${trimBoundary(h, 20)}');
+    rec('old result is trimmed hard', trimResult('x' * 5000).length < 700, '${trimResult('x' * 5000).length}');
+
     // ---- الاحتياط: خادم تجاهل البث (لا أحداث) لا يُعدّ مقطوعاً
     rec('no events is not a truncation', truncationError(kAnthropic, SseState()) == null, '');
   } catch (e) {

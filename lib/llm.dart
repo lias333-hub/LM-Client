@@ -29,6 +29,31 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// خطأ «السياق أطول من نافذة الموديل» (صياغات Anthropic وOpenAI وGemini والخوادم المتوافقة).
+bool isContextTooLong(ApiException e) {
+  final int? st = e.status;
+  if (st != null && st != 400 && st != 413 && st != 422) return false;
+  final String t = '${e.message} ${e.body}'.toLowerCase();
+  const List<String> pats = <String>[
+    'prompt is too long',
+    'context_length_exceeded',
+    'maximum context length',
+    'context length',
+    'context window',
+    'too many tokens',
+    'input is too long',
+    'request_too_large',
+    'request too large',
+    'exceeds the maximum number of tokens',
+    'input token count',
+    'reduce the length of the messages',
+  ];
+  for (final String p in pats) {
+    if (t.contains(p)) return true;
+  }
+  return false;
+}
+
 class ToolDef {
   final String name;
   final String description;
