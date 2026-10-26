@@ -684,6 +684,15 @@ bool isCancel(Object e) => e is DioException && e.type == DioExceptionType.cance
 class SseState {
   int events = 0;
   final List<String> raw = <String>[];
+
+  /// وصلت الإشارة `[DONE]` (OpenAI وما يشبهه).
+  bool done = false;
+
+  /// وصلت إشارة نهاية الرد من المزوّد (message_stop / finish_reason / finishReason).
+  bool sawEnd = false;
+
+  /// كانت هناك استدعاءات أدوات قيد التجميع (OpenAI-compatible).
+  bool hadCalls = false;
 }
 
 Stream<Map<String, dynamic>> sseJson(Stream<String> lines, SseState st) async* {
@@ -692,7 +701,10 @@ Stream<Map<String, dynamic>> sseJson(Stream<String> lines, SseState st) async* {
     if (line.startsWith('data:')) {
       final payload = line.substring(5).trim();
       if (payload.isEmpty) continue;
-      if (payload == '[DONE]') return;
+      if (payload == '[DONE]') {
+        st.done = true;
+        return;
+      }
       dynamic j;
       try {
         j = jsonDecode(payload);
@@ -709,6 +721,55 @@ Stream<Map<String, dynamic>> sseJson(Stream<String> lines, SseState st) async* {
       if (st.raw.length < 400) st.raw.add(line);
     }
   }
+}
+
+/// خطأ وصل داخل الـ stream (الخادم أرسل 200 ثم event خطأ): نربطه بحالة HTTP مكافئة كي تعمل إعادة المحاولة
+/// (overloaded -> 529، rate limit -> 429، خطأ خادم -> 500/503). الأخطاء الأخرى (طلب غير صالح، رصيد) تبقى غير قابلة للإعادة.
+ApiException streamApiError(dynamic err) {
+  final Map<String, dynamic> m = asMap(err);
+  final String tag = '${asStr(m['type'])} ${asStr(m['code'])} ${asStr(m['status'])}'.toLowerCase();
+  int? status;
+  final int? n = toInt(m['code']);
+  if (n != null && n >= 400 && n <= 599) status = n;
+  if (status == null) {
+    if (tag.contains('overloaded')) {
+      status = 529;
+    } else if (tag.contains('rate_limit') || tag.contains('resource_exhausted') || tag.contains('too_many')) {
+      status = 429;
+    } else if (tag.contains('unavailable')) {
+      status = 503;
+    } else if (tag.contains('timeout') || tag.contains('deadline')) {
+      status = 504;
+    } else if (tag.contains('api_error') || tag.contains('server_error') || tag.contains('internal')) {
+      status = 500;
+    }
+  }
+  final String msg = errMsg(err);
+  return ApiException(status == null ? msg : '[$status] ${clip(msg, 1200)}', status: status);
+}
+
+/// انتهى الـ stream دون إشارة نهاية: الرد مقطوع (انقطاع شبكة نظيف)، فلا نعتبره كاملاً.
+/// Anthropic وGemini يرسلان الإشارة دائماً؛ خوادم OpenAI-compatible تختلف، فلا نعتبره مقطوعاً عندها إلا
+/// إذا كان استدعاء أداة قيد التجميع (يضيع بصمت).
+ApiException? truncationError(String kind, SseState st) {
+  if (st.events == 0 || st.sawEnd) return null;
+  final bool strict = kind == kAnthropic || kind == kGemini || st.hadCalls;
+  if (!strict) return null;
+  return ApiException('انقطع البث قبل اكتمال الرد (لم تصل إشارة النهاية).', netError: true);
+}
+
+/// يحوّل أسطر SSE إلى أحداث حسب نوع المزوّد، ويرمي خطأً قابلاً للإعادة إذا انقطع الرد في منتصفه.
+Stream<LlmEvent> parseStreamLines(String kind, Stream<String> lines, SseState st) async* {
+  final Stream<Map<String, dynamic>> events = sseJson(lines, st);
+  if (kind == kAnthropic) {
+    yield* parseAnthropic(events, st);
+  } else if (kind == kGemini) {
+    yield* parseGemini(events, st);
+  } else {
+    yield* parseOpenAi(events, st);
+  }
+  final ApiException? cut = truncationError(kind, st);
+  if (cut != null) throw cut;
 }
 
 Map<String, dynamic> decodeArgs(String s) {
@@ -782,14 +843,14 @@ class _TcAcc {
   final StringBuffer args = StringBuffer();
 }
 
-Stream<LlmEvent> parseOpenAi(Stream<Map<String, dynamic>> events) async* {
+Stream<LlmEvent> parseOpenAi(Stream<Map<String, dynamic>> events, [SseState? st]) async* {
   final acc = <int, _TcAcc>{};
   int lastIdx = 0;
   int nextIdx = 0;
   final splitter = ThinkSplitter();
   String? stop;
   await for (final j in events) {
-    if (j['error'] != null) throw ApiException(errMsg(j['error']));
+    if (j['error'] != null) throw streamApiError(j['error']);
     final usage = j['usage'];
     if (usage is Map) {
       // التوكنز المخزّنة: OpenAI تضعها في prompt_tokens_details، وDeepSeek في prompt_cache_hit_tokens.
@@ -842,6 +903,10 @@ Stream<LlmEvent> parseOpenAi(Stream<Map<String, dynamic>> events) async* {
     final fr = c['finish_reason'];
     if (fr is String && fr.isNotEmpty) stop = fr;
   }
+  if (st != null) {
+    st.sawEnd = stop != null || st.done;
+    st.hadCalls = acc.values.any((_TcAcc a) => a.name.isNotEmpty);
+  }
   final tail = splitter.flush();
   if (tail.text.isNotEmpty || tail.thinking.isNotEmpty) yield LlmEvent(text: tail.text, thinking: tail.thinking);
   final keys = acc.keys.toList()..sort();
@@ -861,11 +926,12 @@ class _Blk {
   _Blk(this.type, this.id, this.name);
 }
 
-Stream<LlmEvent> parseAnthropic(Stream<Map<String, dynamic>> events) async* {
+Stream<LlmEvent> parseAnthropic(Stream<Map<String, dynamic>> events, [SseState? st]) async* {
   final blocks = <int, _Blk>{};
   await for (final j in events) {
     final type = j['type'];
-    if (type == 'error') throw ApiException(errMsg(j['error'] ?? j));
+    if (type == 'error') throw streamApiError(j['error'] ?? j);
+    if (type == 'message_stop') st?.sawEnd = true;
     if (type == 'message_start') {
       final u = asMap(asMap(j['message'])['usage']);
       final read = toInt(u['cache_read_input_tokens']) ?? 0;
@@ -906,6 +972,7 @@ Stream<LlmEvent> parseAnthropic(Stream<Map<String, dynamic>> events) async* {
       final delta = asMap(j['delta']);
       final u = asMap(j['usage']);
       final sr = delta['stop_reason'];
+      if (sr is String && sr.isNotEmpty) st?.sawEnd = true;
       yield LlmEvent(stop: sr is String ? sr : null, outTok: toInt(u['output_tokens']));
     }
   }
@@ -936,9 +1003,9 @@ Stream<LlmEvent> anthropicFull(Map<String, dynamic> j) async* {
   if (sr is String) yield LlmEvent(stop: sr);
 }
 
-Stream<LlmEvent> parseGemini(Stream<Map<String, dynamic>> events) async* {
+Stream<LlmEvent> parseGemini(Stream<Map<String, dynamic>> events, [SseState? st]) async* {
   await for (final j in events) {
-    if (j['error'] != null) throw ApiException(errMsg(j['error']));
+    if (j['error'] != null) throw streamApiError(j['error']);
     final pf = asMap(j['promptFeedback']);
     final br = pf['blockReason'];
     if (br is String && br.isNotEmpty) throw ApiException('حجب Gemini الطلب: $br');
@@ -976,7 +1043,10 @@ Stream<LlmEvent> parseGemini(Stream<Map<String, dynamic>> events) async* {
       }
     }
     final fr = c['finishReason'];
-    if (fr is String && fr.isNotEmpty) yield LlmEvent(stop: fr);
+    if (fr is String && fr.isNotEmpty) {
+      st?.sawEnd = true;
+      yield LlmEvent(stop: fr);
+    }
   }
 }
 
@@ -1001,14 +1071,16 @@ Stream<LlmEvent> executeCall(PreparedCall call, GenRequest r, CancelToken ct) as
   if (rb == null) throw ApiException('رد فارغ من الخادم');
   final lines = rb.stream.cast<List<int>>().transform(utf8.decoder).transform(const LineSplitter());
   final st = SseState();
-  final events = sseJson(lines, st);
   final kind = r.profile.kind;
-  if (kind == kAnthropic) {
-    yield* parseAnthropic(events);
-  } else if (kind == kGemini) {
-    yield* parseGemini(events);
-  } else {
-    yield* parseOpenAi(events);
+  try {
+    yield* parseStreamLines(kind, lines, st);
+  } catch (e) {
+    if (isCancel(e) || e is ApiException) rethrow;
+    // انقطاع الاتصال أثناء استلام الرد (بعد بدء البث): خطأ شبكة قابل للإعادة، لا «خطأ غير معروف».
+    if (e is SocketException || e is HttpException || e is TlsException || e is TimeoutException || e is DioException) {
+      throw ApiException('انقطع الاتصال أثناء استلام الرد — ${clip(e.toString(), 200)}', netError: true);
+    }
+    rethrow;
   }
   // الخادم تجاهل البث وأرجع JSON كاملاً (أو خطأً بحالة 200)
   if (st.events == 0 && st.raw.isNotEmpty) {
@@ -1022,7 +1094,7 @@ Stream<LlmEvent> executeCall(PreparedCall call, GenRequest r, CancelToken ct) as
     if (j is List && j.isNotEmpty) j = j.first;
     if (j is Map) {
       final m = Map<String, dynamic>.from(j);
-      if (m['error'] != null) throw ApiException(errMsg(m['error']));
+      if (m['error'] != null) throw streamApiError(m['error']);
       if (kind == kAnthropic) {
         yield* anthropicFull(m);
       } else if (kind == kGemini) {

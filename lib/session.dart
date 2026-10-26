@@ -398,6 +398,19 @@ class ChatSession extends ChangeNotifier {
 
   bool _hasOutput(ChatMessage m) => m.content.isNotEmpty || m.thinking.isNotEmpty || m.toolCalls.isNotEmpty;
 
+  /// يمسح ناتج جولة انقطعت (نص وتفكير وأدوات لم تُنفَّذ) ليعاد توليدها من الصفر.
+  void _resetRoundOutput(ChatMessage m) {
+    m.content = '';
+    m.thinking = '';
+    m.thinkSig = null;
+    m.redacted.clear();
+    m.toolCalls.clear();
+    m.stopReason = null;
+    m.thinkMs = 0;
+    _thinkStart = 0;
+    _sigSeen = 0;
+  }
+
   Future<bool> _streamRound(ChatMessage msg) async {
     GenRequest req;
     try {
@@ -434,25 +447,26 @@ class ChatSession extends ChangeNotifier {
           return false;
         }
         final ae = await toApiException(e);
-        if (!_hasOutput(msg)) {
-          if (heals < 6 && req.tryHeal(ae)) {
-            heals++;
-            continue;
+        final bool partial = _hasOutput(msg);
+        if (!partial && heals < 6 && req.tryHeal(ae)) {
+          heals++;
+          continue;
+        }
+        if (ae.retriable && attempt < 3) {
+          attempt++;
+          // انقطع الرد في منتصفه: نفرّغ ما وصل ونعيد الجولة كاملة (أدوات الجولة لم تُنفَّذ بعد، فالإعادة آمنة).
+          if (partial) _resetRoundOutput(msg);
+          status = 'retry:$attempt';
+          notifyListeners();
+          // يحترم Retry-After إن أرسله الخادم، وإلا تأخير متصاعد (4، 8، 16 ثانية). الانتظار قابل للإلغاء بزر الإيقاف.
+          final ra = ae.retryAfter;
+          final wait = ra != null ? clampInt(ra, 1, 60) : clampInt(2 << attempt, 2, 20);
+          for (int i = 0; i < wait; i++) {
+            if (_cancel?.isCancelled ?? false) break;
+            await Future<void>.delayed(const Duration(seconds: 1));
           }
-          if (ae.retriable && attempt < 3) {
-            attempt++;
-            status = 'retry:$attempt';
-            notifyListeners();
-            // يحترم Retry-After إن أرسله الخادم، وإلا تأخير متصاعد (4، 8، 16 ثانية). الانتظار قابل للإلغاء بزر الإيقاف.
-            final ra = ae.retryAfter;
-            final wait = ra != null ? clampInt(ra, 1, 60) : clampInt(2 << attempt, 2, 20);
-            for (int i = 0; i < wait; i++) {
-              if (_cancel?.isCancelled ?? false) break;
-              await Future<void>.delayed(const Duration(seconds: 1));
-            }
-            if (_cancel?.isCancelled ?? false) return false;
-            continue;
-          }
+          if (_cancel?.isCancelled ?? false) return false;
+          continue;
         }
         _finishThink(msg);
         msg.error = ae.message;

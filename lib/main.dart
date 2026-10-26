@@ -50,3 +50,4 @@ part 'local_exec.dart';
 part 'exec_probe.dart';
 part 'workspace_ui.dart';
 part 'skills.dart';
+part 'engine_selftest.dart';
