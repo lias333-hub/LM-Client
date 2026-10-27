@@ -1,4 +1,4 @@
-run=124 sha=be0a4811b48f8b47480c0e0f0f25328dd0d61d95 branch=terminal-plus
+run=125 sha=22fcd2e83eab7df88bc501c4128436cf7004d695 branch=merge-a
 sdk=34
 --- install
 Performing Streamed Install
@@ -7,9 +7,9 @@ Success
 --- start
 Starting: Intent { cmp=com.lmclient.lm_client/.MainActivity (has extras) }
 --- probe
-LMClient autoprobe · v2.7.3
+LMClient autoprobe · v2.8.0
 os: sdk_gphone64_x86_64-userdebug 14 UE1A.230829.050 12077443 dev-keys
-LMClient · اختبار التنفيذ · v2.7.3
+LMClient · اختبار التنفيذ · v2.8.0
 
 [OK] تشغيل sh
 المستخدم: u0_a192
@@ -37,14 +37,26 @@ git/python/node غير موجودة، كما هو متوقع في أندرويد
 النتيجة: تنفيذ الملفات الثنائية من مجلد التطبيق ممنوع (قيد W^X في أندرويد 10+ للتطبيقات التي تستهدف SDK 29 فأعلى). لا يمكن تنزيل git/python/node وتشغيلها؛ البدائل: sh+toybox النظام، أو ملفات تنفيذية مضمّنة داخل الـAPK، أو SSH.
 
 [OK] المهلة والإيقاف
-أُوقف أمر sleep 30 بعد 1.6 ثانية (المهلة 1.5).
+أُوقف أمر sleep 30 بعد 1.7 ثانية (المهلة 1.5).
 
 [OK] المهام الخلفية
-المهمة j4615f7 اكتملت وقُرئ ناتجها.
+المهمة jc44f94 اكتملت وقُرئ ناتجها.
 
 [OK] المجلد الحالي ورمز الخروج
 exit=1 ✓ · cwd=/storage/emulated/0/Download ✓
 
+SECRETS OK   keystore round trip :: w=true r=v1
+SECRETS OK   keystore delete :: null
+SECRETS OK   legacy api key still usable after migration :: 1
+SECRETS OK   profiles file no longer holds the key :: [{"id":"sec-p1","name":"legacy","kind":"anthropic","baseUrl":"https://example.invalid","apiKey":"","selectedModel":"m","models":[],"headers":"","streamUsage":true}]
+SECRETS OK   api key is in the keystore :: sk-legacy-123
+SECRETS OK   api key restored after a restart :: 1
+SECRETS OK   removing a profile deletes its key
+SECRETS OK   legacy ssh secrets still usable after migration :: 1
+SECRETS OK   workspaces file holds no secrets :: [{"id":"sec-w1","name":"srv","host":"example.invalid","port":22,"user":"u","keyPem":"","password":"","startDir":"","hostFp":"","isTermux":false}]
+SECRETS OK   ssh secrets restored after a restart :: 1
+SECRETS OK   removing a workspace deletes its secrets
+SECRETS DONE fails=0 total=11
 ENGINE OK   anthropic complete stream :: OK calls=0 text=Hello
 ENGINE OK   anthropic cut mid-text is an error :: ERR status=null retriable=true net=true calls=0 text=Hello
 ENGINE OK   anthropic cut mid-tool_use is an error (no silent drop) :: ERR status=null retriable=true net=true calls=0 text=
@@ -69,7 +81,7 @@ ENGINE OK   trim boundary inside the current turn :: 5/12/-1
 ENGINE OK   old result is trimmed hard :: 503
 ENGINE OK   no events is not a truncation
 ENGINE DONE fails=0 total=23
-E2E mock server on 127.0.0.1:43239
+E2E mock server on 127.0.0.1:37349
 E2E OK   tool loop: tool call, result sent back, final answer :: msgs=3 reqs=2 last=DONE-1 err=null
 E2E OK   truncated text stream is retried from scratch :: content=OK-2 err=null reqs=2
 E2E OK   truncated tool call is retried (no silent drop) :: content=OK-3 calls=0 reqs=2
@@ -90,7 +102,7 @@ SKILLS OK   load bundled file :: A-OK
 SKILLS OK   unknown skill :: Skill not found: nope. Call use_skill with no name to list the available skills.
 SKILLS OK   list skills :: Available skills (call use_skill with the name): ⏎ - ci-skill: for tests
 SKILLS OK   runTool dispatch :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
-SKILLS OK   NET discover :: ci/skills/hello-ci (ref=terminal-plus, blobs=2)
+SKILLS OK   NET discover :: ci/skills/hello-ci (ref=merge-a, blobs=2)
 SKILLS OK   NET fetch :: hello-ci | Fixture skill used by the CI to test importing skills from G… | files=notes.md
 SKILLS DONE fails=0 total=13
 SSH OK   bash echo/pwd/id :: hello-ssh ⏎ /tmp/lmci ⏎ runner
@@ -114,8 +126,8 @@ SSH OK   timeout kills the command :: (no output) ⏎ [timed out after 2s: the p
 SSH OK   non-zero exit code reported :: (no output) ⏎ [exit code: 3]
 SSH OK   cd persists across calls :: /tmp/lmci/proj
 SSH OK   relative path follows the new cwd :: [/tmp/lmci/proj/hello.txt · lines 1-4 of 4] ⏎ 1	line1 ⏎ 2	LINE-TWO ⏎ 3	line3 ⏎ 4	tail-line ⏎ 
-SSH OK   background job starts :: Started background job j14cf14 (pid 3822). Read its output with bash_output, stop it with kill_shell.
-SSH OK   background job output (incremental) :: [job j14cf14: running] ⏎ job-start ⏎ [job j14cf14: finished, exit code 0] ⏎ job-end ⏎ 
+SSH OK   background job starts :: Started background job jf1ad48 (pid 4052). Read its output with bash_output, stop it with kill_shell.
+SSH OK   background job output (incremental) :: [job jf1ad48: running] ⏎ job-start ⏎ [job jf1ad48: finished, exit code 0] ⏎ job-end ⏎ 
 SSH OK   create workspace skills :: skills-made
 SSH OK   use_skill lists workspace skills :: Available skills (call use_skill with the name): ⏎ - ci-proj [this project]: project skill from cwd ⏎ - ci-start [this project]: skill from start dir
 SSH OK   use_skill loads cwd skill :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
