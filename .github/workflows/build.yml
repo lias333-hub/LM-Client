@@ -29,6 +29,7 @@ jobs:
           cp -r /tmp/bak/lib ./lib
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />\n    <queries><package android:name="com.termux" /></queries>\n    <application|' $MANIFEST
+          sed -i '0,/<application/s|<application|<application android:allowBackup="false" android:fullBackupContent="false"|' $MANIFEST
           cat $MANIFEST
       - name: pub get
         run: |

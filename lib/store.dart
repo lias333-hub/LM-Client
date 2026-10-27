@@ -183,6 +183,12 @@ abstract class JsonListNotifier<T> extends Notifier<List<T>> {
   @override
   List<T> build() => <T>[];
 
+  /// الأصناف التي تحمل أسراراً (مفاتيح/كلمات سر) تعيد تعريف هذين الخطّافين لنقل الأسرار إلى المخزن الآمن:
+  /// postLoad يملؤها بعد القراءة، وencodeAll يُخرجها من JSON قبل الكتابة.
+  bool needsResave = false;
+  Future<List<T>> postLoad(List<T> l) async => l;
+  Future<List<Map<String, dynamic>>> encodeAll(List<T> l) async => l.map((e) => encode(e)).toList();
+
   Future<void> load() async {
     final raw = await LocalStorage.load(folderName, fileName);
     if (raw == null) return;
@@ -191,11 +197,25 @@ abstract class JsonListNotifier<T> extends Notifier<List<T>> {
       for (final e in asList(jsonDecode(raw))) {
         out.add(decode(asMap(e)));
       }
-      state = out;
+      state = await postLoad(out);
     } catch (_) {}
+    if (needsResave) {
+      needsResave = false;
+      await _persist();
+    }
   }
 
-  Future<void> _persist() => LocalStorage.save(folderName, fileName, jsonEncode(state.map((e) => encode(e)).toList()));
+  Future<void> _chain = Future<void>.value();
+
+  /// الكتابة متسلسلة وتقرأ أحدث حالة وقت التنفيذ، فلا تتجاوز كتابةٌ أقدم أخرى أحدث.
+  Future<void> _persist() {
+    final Future<void> next = _chain.then((_) async {
+      final data = await encodeAll(state);
+      await LocalStorage.save(folderName, fileName, jsonEncode(data));
+    });
+    _chain = next.catchError((Object _) {});
+    return next;
+  }
 
   Future<void> setAll(List<T> l) async {
     state = l;
@@ -330,6 +350,8 @@ class ProfilesNotifier extends Notifier<ProfilesState> {
   @override
   ProfilesState build() => const ProfilesState(<ApiProfile>[], null);
 
+  bool _secretsOk = true;
+
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString('profiles');
@@ -337,19 +359,40 @@ class ProfilesNotifier extends Notifier<ProfilesState> {
     if (raw == null) return;
     try {
       final l = <ApiProfile>[];
+      bool legacy = false;
       for (final e in asList(jsonDecode(raw))) {
-        l.add(ApiProfile.fromJson(asMap(e)));
+        var pr = ApiProfile.fromJson(asMap(e));
+        if (pr.apiKey.isNotEmpty) {
+          legacy = true; // نسخة قديمة: المفتاح كان نصاً عادياً، يُنقل للمخزن الآمن عند الحفظ أدناه
+        } else {
+          final k = await SecretStore.read('apikey:${pr.id}');
+          if (SecretStore.lastFailed) _secretsOk = false;
+          if (k != null && k.isNotEmpty) pr = pr.copyWith(apiKey: k);
+        }
+        l.add(pr);
       }
       String? sel = selId;
       if (sel == null || !l.any((e) => e.id == sel)) sel = l.isEmpty ? null : l.first.id;
       state = ProfilesState(l, sel);
+      if (legacy) await _save();
     } catch (_) {}
   }
 
   Future<void> _save() async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString('profiles', jsonEncode(state.list.map((e) => e.toJson()).toList()));
+      final out = <Map<String, dynamic>>[];
+      for (final pr in state.list) {
+        final j = pr.toJson();
+        if (pr.apiKey.isNotEmpty) {
+          // المفتاح في Keystore فقط؛ إن تعذّر المخزن نُبقيه في الملف بدل أن يضيع.
+          if (await SecretStore.write('apikey:${pr.id}', pr.apiKey)) j['apiKey'] = '';
+        } else if (_secretsOk) {
+          await SecretStore.delete('apikey:${pr.id}');
+        }
+        out.add(j);
+      }
+      await p.setString('profiles', jsonEncode(out));
       final s = state.selectedId;
       if (s != null) {
         await p.setString('selected_profile', s);
@@ -378,6 +421,7 @@ class ProfilesNotifier extends Notifier<ProfilesState> {
     String? sel = state.selectedId;
     if (sel == id) sel = l.isEmpty ? null : l.first.id;
     state = ProfilesState(l, sel);
+    await SecretStore.delete('apikey:$id');
     await _save();
   }
 

@@ -76,6 +76,7 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
         // ignore: avoid_print
         print('LMPROBE|$line');
       }
+      await runSecretsSelfTest();
       await runEngineSelfTest();
       await runAgentE2E();
       await runSkillsSelfTest(ghBranch: widget.ghBranch);

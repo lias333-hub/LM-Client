@@ -117,6 +117,53 @@ class WorkspacesNotifier extends JsonListNotifier<WorkspaceConfig> {
   Map<String, dynamic> encode(WorkspaceConfig t) => t.toJson();
   @override
   String idOf(WorkspaceConfig t) => t.id;
+
+  bool _secretsOk = true;
+
+  /// مفتاح SSH الخاص وكلمة السر في Keystore، لا في list.json. النسخ القديمة (نص عادي) تُنقل تلقائياً.
+  @override
+  Future<List<WorkspaceConfig>> postLoad(List<WorkspaceConfig> l) async {
+    final out = <WorkspaceConfig>[];
+    for (final w in l) {
+      if (w.keyPem.isNotEmpty || w.password.isNotEmpty) {
+        needsResave = true;
+        out.add(w);
+        continue;
+      }
+      final k = await SecretStore.read('ws:${w.id}:key');
+      final pw = await SecretStore.read('ws:${w.id}:pw');
+      if (SecretStore.lastFailed) _secretsOk = false;
+      out.add(w.copyWith(keyPem: k ?? '', password: pw ?? ''));
+    }
+    return out;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> encodeAll(List<WorkspaceConfig> l) async {
+    final out = <Map<String, dynamic>>[];
+    for (final w in l) {
+      final j = w.toJson();
+      if (w.keyPem.isNotEmpty) {
+        if (await SecretStore.write('ws:${w.id}:key', w.keyPem)) j['keyPem'] = '';
+      } else if (_secretsOk) {
+        await SecretStore.delete('ws:${w.id}:key');
+      }
+      if (w.password.isNotEmpty) {
+        if (await SecretStore.write('ws:${w.id}:pw', w.password)) j['password'] = '';
+      } else if (_secretsOk) {
+        await SecretStore.delete('ws:${w.id}:pw');
+      }
+      out.add(j);
+    }
+    return out;
+  }
+
+  @override
+  Future<void> remove(String id) async {
+    await SecretStore.delete('ws:$id:key');
+    await SecretStore.delete('ws:$id:pw');
+    await super.remove(id);
+  }
 }
 
 final workspacesProvider = NotifierProvider<WorkspacesNotifier, List<WorkspaceConfig>>(WorkspacesNotifier.new);
