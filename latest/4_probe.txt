@@ -1,8 +1,143 @@
-run=128 sha=72d80cf73049b2f9b8ccbc1d4e8dc11635692fa2 branch=terminal-plus
-sdk=
+run=127 sha=72d80cf73049b2f9b8ccbc1d4e8dc11635692fa2 branch=merge-a
+sdk=34
 --- install
+Performing Streamed Install
+Success
 --- perm
 --- start
+Starting: Intent { cmp=com.lmclient.lm_client/.MainActivity (has extras) }
 --- probe
+LMClient autoprobe · v2.8.0
+os: sdk_gphone64_x86_64-userdebug 14 UE1A.230829.050 12077443 dev-keys
+LMClient · اختبار التنفيذ · v2.8.0
+
+[OK] تشغيل sh
+المستخدم: u0_a192
+المعمارية: x86_64 · ABI: x86_64
+أندرويد 14 (SDK 34) · sdk_gphone64_x86_64
+
+[NOTE] الأدوات المتاحة
+متوفر (41): sh toybox ls cat cp mv rm mkdir touch chmod ln head tail wc sort uniq cut tr sed awk grep find xargs tar gzip unzip diff patch du df stat date env printf base64 sha256sum md5sum nohup kill ps sleep
+غير متوفر (12): zip curl wget ssh git python3 python node npm make gcc busybox
+toybox: toybox 0.8.9-android · 202 أمراً
+git/python/node غير موجودة، كما هو متوقع في أندرويد العادي.
+
+[OK] الملفات والتخزين
+مجلد HOME الخاص: يعمل
+قراءة التخزين المشترك: تعمل
+كتابة التخزين المشترك: تعمل
+
+[NOTE] تنفيذ ملفات من مجلد التطبيق (W^X)
+تشغيل السكربت عبر sh (sh ملف): يعمل
+تنفيذ السكربت مباشرة (shebang): مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/probe_exec.sh )
+تنفيذ ملف ثنائي منسوخ إلى مجلد التطبيق: مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/sh_copy -c echo ELF_EXEC_OK)
+
+النتيجة: تنفيذ الملفات الثنائية من مجلد التطبيق ممنوع (قيد W^X في أندرويد 10+ للتطبيقات التي تستهدف SDK 29 فأعلى). لا يمكن تنزيل git/python/node وتشغيلها؛ البدائل: sh+toybox النظام، أو ملفات تنفيذية مضمّنة داخل الـAPK، أو SSH.
+
+[OK] المهلة والإيقاف
+أُوقف أمر sleep 30 بعد 1.7 ثانية (المهلة 1.5).
+
+[OK] المهام الخلفية
+المهمة j315432 اكتملت وقُرئ ناتجها.
+
+[OK] المجلد الحالي ورمز الخروج
+exit=1 ✓ · cwd=/storage/emulated/0/Download ✓
+
+SECRETS OK   keystore round trip :: w=true r=v1
+SECRETS OK   keystore delete :: null
+SECRETS OK   legacy api key still usable after migration :: 1
+SECRETS OK   profiles file no longer holds the key :: [{"id":"sec-p1","name":"legacy","kind":"anthropic","baseUrl":"https://example.invalid","apiKey":"","selectedModel":"m","models":[],"headers":"","streamUsage":true}]
+SECRETS OK   api key is in the keystore :: sk-legacy-123
+SECRETS OK   api key restored after a restart :: 1
+SECRETS OK   removing a profile deletes its key
+SECRETS OK   legacy ssh secrets still usable after migration :: 1
+SECRETS OK   workspaces file holds no secrets :: [{"id":"sec-w1","name":"srv","host":"example.invalid","port":22,"user":"u","keyPem":"","password":"","startDir":"","hostFp":"","isTermux":false}]
+SECRETS OK   ssh secrets restored after a restart :: 1
+SECRETS OK   removing a workspace deletes its secrets
+SECRETS DONE fails=0 total=11
+ENGINE OK   anthropic complete stream :: OK calls=0 text=Hello
+ENGINE OK   anthropic cut mid-text is an error :: ERR status=null retriable=true net=true calls=0 text=Hello
+ENGINE OK   anthropic cut mid-tool_use is an error (no silent drop) :: ERR status=null retriable=true net=true calls=0 text=
+ENGINE OK   anthropic tool_use complete :: OK calls=1 text=
+ENGINE OK   anthropic in-stream overloaded -> 529 retriable :: ERR status=529 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream rate limit -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream api_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic invalid_request stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   openai complete stream :: OK calls=0 text=Hi
+ENGINE OK   openai text without end signal stays lenient (server variance) :: OK calls=0 text=Hi
+ENGINE OK   openai cut mid-tool_call is an error :: ERR status=null retriable=true net=true calls=1 text=
+ENGINE OK   openai tool_call closed by [DONE] without finish_reason is accepted :: OK calls=1 text=
+ENGINE OK   openai in-stream server_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   openai in-stream rate_limit_exceeded -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   openai insufficient_quota stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   gemini complete stream :: OK calls=0 text=Hey
+ENGINE OK   gemini without finishReason is an error :: ERR status=null retriable=true net=true calls=0 text=Hey
+ENGINE OK   gemini in-stream 503 :: ERR status=503 retriable=true net=false calls=0 text=
+ENGINE OK   gemini in-stream 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   too-long detection
+ENGINE OK   trim boundary inside the current turn :: 5/12/-1
+ENGINE OK   old result is trimmed hard :: 503
+ENGINE OK   no events is not a truncation
+ENGINE DONE fails=0 total=23
+E2E mock server on 127.0.0.1:40463
+E2E OK   tool loop: tool call, result sent back, final answer :: msgs=3 reqs=2 last=DONE-1 err=null
+E2E OK   truncated text stream is retried from scratch :: content=OK-2 err=null reqs=2
+E2E OK   truncated tool call is retried (no silent drop) :: content=OK-3 calls=0 reqs=2
+E2E OK   in-stream overloaded is retried :: content=OK-4 err=null reqs=2
+E2E OK   in-turn trimming keeps the request under the budget :: reqs=1 bytes=165945 (untrimmed would be about 240000) last=OK-5
+E2E OK   prompt-too-long self-heal: trim and retry :: reqs=2 first=243937 second=68455 last=OK-6 err=null
+E2E DONE fails=0 total=6
+SKILLS OK   parse quoted :: My-Skill|Does X: and Y|# Body ⏎ hello
+SKILLS OK   parse folded :: folded|line one line two|Body
+SKILLS OK   parse no frontmatter :: |First real line
+SKILLS OK   parse crlf :: crlf|d|B
+SKILLS OK   slug :: hello-world_1
+SKILLS OK   github refs
+SKILLS OK   tool exposed
+SKILLS OK   prompt section :: Skills are reusable expert instructions. When the task matches a skill below, call use_skill with its name BEFORE starting and follow it. ⏎ Installed skills: ⏎ - ci-skill: for tests
+SKILLS OK   load skill :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
+SKILLS OK   load bundled file :: A-OK
+SKILLS OK   unknown skill :: Skill not found: nope. Call use_skill with no name to list the available skills.
+SKILLS OK   list skills :: Available skills (call use_skill with the name): ⏎ - ci-skill: for tests
+SKILLS OK   runTool dispatch :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
+SKILLS OK   NET discover :: ci/skills/hello-ci (ref=merge-a, blobs=2)
+SKILLS OK   NET fetch :: hello-ci | Fixture skill used by the CI to test importing skills from G… | files=notes.md
+SKILLS DONE fails=0 total=13
+SSH OK   bash echo/pwd/id :: hello-ssh ⏎ /tmp/lmci ⏎ runner
+SSH OK   write_file new (relative path) :: Wrote 18 chars to [ci-server] /tmp/lmci/proj/hello.txt
+SSH OK   bash sees the file write_file wrote :: line1 ⏎ line2 ⏎ line3
+SSH OK   read_file :: [/tmp/lmci/proj/hello.txt · lines 1-3 of 3] ⏎ 1	line1 ⏎ 2	line2 ⏎ 3	line3 ⏎ 
+SSH OK   edit_file :: Edited /tmp/lmci/proj/hello.txt: 1 edit(s) applied
+SSH OK   bash sees the edit :: line1 ⏎ LINE-TWO ⏎ line3
+SSH OK   list_directory :: /tmp/lmci/proj ⏎ f hello.txt (21 B)
+SSH OK   search_files pattern+glob :: Found 1 match(es) in 1 file(s) (paths relative to /tmp/lmci; searched on workspace "ci-server") ⏎ proj/hello.txt:2:LINE-TWO
+SSH OK   search_files glob only :: Found 1 file(s) (paths relative to /tmp/lmci; searched on workspace "ci-server") ⏎ proj/hello.txt
+SSH OK   outline_file :: [/tmp/lmci/proj/hello.txt · 3 lines · 0 symbols] ⏎ No structure recognized (the outline is a heuristic for formatted source code and markdown). Use search_files, or read_file with offset/limit.
+SSH OK   write_file overwrite guard (unread file) :: You have not read all of /tmp/lmci/proj/other.txt in this conversation (or it changed on disk since you read it), so overwriting it could destroy content you have not seen. Read it with read_file first, or change only what you need with edit_file. Nothing was 
+SSH OK   write_file append :: Appended 10 chars to [ci-server] /tmp/lmci/proj/hello.txt
+SSH OK   bash sees the append :: tail-line
+SSH OK   write_file creates parent dirs :: Wrote 4 chars to [ci-server] /tmp/lmci/deep/a/b/c.txt
+SSH OK   bash sees deep file :: found-deep
+SSH OK   blocked key path :: Access to /home/runner/.ssh/id_ed25519 is blocked: it holds keys or credentials. Ask the user to run the command themselves if it is really needed.
+SSH OK   read_file on missing file :: File not found: /tmp/lmci/nope/missing.txt
+SSH OK   timeout kills the command :: (no output) ⏎ [timed out after 2s: the process was killed. Use a larger timeout_ms or run_in_background]
+SSH OK   non-zero exit code reported :: (no output) ⏎ [exit code: 3]
+SSH OK   cd persists across calls :: /tmp/lmci/proj
+SSH OK   relative path follows the new cwd :: [/tmp/lmci/proj/hello.txt · lines 1-4 of 4] ⏎ 1	line1 ⏎ 2	LINE-TWO ⏎ 3	line3 ⏎ 4	tail-line ⏎ 
+SSH OK   background job starts :: Started background job jb7f95f (pid 4055). Read its output with bash_output, stop it with kill_shell.
+SSH OK   background job output (incremental) :: [job jb7f95f: running] ⏎ job-start ⏎ [job jb7f95f: finished, exit code 0] ⏎ job-end ⏎ 
+SSH OK   create workspace skills :: skills-made
+SSH OK   use_skill lists workspace skills :: Available skills (call use_skill with the name): ⏎ - ci-proj [this project]: project skill from cwd ⏎ - ci-start [this project]: skill from start dir
+SSH OK   use_skill loads cwd skill :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
+SSH OK   use_skill loads start-dir skill :: # Skill: ci-start (from this project) ⏎ Skill folder: /tmp/lmci/.claude/skills/ci-start ⏎  ⏎ START-BODY ⏎  ⏎ --- ⏎ Other files in the skill folder: notes.md ⏎ Read them with use_skill {"name": "ci-start", "file": "<relative path>"} or read_file; scripts can be
+SSH OK   use_skill reads a workspace skill file :: NOTE-OK ⏎ 
+SSH OK   use_skill rejects path traversal :: file must be a relative path inside the skill folder
+SSH OK   runTool dispatches use_skill on ssh :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
+SSH DONE fails=0 total=30
+DONE
 --- crash
 --- package flags (ALLOW_BACKUP must be absent)
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]
