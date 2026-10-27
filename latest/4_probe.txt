@@ -1,0 +1,8 @@
+run=128 sha=72d80cf73049b2f9b8ccbc1d4e8dc11635692fa2 branch=terminal-plus
+sdk=
+--- install
+--- perm
+--- start
+--- probe
+--- crash
+--- package flags (ALLOW_BACKUP must be absent)
