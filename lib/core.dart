@@ -5,7 +5,7 @@ part of 'main.dart';
 //  Globals
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
-const String kAppVersion = '2.7.2';
+const String kAppVersion = '2.7.3';
 const String kOpenAI = 'openai';
 const String kAnthropic = 'anthropic';
 const String kGemini = 'gemini';

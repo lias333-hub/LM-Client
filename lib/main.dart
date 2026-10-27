@@ -51,3 +51,4 @@ part 'exec_probe.dart';
 part 'workspace_ui.dart';
 part 'skills.dart';
 part 'engine_selftest.dart';
+part 'agent_e2e.dart';

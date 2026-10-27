@@ -77,6 +77,7 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
         print('LMPROBE|$line');
       }
       await runEngineSelfTest();
+      await runAgentE2E();
       await runSkillsSelfTest(ghBranch: widget.ghBranch);
       final Map<String, dynamic>? cfg = widget.sshCfg;
       if (cfg != null) await runSshSelfTest(cfg);
