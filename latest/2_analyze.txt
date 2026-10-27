@@ -3,4 +3,4 @@ Analyzing lib...
    info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/main.dart:5:8 • unnecessary_import
 warning • The value of the field '_profile' isn't used • lib/project_agent.dart:388:23 • unused_field
 
-2 issues found. (ran in 12.3s)
+2 issues found. (ran in 8.3s)
