@@ -181,6 +181,58 @@ Future<void> runAgentE2E() async {
     final int c6 = mock.bodies.length > 1 ? mock.bodies[1].length : 0;
     rec('prompt-too-long self-heal: trim and retry', mock.bodies.length == 2 && c6 > 0 && c6 < a6 ~/ 2 && s6.messages.last.content == 'OK-6' && s6.messages.last.error == null,
         'reqs=${mock.bodies.length} first=$a6 second=$c6 last=${s6.messages.last.content} err=${s6.messages.last.error}');
+
+    // ---- 7) أدوات التخطيط والتفاعل داخل الحلقة الحقيقية: مهام ← سؤال ← وضع التخطيط (كتابة مرفوضة) ← خطة مرفوضة ← خطة مقبولة
+    mock.bodies.clear();
+    mock.handler = (int n, String body) async {
+      switch (n) {
+        case 1:
+          return _MockReply(200, _sseOf(_anTool('p1', kToolTodoWrite, '{"todos":[{"content":"Read code","activeForm":"Reading code","status":"in_progress"},{"content":"Write fix","activeForm":"Writing fix","status":"pending"}]}')));
+        case 2:
+          return _MockReply(200, _sseOf(_anTool('p2', kToolAskUser, '{"questions":[{"question":"Which storage?","header":"Storage","options":[{"label":"SQLite","description":"local db"},{"label":"Files"}]}]}')));
+        case 3:
+          return _MockReply(200, _sseOf(_anTool('p3', kToolEnterPlan, '{}')));
+        case 4:
+          return _MockReply(200, _sseOf(_anTool('p4', kToolWriteFile, '{"path":"a.txt","content":"x"}')));
+        case 5:
+          return _MockReply(200, _sseOf(_anTool('p5', kToolExitPlan, '{"plan":"1. Use files"}')));
+        case 6:
+          return _MockReply(200, _sseOf(_anTool('p6', kToolExitPlan, '{"plan":"1. Use SQLite"}')));
+        default:
+          return _MockReply(200, _sseOf(_anText('DONE-7')));
+      }
+    };
+    int planCalls = 0;
+    PlanState.askHook = (List<AskQuestion> qs) async => <AskAnswer>[const AskAnswer(<String>['SQLite'], '')];
+    PlanState.enterHook = () async => true;
+    PlanState.planHook = (String plan) async {
+      planCalls++;
+      return planCalls == 1 ? const PlanDecision(false, 'use SQLite instead') : const PlanDecision(true);
+    };
+    try {
+      final ChatSession s7 = ChatSession(ConvMeta(id: newId()));
+      await s7.send('fix it', <PendingAtt>[]).timeout(const Duration(seconds: 90));
+      final List<ToolCall> cs = <ToolCall>[for (final ChatMessage m in s7.messages) ...m.toolCalls];
+      String res(int i) => i < cs.length ? (cs[i].result ?? '') : '';
+      bool err(int i) => i < cs.length && cs[i].isError;
+      final bool ok7 = cs.length == 6 &&
+          s7.messages.last.content == 'DONE-7' &&
+          mock.bodies.length == 7 &&
+          !err(0) && res(0).contains('Todo list updated (0/2 done).') &&
+          !err(1) && res(1).contains('SQLite') &&
+          !err(2) && res(2).contains('Plan mode is on') &&
+          err(3) && res(3).contains('Plan mode is active') &&
+          err(4) && res(4).contains('use SQLite instead') &&
+          !err(5) && res(5).contains('approved') &&
+          !PlanState.isPlanMode(s7.meta.id) &&
+          (PlanState.todos[s7.meta.id] ?? <TodoItem>[]).length == 2;
+      rec('planning tools in the real loop (todo, ask, plan mode blocks writes, plan rejected then approved)', ok7,
+          'calls=${cs.length} reqs=${mock.bodies.length} last=${s7.messages.last.content} r=${<String>[for (int i = 0; i < cs.length; i++) '${err(i) ? 'E' : 'o'}:${clip(res(i), 40)}'].join(' | ')}');
+    } finally {
+      PlanState.askHook = null;
+      PlanState.enterHook = null;
+      PlanState.planHook = null;
+    }
   } catch (e) {
     rec('e2e harness', false, '$e');
   } finally {

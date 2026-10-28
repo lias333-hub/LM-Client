@@ -289,6 +289,7 @@ class ChatSession extends ChangeNotifier {
     notifyListeners();
     int rounds = 0;
     ReadLedger.newRun(meta.id);
+    PlanState.syncFromHistory(meta.id, messages);
     _recentSigs.clear();
     _loopAbort = false;
     _runTokens = 0;

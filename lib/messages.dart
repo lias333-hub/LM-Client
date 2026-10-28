@@ -79,6 +79,14 @@ String toolLabel(String name) {
       return 'الوقت الحالي';
     case kToolUseSkill:
       return 'تحميل مهارة';
+    case kToolTodoWrite:
+      return 'قائمة المهام';
+    case kToolAskUser:
+      return 'سؤال للمستخدم';
+    case kToolEnterPlan:
+      return 'دخول وضع التخطيط';
+    case kToolExitPlan:
+      return 'خطة للموافقة';
   }
   return name;
 }
@@ -113,6 +121,13 @@ IconData toolIcon(String name) {
       return Icons.schedule;
     case kToolUseSkill:
       return Icons.auto_awesome;
+    case kToolTodoWrite:
+      return Icons.checklist;
+    case kToolAskUser:
+      return Icons.help_outline;
+    case kToolEnterPlan:
+    case kToolExitPlan:
+      return Icons.map_outlined;
   }
   return Icons.build_outlined;
 }
@@ -128,6 +143,27 @@ String toolSummary(ToolCall c) {
   if (c.name == kToolBash) {
     final cmd = asStr(c.args['command']).trim().split('\n').first;
     if (cmd.isNotEmpty) return clip(cmd, 120);
+  }
+  if (c.name == kToolTodoWrite) {
+    final List<TodoItem> items = _lenientTodos(c.args['todos']);
+    if (items.isNotEmpty) {
+      final int done = items.where((TodoItem t) => t.status == 'completed').length;
+      TodoItem? cur;
+      for (final TodoItem t in items) {
+        if (t.status == 'in_progress') {
+          cur = t;
+          break;
+        }
+      }
+      return '$done/${items.length}${cur == null ? '' : ' · ${clip(cur.activeForm, 80)}'}';
+    }
+  }
+  if (c.name == kToolAskUser) {
+    final List<dynamic> qs = asList(c.args['questions']);
+    if (qs.isNotEmpty) {
+      final String q = asStr(asMap(qs.first)['question']).trim();
+      if (q.isNotEmpty) return clip(q, 120);
+    }
   }
   if (c.name == kToolReadFile) {
     final off = c.args['offset'];
