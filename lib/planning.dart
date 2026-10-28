@@ -571,7 +571,7 @@ class PlanApprovalSheet extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(color: p.codeBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
                 padding: const EdgeInsets.all(12),
-                child: SingleChildScrollView(child: SelectableText(plan, style: TextStyle(color: p.text, fontSize: 13.5, height: 1.55))),
+                child: SingleChildScrollView(child: RichMarkdown(data: plan, settings: appContainer.read(settingsProvider))),
               ),
             ),
             const SizedBox(height: 12),
