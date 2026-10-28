@@ -83,12 +83,59 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       await runSkillsSelfTest(ghBranch: widget.ghBranch);
       final Map<String, dynamic>? cfg = widget.sshCfg;
       if (cfg != null) await runSshSelfTest(cfg);
+      await _uiPreview();
     } catch (e) {
       // ignore: avoid_print
       print('LMPROBE|autoprobe exception: $e');
     }
     // ignore: avoid_print
     print('LMPROBE|DONE');
+  }
+
+  /// معاينة بصرية للأوراق الجديدة (سؤال المستخدم، موافقة الخطة): يلتقطها CI عند العلامة SHOT ويحفظها صوراً.
+  Future<void> _uiPreview() async {
+    try {
+      final List<AskQuestion> qs = <AskQuestion>[
+        const AskQuestion('Which storage should the app use for chat history?', 'Storage', false, <AskOption>[
+          AskOption('SQLite', 'Fast queries, one extra dependency'),
+          AskOption('JSON files', 'Simple, what the app uses now'),
+          AskOption('Hive', ''),
+        ]),
+        const AskQuestion('Which platforms should CI build?', 'Targets', true, <AskOption>[
+          AskOption('Android', 'APK'),
+          AskOption('Web', 'Static build'),
+        ]),
+      ];
+      unawaited(showModalBottomSheet<List<AskAnswer>>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (BuildContext c) => AskUserSheet(questions: qs),
+      ));
+      await Future<void>.delayed(const Duration(seconds: 5));
+      // ignore: avoid_print
+      print('LMPROBE|SHOT ask');
+      await Future<void>.delayed(const Duration(seconds: 9));
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      const String plan = '## Goal\nMove chat history from JSON files to SQLite.\n\n## Files\n- lib/store.dart: new SqliteStore\n- lib/session.dart: persist() writes only the changed message\n- pubspec.yaml: add sqflite\n\n## Steps\n1. Add the dependency and a migration that imports the old JSON.\n2. Switch persist() to incremental writes.\n3. Add a CI test that loads 1,000 messages and checks the time.\n\n## Verify\nCI green, 30/30 SSH tests, new load test under 200 ms.';
+      unawaited(showModalBottomSheet<PlanDecision>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (BuildContext c) => const PlanApprovalSheet(plan: plan),
+      ));
+      await Future<void>.delayed(const Duration(seconds: 5));
+      // ignore: avoid_print
+      print('LMPROBE|SHOT plan');
+      await Future<void>.delayed(const Duration(seconds: 9));
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      // ignore: avoid_print
+      print('LMPROBE|ui preview exception: $e');
+    }
   }
 
   @override

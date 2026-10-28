@@ -156,8 +156,12 @@ jobs:
           ROUTE='/probe?gh=${{ github.ref_name }}'
           if [ -f ssh_route.txt ]; then ROUTE=$(cat ssh_route.txt); fi
           adb shell "am start -n $PKG/.MainActivity --es route '$ROUTE'" > $OUT/start.txt 2>&1
-          for i in $(seq 1 90); do
-            if adb logcat -d | grep -q 'LMPROBE|DONE'; then break; fi
+          for i in $(seq 1 130); do
+            L=$(adb logcat -d | grep 'LMPROBE|')
+            for tag in ask plan; do
+              if echo "$L" | grep -q "LMPROBE|SHOT $tag" && [ ! -f $OUT/screen_$tag.png ]; then adb exec-out screencap -p > $OUT/screen_$tag.png; fi
+            done
+            if echo "$L" | grep -q 'LMPROBE|DONE'; then break; fi
             sleep 3
           done
           adb logcat -d | grep 'LMPROBE|' | sed 's/^.*LMPROBE|//' > $OUT/probe.txt
@@ -195,6 +199,8 @@ jobs:
             echo "--- package flags (ALLOW_BACKUP must be absent)"; cat probe_out/flags.txt 2>/dev/null
           } > /tmp/logrepo/latest/4_probe.txt
           cp probe_out/screen.png /tmp/logrepo/latest/4_screen.png 2>/dev/null
+          cp probe_out/screen_ask.png /tmp/logrepo/latest/4_screen_ask.png 2>/dev/null
+          cp probe_out/screen_plan.png /tmp/logrepo/latest/4_screen_plan.png 2>/dev/null
           git -C /tmp/logrepo add -A
           git -C /tmp/logrepo commit -q -m "probe run ${{ github.run_number }}"
           git -C /tmp/logrepo pull -q --rebase origin ci-logs

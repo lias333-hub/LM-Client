@@ -333,7 +333,7 @@ Future<ToolOutcome> _toolExitPlan(Map<String, dynamic> a, String convId) async {
   final PlanDecision d = hook != null ? await hook(plan) : await _showPlanSheet(plan);
   if (!d.approved) {
     final String fb = d.feedback.trim();
-    return ToolOutcome('The user did not approve the plan.${fb.isEmpty ? '' : ' Their comments: ${clip(fb, 3000)}'} You are still in plan mode: revise the plan and call exit_plan_mode again, or ask a question with ask_user_question.', true);
+    return ToolOutcome('The user did not approve the plan.${fb.isEmpty ? '' : ' Their comments: "${clip(fb, 3000)}".'} You are still in plan mode: revise the plan and call exit_plan_mode again, or ask a question with ask_user_question.', true);
   }
   PlanState.planMode.remove(convId);
   return const ToolOutcome('The user approved the plan. Plan mode is off: you may now edit files and run commands. Start with the first step and track progress with todo_write.', false);
