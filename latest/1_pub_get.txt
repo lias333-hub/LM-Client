@@ -38,7 +38,7 @@ Downloading packages...
 + image_picker 1.1.2 (1.2.4 available)
 + image_picker_android 0.8.12+12 (0.8.13+25 available)
 + image_picker_for_web 3.0.6 (3.1.1 available)
-+ image_picker_ios 0.8.12+2 (0.8.13+13 available)
++ image_picker_ios 0.8.12+2 (0.8.13+14 available)
 + image_picker_linux 0.2.1+2 (0.2.2 available)
 + image_picker_macos 0.2.1+2 (0.2.2+1 available)
 + image_picker_platform_interface 2.10.1 (2.11.2 available)
