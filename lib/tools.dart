@@ -164,6 +164,8 @@ List<ToolDef> availableTools(AppSettings s, Agent? agent, {required bool hasLibr
       ));
     }
   }
+  // وكيل فرعي للاستقصاء بالقراءة فقط: يُعرض فقط إن وُجدت أداة قراءة يستطيع استخدامها.
+  if (t.any((ToolDef d) => kSubAgentTools.contains(d.name))) t.add(taskToolDef());
   return t;
 }
 
@@ -390,6 +392,9 @@ Future<ToolOutcome> runTool(ToolCall c, Agent? agent, AppSettings s, {String con
     // وضع التخطيط: أي أداة تعدّل شيئاً تُرفض (قبل أي فحص آخر) حتى يوافق المستخدم على الخطة.
     final String? planBlock = planModeBlock(convId, c);
     if (planBlock != null) return ToolOutcome(planBlock, true);
+    // الوكيل الفرعي: قائمة بيضاء لأدوات القراءة، وbash للقراءة فقط (قبل أي فحص آخر).
+    final String? subBlock = subAgentBlock(convId, c);
+    if (subBlock != null) return ToolOutcome(subBlock, true);
     // لا ننفّذ أي أداة غير مفعّلة حالياً حتى لو طلبها النموذج.
     final allowed =availableTools(s, agent, hasLibrary: true, hasMemory: true, workspace: currentWorkspace()).map((t) => t.name).toSet();
     if (!allowed.contains(c.name)) return ToolOutcome('Tool not available: ${c.name}', true);
@@ -436,6 +441,9 @@ Future<ToolOutcome> runTool(ToolCall c, Agent? agent, AppSettings s, {String con
         return await _toolEnterPlan(convId);
       case kToolExitPlan:
         return await _toolExitPlan(c.args, convId);
+      case kToolTask:
+        // تُنفَّذ في ChatSession._execTools (تحتاج الجلسة الأم)؛ الوصول إلى هنا يعني استدعاءً من خارج جلسة.
+        return const ToolOutcome('The task tool can only run inside a conversation.', true);
     }
     return ToolOutcome('Unknown tool: ${c.name}', true);
   } on ToolError catch (e) {

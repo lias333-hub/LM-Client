@@ -56,3 +56,4 @@ part 'agent_e2e.dart';
 part 'secrets.dart';
 part 'planning.dart';
 part 'keepalive.dart';
+part 'subagent.dart';

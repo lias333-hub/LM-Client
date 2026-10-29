@@ -233,6 +233,189 @@ Future<void> runAgentE2E() async {
       PlanState.enterHook = null;
       PlanState.planHook = null;
     }
+
+    // ---- 8-12) الوكيل الفرعي (أداة task): جلسة مخفية بسياقها الخاص وأدوات قراءة فقط. تُستعمل المكتبة (بلا صلاحيات ولا شبكة).
+    final LibraryNotifier libN = appContainer.read(libraryProvider.notifier);
+    LibraryItem? notesItem;
+    final int savedSubRounds = SubAgents.maxRounds;
+    try {
+      notesItem = await libN.addBytes('sub-notes.txt', Uint8List.fromList(utf8.encode('RAW-LINE-7777 the needle value is 42\n')), mime: 'text/plain');
+      bool isSubReq(String b) => b.contains('You are a research sub-agent');
+      bool hasTool(String b, String name) => b.contains('"name":"$name"') || b.contains('"name": "$name"');
+      Future<_MockReply> parentReply(String body, String finalText, String desc) async {
+        if (!body.contains('tool_result')) {
+          final String args = jsonEncode(<String, dynamic>{'description': desc, 'prompt': 'Read sub-notes.txt in the library and report the needle value.'});
+          return _MockReply(200, _sseOf(_anTool('t1', kToolTask, args)));
+        }
+        return _MockReply(200, _sseOf(_anText(finalText)));
+      }
+
+      List<ToolCall> callsOf(ChatSession s) => <ToolCall>[for (final ChatMessage m in s.messages) ...m.toolCalls];
+      List<String> subBodies() => <String>[for (final String b in mock.bodies) if (isSubReq(b)) b];
+      List<String> parBodies() => <String>[for (final String b in mock.bodies) if (!isSubReq(b)) b];
+
+      // 8) مسار كامل: الأب يفوّض، الوكيل يقرأ، يعود التقرير فقط، وسياق الأب لا يتسرّب إليه ولا نتائج قراءته إلى الأب
+      mock.bodies.clear();
+      mock.handler = (int n, String body) async {
+        if (!isSubReq(body)) return parentReply(body, 'DONE-8', 'Find the needle');
+        if (!body.contains('tool_result')) return _MockReply(200, _sseOf(_anTool('s1', kToolReadLib, '{"name":"sub-notes.txt"}')));
+        return _MockReply(200, _sseOf(_anText('REPORT-8: needle=42')));
+      };
+      final int convBefore = appContainer.read(convListProvider).length;
+      final ChatSession s8 = ChatSession(ConvMeta(id: newId()));
+      await s8.send('PARENT-SECRET-123 please investigate the notes', <PendingAtt>[]).timeout(const Duration(seconds: 90));
+      final List<ToolCall> c8 = callsOf(s8);
+      final List<String> sb8 = subBodies();
+      final List<String> pb8 = parBodies();
+      final bool ok8 = c8.length == 1 &&
+          c8[0].name == kToolTask &&
+          !c8[0].isError &&
+          (c8[0].result ?? '').contains('REPORT-8: needle=42') &&
+          (c8[0].result ?? '').contains('[sub-agent:') &&
+          s8.messages.length == 3 &&
+          s8.messages.last.content == 'DONE-8' &&
+          mock.bodies.length == 4 &&
+          sb8.length == 2 &&
+          pb8.length == 2 &&
+          hasTool(pb8[0], kToolTask) &&
+          sb8.every((String b) => !b.contains('PARENT-SECRET-123') && b.contains('Read sub-notes.txt in the library')) &&
+          sb8.every((String b) => hasTool(b, kToolReadLib) && !hasTool(b, kToolTask) && !hasTool(b, kToolTodoWrite) && !hasTool(b, kToolAskUser) && !hasTool(b, kToolSaveMemory) && !hasTool(b, kToolWriteFile)) &&
+          sb8[1].contains('RAW-LINE-7777') &&
+          pb8[1].contains('REPORT-8: needle=42') &&
+          !pb8[1].contains('RAW-LINE-7777') &&
+          appContainer.read(convListProvider).length == convBefore + 1 &&
+          SubAgents._specs.isEmpty &&
+          SubAgents._running.isEmpty;
+      rec('sub-agent: own context, read-only tools, only the report returns to the parent', ok8,
+          'calls=${c8.length} err=${c8.isNotEmpty ? c8[0].isError : null} msgs=${s8.messages.length} reqs=${mock.bodies.length} sub=${sb8.length} convs=${appContainer.read(convListProvider).length}/$convBefore res=${clip(c8.isNotEmpty ? (c8[0].result ?? '') : '', 80)}');
+
+      // 9) الكتابة وحفظ الذاكرة وtask داخل task مرفوضة داخل الوكيل الفرعي (ولا تصل إلى الأداة الحقيقية)
+      mock.bodies.clear();
+      int subN9 = 0;
+      mock.handler = (int n, String body) async {
+        if (!isSubReq(body)) return parentReply(body, 'DONE-9', 'Try to write');
+        subN9++;
+        switch (subN9) {
+          case 1:
+            return _MockReply(200, _sseOf(_anTool('w1', kToolWriteFile, '{"path":"x.txt","content":"x"}')));
+          case 2:
+            return _MockReply(200, _sseOf(_anTool('w2', kToolTask, '{"description":"nested","prompt":"nested nested nested"}')));
+          case 3:
+            return _MockReply(200, _sseOf(_anTool('w3', kToolSaveMemory, '{"title":"t","content":"c"}')));
+          default:
+            return _MockReply(200, _sseOf(_anText('REPORT-9')));
+        }
+      };
+      final ChatSession s9 = ChatSession(ConvMeta(id: newId()));
+      await s9.send('try to write', <PendingAtt>[]).timeout(const Duration(seconds: 90));
+      final List<ToolCall> c9 = callsOf(s9);
+      final List<String> sb9 = subBodies();
+      final bool ok9 = c9.length == 1 &&
+          !c9[0].isError &&
+          (c9[0].result ?? '').contains('REPORT-9') &&
+          sb9.length == 4 &&
+          sb9[1].contains('Tool not available to a sub-agent: write_file') &&
+          sb9[2].contains('Tool not available to a sub-agent: task') &&
+          sb9[3].contains('Tool not available to a sub-agent: save_memory') &&
+          s9.messages.last.content == 'DONE-9';
+      rec('sub-agent cannot write, save memory or start another sub-agent', ok9,
+          'calls=${c9.length} sub=${sb9.length} res=${clip(c9.isNotEmpty ? (c9[0].result ?? '') : '', 80)} last=${s9.messages.last.content}');
+
+      // 10) سياسة القائمة البيضاء وbash للقراءة فقط (اختبار مباشر للدالة)
+      SubAgents._specs['unit-sub'] = const SubAgentSpec(parentId: 'p', system: '', tools: <String>{kToolBash, kToolReadFile}, maxRounds: 5, tokenBudget: 1000);
+      final List<String> bad = <String>[];
+      String? blk(String name, Map<String, dynamic> a) => subAgentBlock('unit-sub', ToolCall(id: 'u', name: name, args: a));
+      void expectOk(String label, String? r) {
+        if (r != null) bad.add('$label should pass');
+      }
+
+      void expectBlocked(String label, String? r) {
+        if (r == null) bad.add('$label should be blocked');
+      }
+
+      expectOk('read_file', blk(kToolReadFile, <String, dynamic>{'path': 'a'}));
+      expectOk('ls', blk(kToolBash, <String, dynamic>{'command': 'ls -la'}));
+      expectOk('git log', blk(kToolBash, <String, dynamic>{'command': 'git log --oneline -5'}));
+      expectOk('grep | head', blk(kToolBash, <String, dynamic>{'command': 'grep -rn foo . | head -5'}));
+      expectBlocked('write_file', blk(kToolWriteFile, <String, dynamic>{'path': 'a', 'content': 'b'}));
+      expectBlocked('task', blk(kToolTask, <String, dynamic>{}));
+      expectBlocked('rm', blk(kToolBash, <String, dynamic>{'command': 'rm -rf build'}));
+      expectBlocked('redirect', blk(kToolBash, <String, dynamic>{'command': 'echo hi > f.txt'}));
+      expectBlocked('chain', blk(kToolBash, <String, dynamic>{'command': 'cat a; rm b'}));
+      expectBlocked('git commit', blk(kToolBash, <String, dynamic>{'command': 'git commit -m x'}));
+      expectBlocked('find -delete', blk(kToolBash, <String, dynamic>{'command': 'find . -name x -delete'}));
+      expectBlocked('background', blk(kToolBash, <String, dynamic>{'command': 'ls', 'run_in_background': true}));
+      if (subAgentBlock('plain-conv', ToolCall(id: 'u', name: kToolWriteFile, args: <String, dynamic>{})) != null) bad.add('a normal conversation must not be restricted');
+      SubAgents._specs.remove('unit-sub');
+      final List<ToolDef> filt = subAgentToolDefs(<ToolDef>[
+        ToolDef(kToolReadFile, 'read', _obj(<String, dynamic>{}, <String>[])),
+        ToolDef(kToolWriteFile, 'write', _obj(<String, dynamic>{}, <String>[])),
+        ToolDef(kToolTask, 'task', _obj(<String, dynamic>{}, <String>[])),
+        ToolDef(kToolBash, 'run', _obj(<String, dynamic>{}, <String>[])),
+        ToolDef(kToolTodoWrite, 'todo', _obj(<String, dynamic>{}, <String>[])),
+      ]);
+      if (filt.map((ToolDef d) => d.name).join(',') != '$kToolReadFile,$kToolBash' || !filt[1].description.contains('read-only')) bad.add('tool filter: ${filt.map((ToolDef d) => d.name).join(',')}');
+      rec('sub-agent policy: read tools and read-only bash pass, everything else is blocked', bad.isEmpty, bad.join('; '));
+
+      // 11) سقف الجولات: جولة ختام بلا أدوات تُرجع تقريراً بما وُجد بدل ضياع الاستقصاء
+      SubAgents.maxRounds = 2;
+      mock.bodies.clear();
+      mock.handler = (int n, String body) async {
+        if (!isSubReq(body)) return parentReply(body, 'DONE-11', 'Endless digging');
+        if (body.contains('reached the tool-call limit')) return _MockReply(200, _sseOf(_anText('REPORT-11-PARTIAL')));
+        return _MockReply(200, _sseOf(_anTool('e$n', kToolReadLib, '{"name":"sub-notes.txt"}')));
+      };
+      final ChatSession s11 = ChatSession(ConvMeta(id: newId()));
+      await s11.send('dig forever', <PendingAtt>[]).timeout(const Duration(seconds: 90));
+      final List<ToolCall> c11 = callsOf(s11);
+      final List<String> sb11 = subBodies();
+      final bool ok11 = c11.length == 1 &&
+          !c11[0].isError &&
+          (c11[0].result ?? '').contains('REPORT-11-PARTIAL') &&
+          (c11[0].result ?? '').contains('stopped at its limit') &&
+          sb11.length == 3 &&
+          sb11[2].contains('Skipped: tool loop limit reached') &&
+          mock.bodies.length == 5 &&
+          s11.messages.last.content == 'DONE-11';
+      rec('sub-agent round cap: a final no-tools turn returns a partial report', ok11,
+          'calls=${c11.length} reqs=${mock.bodies.length} sub=${sb11.length} res=${clip(c11.isNotEmpty ? (c11[0].result ?? '') : '', 120)} last=${s11.messages.last.content}');
+      SubAgents.maxRounds = savedSubRounds;
+
+      // 12) زر الإيقاف في المحادثة الأم يوقف الوكيل الفرعي الجاري فوراً (وإلا يحرق توكنز المستخدم)
+      mock.bodies.clear();
+      mock.handler = (int n, String body) async {
+        if (!isSubReq(body)) return parentReply(body, 'DONE-12', 'Slow digging');
+        await Future<void>.delayed(const Duration(seconds: 12));
+        return _MockReply(200, _sseOf(_anText('LATE-REPORT')));
+      };
+      final ChatSession s12 = ChatSession(ConvMeta(id: newId()));
+      final Future<void> run12 = s12.send('slow job', <PendingAtt>[]);
+      int waited = 0;
+      while (SubAgents._running.isEmpty && waited < 150) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        waited++;
+      }
+      final bool started12 = SubAgents._running.isNotEmpty;
+      final Stopwatch sw12 = Stopwatch()..start();
+      s12.stop();
+      await run12.timeout(const Duration(seconds: 30));
+      sw12.stop();
+      final List<ToolCall> c12 = callsOf(s12);
+      final bool ok12 = started12 &&
+          sw12.elapsed.inSeconds < 8 &&
+          c12.length == 1 &&
+          c12[0].isError &&
+          (c12[0].result ?? '').contains('Cancelled') &&
+          SubAgents._running.isEmpty &&
+          SubAgents._specs.isEmpty &&
+          !s12.generating;
+      rec('stopping the parent stops its running sub-agent', ok12,
+          'started=$started12 secs=${sw12.elapsed.inSeconds} calls=${c12.length} err=${c12.isNotEmpty ? c12[0].isError : null} res=${clip(c12.isNotEmpty ? (c12[0].result ?? '') : '', 60)} running=${SubAgents._running.length}');
+    } finally {
+      SubAgents.maxRounds = savedSubRounds;
+      final LibraryItem? ni = notesItem;
+      if (ni != null) await libN.removeItem(ni.id);
+    }
   } catch (e) {
     rec('e2e harness', false, '$e');
   } finally {

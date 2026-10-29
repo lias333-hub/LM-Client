@@ -87,6 +87,8 @@ String toolLabel(String name) {
       return 'دخول وضع التخطيط';
     case kToolExitPlan:
       return 'خطة للموافقة';
+    case kToolTask:
+      return 'وكيل فرعي';
   }
   return name;
 }
@@ -128,6 +130,8 @@ IconData toolIcon(String name) {
     case kToolEnterPlan:
     case kToolExitPlan:
       return Icons.map_outlined;
+    case kToolTask:
+      return Icons.smart_toy_outlined;
   }
   return Icons.build_outlined;
 }
@@ -157,6 +161,10 @@ String toolSummary(ToolCall c) {
       }
       return '$done/${items.length}${cur == null ? '' : ' · ${clip(cur.activeForm, 80)}'}';
     }
+  }
+  if (c.name == kToolTask) {
+    final String d = asStr(c.args['description']).trim();
+    if (d.isNotEmpty) return clip(d, 100);
   }
   if (c.name == kToolAskUser) {
     final List<dynamic> qs = asList(c.args['questions']);

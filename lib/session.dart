@@ -22,9 +22,17 @@ class QueuedMsg {
 }
 
 class ChatSession extends ChangeNotifier {
-  ChatSession(this.meta, {bool existing = false})
+  ChatSession(this.meta, {bool existing = false, this.sub})
       : loaded = !existing,
         persisted = existing;
+
+  /// وضع الوكيل الفرعي (subagent.dart): جلسة مخفية بأدوات قراءة فقط، لا تُحفظ ولا تُعنون ولا تُلخَّص. null = محادثة عادية.
+  final SubAgentSpec? sub;
+
+  /// سقف جولات الوكيل الفرعي الحالي (يضبطه المشغّل: السقف العادي ثم 1 لجولة الختام)، وهل بلغه التشغيل الأخير.
+  int subRoundCap = 0;
+  bool subCapHit = false;
+  bool _stopFlag = false;
 
   ConvMeta meta;
   bool loaded;
@@ -97,7 +105,7 @@ class ChatSession extends ChangeNotifier {
   }
 
   Future<void> persist() async {
-    if (deleted || messages.isEmpty) return;
+    if (sub != null || deleted || messages.isEmpty) return;
     meta.updatedAt = DateTime.now();
     final data = jsonEncode(messages.map((m) => m.toJson()).toList());
     await LocalStorage.save('chats', meta.id, data);
@@ -267,8 +275,12 @@ class ChatSession extends ChangeNotifier {
   }
 
   void stop() {
+    // الوكيل الفرعي: قد يصل الإيقاف قبل أن تُنشأ إشارة الإلغاء، فنتذكّره ليُطبَّق عند بدء التشغيل.
+    if (sub != null) _stopFlag = true;
     final c = _cancel;
     if (c != null && !c.isCancelled) c.cancel('stopped');
+    // إيقاف المحادثة الأم يوقف وكيلها الفرعي الجاري أيضاً.
+    SubAgents.stopFor(meta.id);
     BashRuntime.cancelAll();
   }
 
@@ -286,18 +298,22 @@ class ChatSession extends ChangeNotifier {
     generating = true;
     status = 'connecting';
     _cancel = CancelToken();
+    if (sub != null && _stopFlag) _cancel!.cancel('stopped');
     notifyListeners();
     int rounds = 0;
     ReadLedger.newRun(meta.id);
-    PlanState.syncFromHistory(meta.id, messages);
-    unawaited(KeepAlive.acquire('Claude يعمل على مهمتك…'));
+    // الوكيل الفرعي: لا وضع تخطيط ولا قائمة مهام، والمحادثة الأم تحمل قفل الخدمة الخلفية أصلاً.
+    if (sub == null) {
+      PlanState.syncFromHistory(meta.id, messages);
+      unawaited(KeepAlive.acquire('Claude يعمل على مهمتك…'));
+    }
     _recentSigs.clear();
     _loopAbort = false;
     _runTokens = 0;
     try {
       // تجاوزنا ميزانية السياق: نلخّص الأقدم بدل حذفه (طلب إضافي واحد). عند الفشل يعمل القصّ الاحتياطي.
       final cs = appContainer.read(settingsProvider);
-      if (cs.autoCompact && _overBudget(cs)) {
+      if (sub == null && cs.autoCompact && _overBudget(cs)) {
         status = 'compacting';
         notifyListeners();
         final n = await compact(cs, manual: false);
@@ -342,8 +358,9 @@ class ChatSession extends ChangeNotifier {
           }
           break;
         }
-        final int maxRounds = appContainer.read(settingsProvider).maxToolRounds;
+        final int maxRounds = sub != null ? subRoundCap : appContainer.read(settingsProvider).maxToolRounds;
         if (rounds >= maxRounds) {
+          if (sub != null) subCapHit = true;
           msg.error = 'تم إيقاف حلقة الأدوات بعد $maxRounds جولات. اكتب «تابع» لإكمال العمل.';
           for (final c in msg.toolCalls) {
             c.status = 'error';
@@ -363,11 +380,13 @@ class ChatSession extends ChangeNotifier {
           break;
         }
         if (_loopAbort) {
+          if (sub != null) subCapHit = true;
           msg.error = 'توقف الـ Agent لأنه كرّر نفس الاستدعاء بنفس النتيجة عدة مرات. أعطه توجيهاً جديداً أو غيّر المقاربة.';
           break;
         }
-        final budget = appContainer.read(settingsProvider).taskBudget;
+        final int budget = sub?.tokenBudget ?? appContainer.read(settingsProvider).taskBudget;
         if (budget > 0 && _runTokens >= budget) {
+          if (sub != null) subCapHit = true;
           msg.error = 'بلغ التشغيل ميزانية التوكنز ($_runTokens من $budget). اكتب «تابع» للمتابعة أو ارفع الميزانية من الإعدادات.';
           break;
         }
@@ -378,7 +397,7 @@ class ChatSession extends ChangeNotifier {
       final m = ChatMessage(id: newId(), role: 'assistant', error: 'خطأ غير متوقع: $e');
       messages.add(m);
     } finally {
-      unawaited(KeepAlive.release());
+      if (sub == null) unawaited(KeepAlive.release());
       generating = false;
       status = '';
       streamingMsg = null;
@@ -569,9 +588,10 @@ class ChatSession extends ChangeNotifier {
       }
       c.status = 'running';
       status = 'tool:${c.name}';
-      unawaited(KeepAlive.note(statusLabel(status)));
+      if (sub == null) unawaited(KeepAlive.note(statusLabel(status)));
       notifyListeners();
-      final out = await runTool(c, agent, s, convId: meta.id);
+      // أداة task تحتاج الجلسة الأم نفسها (إيقافها وميزانيتها)؛ بقية الأدوات تمرّ على runTool.
+      final out = (c.name == kToolTask && sub == null) ? await runTaskTool(this, c, agent, s) : await runTool(c, agent, s, convId: meta.id);
       var text = out.text;
       // كاشف الحلقات: نفس الاستدعاء بنفس النتيجة مراراً ⇒ تحذير للنموذج، ثم إيقاف.
       final sig = '${c.name}|${jsonEncode(c.args)}|${out.error}|${out.text.hashCode}'.hashCode;
@@ -716,6 +736,7 @@ class ChatSession extends ChangeNotifier {
     final h = _included();
     if (step <= 1 && _advanceTrim(h, 3)) return true;
     if (step <= 2 && _advanceTrim(h, 1)) return true;
+    if (sub != null) return false; // الوكيل الفرعي لا يلخّص: يفشل ويُرجع ما لديه
     status = 'compacting';
     notifyListeners();
     final n = await compact(appContainer.read(settingsProvider), manual: true);
@@ -912,8 +933,11 @@ class ChatSession extends ChangeNotifier {
     final project = c.read(projectsProvider.notifier).byId(meta.projectId);
     final mem = c.read(memoryProvider);
     final lib = c.read(libraryProvider);
-    final tools = availableTools(s, agent, hasLibrary: lib.isNotEmpty, hasMemory: mem.isNotEmpty, workspace: currentWorkspace());
-    final system = await buildSystemPrompt(s: s, project: project, agent: agent, memory: mem, library: lib, tools: tools);
+    final all = availableTools(s, agent, hasLibrary: lib.isNotEmpty, hasMemory: mem.isNotEmpty, workspace: currentWorkspace());
+    final SubAgentSpec? sp = sub;
+    // الوكيل الفرعي: أدواته قراءة فقط، وتعليماته مختصرة خاصة به (لا مشروع ولا ذاكرة ولا مكتبة في الـ prompt).
+    final tools = sp == null ? all : subAgentToolDefs(all);
+    final system = sp != null ? sp.system : await buildSystemPrompt(s: s, project: project, agent: agent, memory: mem, library: lib, tools: tools);
     final hist = _history(pending, s);
     if (hist.isEmpty) throw ApiException('لا توجد رسائل لإرسالها (كلها مستبعدة من السياق).');
     final msgs = await resolveMessages(hist, profile, s, minFullFrom: _ffFor(hist));
@@ -926,7 +950,8 @@ class ChatSession extends ChangeNotifier {
       temperature: s.temperature,
       topP: s.topP,
       maxTokens: s.maxTokens,
-      thinkLevel: s.thinkLevel,
+      // الاستقصاء لا يحتاج تفكيراً ممتداً (يوفّر توكنز المستخدم)؛ الأم هي التي تفكّر في النتيجة.
+      thinkLevel: sp != null ? 0 : s.thinkLevel,
       thinkMode: s.thinkMode,
       cache: s.promptCache,
     );
@@ -935,7 +960,7 @@ class ChatSession extends ChangeNotifier {
   // ---- auto title ------------------------------------------------------
   void _maybeTitle() {
     final s = appContainer.read(settingsProvider);
-    if (!s.autoTitle || _titled || _titling || deleted) return;
+    if (sub != null || !s.autoTitle || _titled || _titling || deleted) return;
     int users = 0;
     for (final m in messages) {
       if (m.role == 'user') users++;
