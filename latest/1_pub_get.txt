@@ -1,7 +1,7 @@
 Resolving dependencies...
 Downloading packages...
 + args 2.7.0
-+ asn1lib 1.6.7
++ asn1lib 1.6.8
   async 2.11.0 (2.13.1 available)
   boolean_selector 2.1.1 (2.1.2 available)
   characters 1.3.0 (1.4.1 available)
@@ -45,6 +45,7 @@ Downloading packages...
 + image_picker_windows 0.2.1+1 (0.2.2 available)
 + js 0.6.7 (0.7.2 available)
 + json_annotation 4.9.0 (4.12.0 available)
++ lm_keepalive 0.0.1 from path packages/lm_keepalive
 + lm_termux 0.0.1 from path packages/lm_termux
 + markdown 7.3.0 (7.3.1 available)
   matcher 0.12.16+1 (0.12.20 available)
@@ -106,7 +107,7 @@ These packages are no longer being depended on:
 - leak_tracker_testing 3.0.1
 - lints 3.0.0
 - vm_service 14.2.1
-Changed 89 dependencies!
+Changed 90 dependencies!
 1 package is discontinued.
 66 packages have newer versions incompatible with dependency constraints.
 Try `flutter pub outdated` for more information.
