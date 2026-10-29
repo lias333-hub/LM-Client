@@ -69,6 +69,8 @@ class AppSettings {
   bool get autoTitle => _b('autoTitle', false);
   bool get includeDate => _b('includeDate', true);
   bool get memoryOn => _b('memoryOn', true);
+  /// خدمة المقدّمة + قفل التشغيل أثناء عمل الـ Agent (إشعار دائم)، كي لا يوقفه أندرويد عند إغلاق الشاشة.
+  bool get keepAlive => _b('keepAlive', true);
   bool get showTokens => _b('showTokens', true);
   bool get richFormat => _b('richFormat', true);
   bool get cursorBtns => _b('cursorBtns', false);

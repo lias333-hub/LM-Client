@@ -151,6 +151,7 @@ jobs:
           adb shell getprop ro.build.version.sdk > $OUT/sdk.txt
           adb install -r apk/app-release.apk > $OUT/install.txt 2>&1
           adb shell appops set --uid $PKG MANAGE_EXTERNAL_STORAGE allow > $OUT/perm.txt 2>&1
+          adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS >> $OUT/perm.txt 2>&1
           adb logcat -c
           adb reverse tcp:2222 tcp:2222 > $OUT/reverse.txt 2>&1
           ROUTE='/probe?gh=${{ github.ref_name }}'
@@ -161,6 +162,11 @@ jobs:
             for tag in ask plan; do
               if echo "$L" | grep -q "LMPROBE|SHOT $tag" && [ ! -f $OUT/screen_$tag.png ]; then adb exec-out screencap -p > $OUT/screen_$tag.png; fi
             done
+            if echo "$L" | grep -q "LMPROBE|SHOT keepalive" && [ ! -f $OUT/ka_services.txt ]; then
+              adb shell dumpsys activity services $PKG > $OUT/ka_services.txt 2>&1
+              adb shell dumpsys notification --noredact 2>&1 | grep -B2 -A14 'lmclient' > $OUT/ka_notif.txt
+              adb shell dumpsys power 2>&1 | grep -i 'lmclient:work' > $OUT/ka_wake.txt
+            fi
             if echo "$L" | grep -q 'LMPROBE|DONE'; then break; fi
             sleep 3
           done
@@ -197,6 +203,9 @@ jobs:
             echo "--- probe"; cat probe_out/probe.txt 2>/dev/null
             echo "--- crash"; cat probe_out/crash.txt 2>/dev/null
             echo "--- package flags (ALLOW_BACKUP must be absent)"; cat probe_out/flags.txt 2>/dev/null
+            echo "--- keepalive: foreground service (dumpsys activity services)"; grep -iE 'ServiceRecord|isForeground|foregroundServiceType|KeepAliveService' probe_out/ka_services.txt 2>/dev/null | head -12
+            echo "--- keepalive: notification"; head -30 probe_out/ka_notif.txt 2>/dev/null
+            echo "--- keepalive: wake lock"; cat probe_out/ka_wake.txt 2>/dev/null
           } > /tmp/logrepo/latest/4_probe.txt
           cp probe_out/screen.png /tmp/logrepo/latest/4_screen.png 2>/dev/null
           cp probe_out/screen_ask.png /tmp/logrepo/latest/4_screen_ask.png 2>/dev/null

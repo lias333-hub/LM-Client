@@ -31,6 +31,8 @@ dependencies:
   pinenacl: ^0.6.0
   lm_termux:
     path: packages/lm_termux
+  lm_keepalive:
+    path: packages/lm_keepalive
 flutter:
   uses-material-design: true
 dependency_overrides:

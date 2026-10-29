@@ -290,6 +290,7 @@ class ChatSession extends ChangeNotifier {
     int rounds = 0;
     ReadLedger.newRun(meta.id);
     PlanState.syncFromHistory(meta.id, messages);
+    unawaited(KeepAlive.acquire('Claude يعمل على مهمتك…'));
     _recentSigs.clear();
     _loopAbort = false;
     _runTokens = 0;
@@ -377,6 +378,7 @@ class ChatSession extends ChangeNotifier {
       final m = ChatMessage(id: newId(), role: 'assistant', error: 'خطأ غير متوقع: $e');
       messages.add(m);
     } finally {
+      unawaited(KeepAlive.release());
       generating = false;
       status = '';
       streamingMsg = null;
@@ -567,6 +569,7 @@ class ChatSession extends ChangeNotifier {
       }
       c.status = 'running';
       status = 'tool:${c.name}';
+      unawaited(KeepAlive.note(statusLabel(status)));
       notifyListeners();
       final out = await runTool(c, agent, s, convId: meta.id);
       var text = out.text;
