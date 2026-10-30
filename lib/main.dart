@@ -57,3 +57,4 @@ part 'secrets.dart';
 part 'planning.dart';
 part 'keepalive.dart';
 part 'subagent.dart';
+part 'redact.dart';

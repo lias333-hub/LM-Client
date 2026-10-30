@@ -59,6 +59,11 @@ class AppSettings {
     final int v = _i('maxToolRounds', 60);
     return v < 5 ? 5 : (v > 500 ? 500 : v);
   }
+  /// نقطة توقّف كل N جولة في التشغيل الواحد: تسأل «متابعة أم إيقاف» مع الأرقام الفعلية. إعداد مخفي؛ 0 = معطّل (حتى تُقرّ واجهته).
+  int get checkpointRounds {
+    final int v = _i('checkpointRounds', 0);
+    return v <= 0 ? 0 : (v < 5 ? 5 : (v > 500 ? 500 : v));
+  }
   bool get promptCache => _b('promptCache', true);
   bool get trimOldResults => _b('trimOldResults', true);
   // behaviour

@@ -416,6 +416,46 @@ Future<void> runAgentE2E() async {
       final LibraryItem? ni = notesItem;
       if (ni != null) await libN.removeItem(ni.id);
     }
+
+    // ---- 13) نقطة التوقّف الدورية: معطّلة افتراضياً؛ عند تفعيلها تسأل بالأرقام الحقيقية، وتوقف التشغيل إن رُفضت
+    Future<ChatSession> runCp(int every, bool answer, List<String> asked) async {
+      mock.bodies.clear();
+      mock.handler = (int n, String body) async {
+        // وسيط مختلف في كل جولة كي لا يعدّها كاشف الحلقات تكراراً (نتيجة current_time واحدة داخل الدقيقة).
+        if (n <= 5) return _MockReply(200, _sseOf(_anTool('cp$n', 'current_time', '{"n":$n}')));
+        return _MockReply(200, _sseOf(_anText('DONE-13')));
+      };
+      st.set('checkpointRounds', every);
+      RunCheckpoint.hook = (String title, String body2) async {
+        asked.add('$title\n$body2');
+        return answer;
+      };
+      try {
+        final ChatSession s = ChatSession(ConvMeta(id: newId()));
+        await s.send('keep going', <PendingAtt>[]).timeout(const Duration(seconds: 60));
+        return s;
+      } finally {
+        RunCheckpoint.hook = null;
+        st.set('checkpointRounds', 0);
+      }
+    }
+
+    final List<String> askedOff = <String>[];
+    final ChatSession s13a = await runCp(0, true, askedOff);
+    rec('checkpoint is off by default (no question, run completes)', askedOff.isEmpty && s13a.messages.last.content == 'DONE-13' && mock.bodies.length == 6, 'asked=${askedOff.length} reqs=${mock.bodies.length}');
+
+    final List<String> askedYes = <String>[];
+    final ChatSession s13b = await runCp(5, true, askedYes);
+    rec(
+      'checkpoint asks once after N rounds with real numbers, and continues on yes',
+      askedYes.length == 1 && askedYes[0].contains('نقطة توقّف: 5 جولة') && askedYes[0].contains('آخر خطوة: current_time') && askedYes[0].contains('توكن') && s13b.messages.last.content == 'DONE-13' && mock.bodies.length == 6,
+      'asked=${askedYes.length} reqs=${mock.bodies.length} q=${askedYes.isEmpty ? '' : askedYes[0]}',
+    );
+
+    final List<String> askedNo = <String>[];
+    final ChatSession s13c = await runCp(5, false, askedNo);
+    final String err13 = s13c.messages.last.error ?? '';
+    rec('checkpoint stops the run on no (history ends cleanly, resumable)', askedNo.length == 1 && err13.contains('نقطة التوقّف') && mock.bodies.length == 5 && !s13c.generating, 'asked=${askedNo.length} reqs=${mock.bodies.length} err=$err13');
   } catch (e) {
     rec('e2e harness', false, '$e');
   } finally {

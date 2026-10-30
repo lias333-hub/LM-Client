@@ -12,6 +12,59 @@ const String kSummarySystem =
     'files read or changed and their current state; unfinished tasks and next steps. Drop pleasantries and anything already resolved. '
     'Use the same language as the conversation. No preamble. At most about 700 words.';
 
+/// نقطة التوقّف الدورية: تستعمل بطاقة الموافقة الموجودة أصلاً ([hook] للاختبار فقط).
+class RunCheckpoint {
+  static Future<bool> Function(String title, String body)? hook;
+  static Future<bool> ask(String title, String body) {
+    final Future<bool> Function(String, String)? h = hook;
+    if (h != null) return h(title, body);
+    return askConfirm(title, body, ok: 'متابعة', cancel: 'إيقاف');
+  }
+}
+
+String fmtElapsed(Duration d) {
+  final int s = d.inSeconds < 0 ? 0 : d.inSeconds;
+  return '${s ~/ 60}:${two(s % 60)}';
+}
+
+String fmtTokShort(int n) {
+  if (n < 1000) return '$n';
+  final double k = n / 1000;
+  return '${k.toStringAsFixed(n >= 100000 ? 0 : 1)}k';
+}
+
+/// ملخّص حيّ مأخوذ من نص التفكير نفسه (بلا طلب إضافي للنموذج): آخر جملة، مقصوصة من بدايتها إن طالت.
+String liveSummary(String text, {int max = 140}) {
+  final String t = text.replaceAll(RegExp(r'[*`#>]+'), '').trim();
+  if (t.isEmpty) return '';
+  String l = '';
+  for (final String raw in t.split('\n').reversed) {
+    final String x = raw.trim();
+    if (x.isNotEmpty) {
+      l = x;
+      break;
+    }
+  }
+  if (l.isEmpty) return '';
+  // حدود الجمل داخل السطر الأخير (نقطة/علامة تعجّب/استفهام ثم مسافة).
+  final List<String> parts = <String>[];
+  int from = 0;
+  for (int i = 0; i < l.length - 1; i++) {
+    final String ch = l[i];
+    if ((ch == '.' || ch == '!' || ch == '?' || ch == '؟') && l[i + 1] == ' ') {
+      parts.add(l.substring(from, i + 1).trim());
+      from = i + 2;
+    }
+  }
+  parts.add(l.substring(from).trim());
+  parts.removeWhere((String p) => p.isEmpty);
+  if (parts.isEmpty) return '';
+  // الجملة الأخيرة قد تكون قيد الكتابة: إن قصرت نضمّ التي قبلها كي لا يومض السطر بكلمتين.
+  String pick = parts.last;
+  if (pick.length < 20 && parts.length > 1) pick = '${parts[parts.length - 2]} $pick';
+  return pick.length > max ? '…${pick.substring(pick.length - max)}' : pick;
+}
+
 /// رسالة كتبها المستخدم أثناء عمل النموذج، تنتظر التسليم.
 class QueuedMsg {
   final String id;
@@ -66,6 +119,32 @@ class ChatSession extends ChangeNotifier {
   bool _loopAbort = false;
   /// مجموع ما عالجه النموذج (دخل + خرج) في التشغيل الحالي، لميزانية المهمة.
   int _runTokens = 0;
+  /// عدّادات التشغيل الحالي (للملخّص الحيّ ولنقطة التوقّف): جولات النموذج، بداية التشغيل، دخل معالَج ومنه من الكاش، وآخر طلب فعلي.
+  int runRounds = 0;
+  DateTime? runStart;
+  int _runIn = 0;
+  int _runCache = 0;
+  int lastInTok = 0;
+  int lastCacheTok = 0;
+  int _lastCheckpoint = 0;
+  ToolCall? runningCall;
+
+  /// سطر التقدّم الحيّ (بلا أي طلب إضافي للنموذج): أثناء التفكير آخر جملة منه، وأثناء أداة وصفها أو آخر سطر كتبه النموذج قبلها.
+  String get liveNote {
+    final ChatMessage? m = streamingMsg;
+    if (status == 'thinking') return m == null ? '' : liveSummary(m.thinking);
+    if (status.startsWith('tool:')) {
+      final ToolCall? c = runningCall;
+      final String d = c == null ? '' : asStr(c.args['description']).trim();
+      if (d.isNotEmpty) return clip(d, 140);
+      for (int i = messages.length - 1; i >= 0 && i >= messages.length - 3; i--) {
+        final ChatMessage x = messages[i];
+        if (x.role == 'assistant' && x.content.trim().isNotEmpty) return liveSummary(x.content);
+      }
+      return c == null ? '' : toolSummary(c);
+    }
+    return '';
+  }
 
   bool get isEmpty => messages.isEmpty;
 
@@ -310,6 +389,12 @@ class ChatSession extends ChangeNotifier {
     _recentSigs.clear();
     _loopAbort = false;
     _runTokens = 0;
+    runRounds = 0;
+    runStart = DateTime.now();
+    _runIn = 0;
+    _runCache = 0;
+    _lastCheckpoint = 0;
+    runningCall = null;
     try {
       // تجاوزنا ميزانية السياق: نلخّص الأقدم بدل حذفه (طلب إضافي واحد). عند الفشل يعمل القصّ الاحتياطي.
       final cs = appContainer.read(settingsProvider);
@@ -325,6 +410,7 @@ class ChatSession extends ChangeNotifier {
       }
       while (true) {
         rounds++;
+        runRounds++;
         final msg = ChatMessage(id: newId(), role: 'assistant');
         messages.add(msg);
         streamingMsg = msg;
@@ -349,6 +435,10 @@ class ChatSession extends ChangeNotifier {
           break;
         }
         _runTokens += msg.inTok + msg.outTok;
+        _runIn += msg.inTok;
+        _runCache += msg.cacheTok;
+        lastInTok = msg.inTok;
+        lastCacheTok = msg.cacheTok;
         if (msg.toolCalls.isEmpty) {
           // انتهى الرد وفي الطابور رسائل: تُرسل كدور جديد مباشرة.
           if (queue.isNotEmpty) {
@@ -390,6 +480,15 @@ class ChatSession extends ChangeNotifier {
           msg.error = 'بلغ التشغيل ميزانية التوكنز ($_runTokens من $budget). اكتب «تابع» للمتابعة أو ارفع الميزانية من الإعدادات.';
           break;
         }
+        // نقطة توقّف دورية: تُظهر الأرقام الحقيقية وتسأل «متابعة أم إيقاف» (إعداد مخفي؛ 0 = معطّل). لا تسري على الوكيل الفرعي.
+        final int cpEvery = sub != null ? 0 : appContainer.read(settingsProvider).checkpointRounds;
+        if (cpEvery > 0 && runRounds - _lastCheckpoint >= cpEvery) {
+          _lastCheckpoint = runRounds;
+          if (!await _checkpoint(msg)) {
+            msg.error = 'أوقفتَ التشغيل عند نقطة التوقّف بعد $runRounds جولة. اكتب «تابع» لإكمال العمل.';
+            break;
+          }
+        }
         // رسائل كتبها المستخدم أثناء العمل: تصل النموذج الآن، بين جولتي الأدوات.
         if (queue.isNotEmpty) await _deliverQueue(inLoop: true);
       }
@@ -398,6 +497,7 @@ class ChatSession extends ChangeNotifier {
       messages.add(m);
     } finally {
       if (sub == null) unawaited(KeepAlive.release());
+      runningCall = null;
       generating = false;
       status = '';
       streamingMsg = null;
@@ -419,6 +519,15 @@ class ChatSession extends ChangeNotifier {
     }
     await persist();
     _maybeTitle();
+  }
+
+  Future<bool> _checkpoint(ChatMessage msg) async {
+    final Duration el = DateTime.now().difference(runStart ?? DateTime.now());
+    final String cache = _runIn > 0 ? ' (${(_runCache * 100 / _runIn).round()}% منه من الكاش)' : '';
+    final ToolCall? last = msg.toolCalls.isEmpty ? null : msg.toolCalls.last;
+    final String lastStep = last == null ? '' : '\nآخر خطوة: ${last.name}(${clip(toolSummary(last), 80)})';
+    final String body = 'عمل الـ Agent $runRounds جولة خلال ${fmtElapsed(el)}\nالمُعالَج: ~${fmtTokShort(_runTokens)} توكن$cache$lastStep';
+    return RunCheckpoint.ask('نقطة توقّف: $runRounds جولة', body);
   }
 
   bool _hasOutput(ChatMessage m) => m.content.isNotEmpty || m.thinking.isNotEmpty || m.toolCalls.isNotEmpty;
@@ -587,12 +696,14 @@ class ChatSession extends ChangeNotifier {
         continue;
       }
       c.status = 'running';
+      runningCall = c;
       status = 'tool:${c.name}';
       if (sub == null) unawaited(KeepAlive.note(statusLabel(status)));
       notifyListeners();
       // أداة task تحتاج الجلسة الأم نفسها (إيقافها وميزانيتها)؛ بقية الأدوات تمرّ على runTool.
       final out = (c.name == kToolTask && sub == null) ? await runTaskTool(this, c, agent, s) : await runTool(c, agent, s, convId: meta.id);
-      var text = out.text;
+      // الأسرار لا تصل النموذج ولا تُحفظ في بطاقة الأداة (انظر redact.dart).
+      var text = Redactor.forTool(c.name, c.args, out.text);
       // كاشف الحلقات: نفس الاستدعاء بنفس النتيجة مراراً ⇒ تحذير للنموذج، ثم إيقاف.
       final sig = '${c.name}|${jsonEncode(c.args)}|${out.error}|${out.text.hashCode}'.hashCode;
       _recentSigs.add(sig);
@@ -607,6 +718,7 @@ class ChatSession extends ChangeNotifier {
       c.status = out.error ? 'error' : 'done';
       notifyListeners();
     }
+    runningCall = null;
     status = 'connecting';
   }
 

@@ -133,6 +133,84 @@ Future<void> runEngineSelfTest() async {
     rec('trim boundary inside the current turn', trimBoundary(h, 8) == 5 && trimBoundary(h, 1) == 12 && trimBoundary(h, 20) == -1, '${trimBoundary(h, 8)}/${trimBoundary(h, 1)}/${trimBoundary(h, 20)}');
     rec('old result is trimmed hard', trimResult('x' * 5000).length < 700, '${trimResult('x' * 5000).length}');
 
+    // ---- إخفاء الأسرار (المفاتيح تُبنى وقت التشغيل كي لا تظهر حرفياً في الشيفرة)
+    final String kGoogle = 'AIza${'aB3dE' * 7}';
+    final String kAnt = 'sk-ant-${'a1B2c3' * 6}';
+    final String kGh = 'ghp_${'a1B2c' * 8}';
+    final String kAq = 'AQ.${'Ab8RN6' * 8}';
+    final String kJwt = 'eyJ${'abcde12345' * 2}.${'fghij67890' * 2}.${'klmno13579' * 2}';
+    final String kPem = '-----BEGIN ${'RSA'} PRIVATE KEY-----\n${'MIIEowIBAAKC' * 6}\n-----END ${'RSA'} PRIVATE KEY-----';
+    Redacted rd(String s, {bool h = false, List<String> known = const <String>[]}) => Redactor.clean(s, heuristics: h, known: known);
+    Redacted r = rd('key=$kGoogle ok');
+    rec('redact google key', r.count == 1 && !r.text.contains(kGoogle) && r.text.contains('ok'), r.text);
+    r = rd('x $kAnt y');
+    rec('redact anthropic-style key', r.count == 1 && !r.text.contains('a1B2c3a1B2c3'), r.text);
+    r = rd('token $kGh');
+    rec('redact github token', r.count == 1 && !r.text.contains(kGh), r.text);
+    r = rd('GEMINI=$kAq');
+    rec('redact google AQ. token', r.count == 1 && !r.text.contains('Ab8RN6Ab8RN6'), r.text);
+    r = rd('jwt: $kJwt');
+    rec('redact jwt', r.count == 1 && !r.text.contains('abcde12345'), r.text);
+    r = rd('before\n$kPem\nafter');
+    rec('redact private key block', r.count == 1 && r.text.contains('before') && r.text.contains('after') && !r.text.contains('MIIEowIBAAKC'), r.text);
+    r = rd('curl -H "Authorization: Bearer ${'Zz9y8X7w' * 4}" https://x');
+    rec('redact bearer header', r.count == 1 && !r.text.contains('Zz9y8X7wZz9y8X7w') && r.text.contains('Authorization: Bearer [REDACTED]'), r.text);
+    final String tok = 'a1b2${'C3d4' * 4}';
+    r = rd('export ANTHROPIC_AUTH_TOKEN="$tok"', h: true);
+    rec('assignment heuristic keeps the name, hides the value', r.count == 1 && r.text.contains('ANTHROPIC_AUTH_TOKEN="[REDACTED]"') && !r.text.contains(tok), r.text);
+    r = rd('export ANTHROPIC_AUTH_TOKEN="$tok"');
+    rec('assignment heuristic is off by default', r.count == 0 && r.text.contains(tok), r.text);
+    r = rd('{"apiKey": "${'k9Z8' * 5}", "name": "x"}', h: true);
+    rec('json key heuristic', r.count == 1 && r.text.contains('"apiKey": "[REDACTED]"') && r.text.contains('"name": "x"'), r.text);
+    final String code = 'final String password = widget.password;\nconst tokenizer = buildTokenizer(config);\nid 3f2a9c1e7b4d8a6f0e1c2b3a4d5e6f7a8b9c0d1e uuid 123e4567-e89b-12d3-a456-426614174000\ntask-force-alpha-bravo-charlie-delta-echo-foxtrot\nمرحباً بالعالم';
+    r = rd(code, h: true);
+    rec('no false positives on ordinary code and text', r.count == 0 && r.text == code, r.text);
+    r = rd('my key is hunter2hunter2 ok', known: <String>['hunter2hunter2']);
+    rec('app-known secret is matched literally', r.count == 1 && r.text == 'my key is [REDACTED:saved-secret] ok', r.text);
+    final String viaBash = Redactor.forTool(kToolBash, <String, dynamic>{'command': 'cat ~/.bashrc'}, 'export OPENAI_API_KEY="$tok"\nalias ll="ls -l"');
+    rec('bash output: hidden + note for the model', !viaBash.contains(tok) && viaBash.endsWith(Redactor.note) && viaBash.contains('alias ll="ls -l"'), viaBash);
+    final String plain = Redactor.forTool(kToolBash, <String, dynamic>{'command': 'ls'}, 'a\nb\n');
+    rec('clean output passes through untouched', plain == 'a\nb\n', plain);
+    final String srcRead = Redactor.forTool(kToolReadFile, <String, dynamic>{'path': 'lib/main.dart'}, 'const API_KEY = "$tok";');
+    rec('read_file of source keeps assignment text (no heuristics)', srcRead.contains(tok), srcRead);
+    final String rcRead = Redactor.forTool(kToolReadFile, <String, dynamic>{'path': '/home/u/.bashrc'}, 'export API_KEY="$tok"');
+    rec('read_file of a sensitive-named file hides assignments', !rcRead.contains(tok), rcRead);
+    rec(
+      'sensitive path detection',
+      Redactor.sensitivePath('/home/u/.env') &&
+          Redactor.sensitivePath('app/.env.local') &&
+          Redactor.sensitivePath('~/.ssh/id_ed25519') &&
+          Redactor.sensitivePath('certs/server.pem') &&
+          !Redactor.sensitivePath('lib/secrets.dart') &&
+          !Redactor.sensitivePath('lib/token_utils.dart') &&
+          !Redactor.sensitivePath('README.md'),
+      '',
+    );
+
+    // ---- الملخّص الحيّ (آخر جملة من التفكير، وصف الأداة، سطر السرد) وأرقام العرض
+    rec('live summary: empty', liveSummary('') == '' && liveSummary('  \n ') == '', '');
+    rec('live summary: last full sentence', liveSummary('Let me check git tracking. Then list models in one call.') == 'Then list models in one call.', liveSummary('Let me check git tracking. Then list models in one call.'));
+    rec('live summary: a short tail joins the previous sentence', liveSummary('Check the proxy map first. Ok.') == 'Check the proxy map first. Ok.', liveSummary('Check the proxy map first. Ok.'));
+    rec('live summary: last non-empty line, markdown stripped', liveSummary('first line\n\n**Plan** the next step carefully\n') == 'Plan the next step carefully', liveSummary('first line\n\n**Plan** the next step carefully\n'));
+    final String longSum = liveSummary('w' * 300);
+    rec('live summary: long text is clipped from the start', longSum.startsWith('…') && longSum.length == 141, '${longSum.length}');
+    rec('live summary: arabic punctuation', liveSummary('فحصت الملف. ثم سأقرأ إعدادات الوسيط الآن؟') == 'ثم سأقرأ إعدادات الوسيط الآن؟', liveSummary('فحصت الملف. ثم سأقرأ إعدادات الوسيط الآن؟'));
+    final ChatSession ls = ChatSession(ConvMeta(id: newId()));
+    ls.status = 'thinking';
+    ls.streamingMsg = ChatMessage(id: 'lx', role: 'assistant', thinking: 'First. Now checking the bashrc file for tokens.');
+    final String n1 = ls.liveNote;
+    ls.streamingMsg = null;
+    ls.status = 'tool:bash';
+    ls.runningCall = ToolCall(id: 'lt', name: 'bash', args: <String, dynamic>{'command': 'ls', 'description': 'Listing skills'});
+    final String n2 = ls.liveNote;
+    ls.messages.add(ChatMessage(id: 'lm', role: 'assistant', content: 'Checking the proxy config in one command.'));
+    ls.runningCall = ToolCall(id: 'lt2', name: 'bash', args: <String, dynamic>{'command': 'ls'});
+    final String n3 = ls.liveNote;
+    ls.status = '';
+    final String n4 = ls.liveNote;
+    rec('live note: thinking / tool description / narration / idle', n1 == 'Now checking the bashrc file for tokens.' && n2 == 'Listing skills' && n3 == 'Checking the proxy config in one command.' && n4 == '', '$n1 | $n2 | $n3 | $n4');
+    rec('display formats', fmtElapsed(const Duration(seconds: 251)) == '4:11' && fmtTokShort(22707) == '22.7k' && fmtTokShort(680000) == '680k' && fmtTokShort(999) == '999', '${fmtElapsed(const Duration(seconds: 251))} ${fmtTokShort(22707)} ${fmtTokShort(680000)}');
+
     // ---- الاحتياط: خادم تجاهل البث (لا أحداث) لا يُعدّ مقطوعاً
     rec('no events is not a truncation', truncationError(kAnthropic, SseState()) == null, '');
   } catch (e) {
