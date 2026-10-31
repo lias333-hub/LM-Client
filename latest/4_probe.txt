@@ -1,0 +1,273 @@
+run=138 sha=b4360b3382e37fc4c47d5e61c18b7ed2c86106f2 branch=merge-a
+sdk=34
+--- install
+Performing Streamed Install
+Success
+--- perm
+--- start
+Starting: Intent { cmp=com.lmclient.lm_client/.MainActivity (has extras) }
+--- probe
+LMClient autoprobe · v2.10.0
+os: sdk_gphone64_x86_64-userdebug 14 UE1A.230829.050 12077443 dev-keys
+LMClient · اختبار التنفيذ · v2.10.0
+
+[OK] تشغيل sh
+المستخدم: u0_a192
+المعمارية: x86_64 · ABI: x86_64
+أندرويد 14 (SDK 34) · sdk_gphone64_x86_64
+
+[NOTE] الأدوات المتاحة
+متوفر (41): sh toybox ls cat cp mv rm mkdir touch chmod ln head tail wc sort uniq cut tr sed awk grep find xargs tar gzip unzip diff patch du df stat date env printf base64 sha256sum md5sum nohup kill ps sleep
+غير متوفر (12): zip curl wget ssh git python3 python node npm make gcc busybox
+toybox: toybox 0.8.9-android · 202 أمراً
+git/python/node غير موجودة، كما هو متوقع في أندرويد العادي.
+
+[OK] الملفات والتخزين
+مجلد HOME الخاص: يعمل
+قراءة التخزين المشترك: تعمل
+كتابة التخزين المشترك: تعمل
+
+[NOTE] تنفيذ ملفات من مجلد التطبيق (W^X)
+تشغيل السكربت عبر sh (sh ملف): يعمل
+تنفيذ السكربت مباشرة (shebang): مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/probe_exec.sh )
+تنفيذ ملف ثنائي منسوخ إلى مجلد التطبيق: مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/sh_copy -c echo ELF_EXEC_OK)
+
+النتيجة: تنفيذ الملفات الثنائية من مجلد التطبيق ممنوع (قيد W^X في أندرويد 10+ للتطبيقات التي تستهدف SDK 29 فأعلى). لا يمكن تنزيل git/python/node وتشغيلها؛ البدائل: sh+toybox النظام، أو ملفات تنفيذية مضمّنة داخل الـAPK، أو SSH.
+
+[OK] المهلة والإيقاف
+أُوقف أمر sleep 30 بعد 1.7 ثانية (المهلة 1.5).
+
+[OK] المهام الخلفية
+المهمة j22c49b اكتملت وقُرئ ناتجها.
+
+[OK] المجلد الحالي ورمز الخروج
+exit=1 ✓ · cwd=/storage/emulated/0/Download ✓
+
+SECRETS OK   keystore round trip :: w=true r=v1
+SECRETS OK   keystore delete :: null
+SECRETS OK   legacy api key still usable after migration :: 1
+SECRETS OK   profiles file no longer holds the key :: [{"id":"sec-p1","name":"legacy","kind":"anthropic","baseUrl":"https://example.invalid","apiKey":"","selectedModel":"m","models":[],"headers":"","streamUsage":true}]
+SECRETS OK   api key is in the keystore :: sk-legacy-123
+SECRETS OK   api key restored after a restart :: 1
+SECRETS OK   removing a profile deletes its key
+SECRETS OK   legacy ssh secrets still usable after migration :: 1
+SECRETS OK   workspaces file holds no secrets :: [{"id":"sec-w1","name":"srv","host":"example.invalid","port":22,"user":"u","keyPem":"","password":"","startDir":"","hostFp":"","isTermux":false}]
+SECRETS OK   ssh secrets restored after a restart :: 1
+SECRETS OK   removing a workspace deletes its secrets
+SECRETS DONE fails=0 total=11
+ENGINE OK   anthropic complete stream :: OK calls=0 text=Hello
+ENGINE OK   anthropic cut mid-text is an error :: ERR status=null retriable=true net=true calls=0 text=Hello
+ENGINE OK   anthropic cut mid-tool_use is an error (no silent drop) :: ERR status=null retriable=true net=true calls=0 text=
+ENGINE OK   anthropic tool_use complete :: OK calls=1 text=
+ENGINE OK   anthropic in-stream overloaded -> 529 retriable :: ERR status=529 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream rate limit -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream api_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic invalid_request stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   openai complete stream :: OK calls=0 text=Hi
+ENGINE OK   openai text without end signal stays lenient (server variance) :: OK calls=0 text=Hi
+ENGINE OK   openai cut mid-tool_call is an error :: ERR status=null retriable=true net=true calls=1 text=
+ENGINE OK   openai tool_call closed by [DONE] without finish_reason is accepted :: OK calls=1 text=
+ENGINE OK   openai in-stream server_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   openai in-stream rate_limit_exceeded -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   openai insufficient_quota stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   gemini complete stream :: OK calls=0 text=Hey
+ENGINE OK   gemini without finishReason is an error :: ERR status=null retriable=true net=true calls=0 text=Hey
+ENGINE OK   gemini in-stream 503 :: ERR status=503 retriable=true net=false calls=0 text=
+ENGINE OK   gemini in-stream 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   too-long detection
+ENGINE OK   trim boundary inside the current turn :: 5/12/-1
+ENGINE OK   old result is trimmed hard :: 503
+ENGINE OK   usage openai-compatible: in, cached, out and reasoning tokens :: in=22707 out=2682 cache=22528 think=2400
+ENGINE OK   usage deepseek style: cache hit field, reasoning not reported stays null (no guess) :: in=1000 out=50 cache=900 think=null
+ENGINE OK   usage anthropic: input includes cache read and write, thinking tokens from output_tokens_details :: in=105 out=300 cache=90 think=250
+ENGINE OK   usage anthropic without a thinking breakdown stays null :: in=10 out=7 cache=0 think=null
+ENGINE OK   usage gemini: thoughts counted inside output and reported separately :: in=500 out=200 cache=300 think=160
+ENGINE OK   redact google key :: key=[REDACTED:google-key] ok
+ENGINE OK   redact anthropic-style key :: x [REDACTED:api-key] y
+ENGINE OK   redact github token :: token [REDACTED:github-token]
+ENGINE OK   redact google AQ. token :: GEMINI=[REDACTED:google-token]
+ENGINE OK   redact jwt :: jwt: [REDACTED:jwt]
+ENGINE OK   redact private key block :: before ⏎ [REDACTED:private-key] ⏎ after
+ENGINE OK   redact bearer header :: curl -H "Authorization: Bearer [REDACTED]" https://x
+ENGINE OK   assignment heuristic keeps the name, hides the value :: export ANTHROPIC_AUTH_TOKEN="[REDACTED]"
+ENGINE OK   assignment heuristic is off by default :: export ANTHROPIC_AUTH_TOKEN="a1b2C3d4C3d4C3d4C3d4"
+ENGINE OK   json key heuristic :: {"apiKey": "[REDACTED]", "name": "x"}
+ENGINE OK   no false positives on ordinary code and text :: final String password = widget.password; ⏎ const tokenizer = buildTokenizer(config); ⏎ id 3f2a9c1e7b4d8a6f0e1c2b3a4d5e6f7a8b9c0d1e uuid 123e4567-e89b-12d3-a456-426614174000 ⏎ task-force-alpha-bravo-charlie-delta-echo-fox
+ENGINE OK   app-known secret is matched literally :: my key is [REDACTED:saved-secret] ok
+ENGINE OK   bash output: hidden + note for the model :: export OPENAI_API_KEY="[REDACTED]" ⏎ alias ll="ls -l" ⏎ [note: the app hid secret values in this output before sending it to the model. Do not try to recover, print or guess them.]
+ENGINE OK   clean output passes through untouched :: a ⏎ b ⏎ 
+ENGINE OK   read_file of source keeps assignment text (no heuristics) :: const API_KEY = "a1b2C3d4C3d4C3d4C3d4";
+ENGINE OK   read_file of a sensitive-named file hides assignments :: export API_KEY="[REDACTED]" ⏎ [note: the app hid secret values in this output before sending it to the model. Do not try to recover, print or guess them.]
+ENGINE OK   sensitive path detection
+ENGINE OK   live summary: empty
+ENGINE OK   live summary: last full sentence :: Then list models in one call.
+ENGINE OK   live summary: a short tail joins the previous sentence :: Check the proxy map first. Ok.
+ENGINE OK   live summary: last non-empty line, markdown stripped :: Plan the next step carefully
+ENGINE OK   live summary: long text is clipped from the start :: 141
+ENGINE OK   live summary: arabic punctuation :: ثم سأقرأ إعدادات الوسيط الآن؟
+ENGINE OK   live note: thinking / tool description / narration / idle :: Now checking the bashrc file for tokens. | Listing skills | Checking the proxy config in one command. | 
+ENGINE OK   display formats :: 4:11 22.7k 680k
+ENGINE OK   no events is not a truncation
+ENGINE DONE fails=0 total=53
+E2E mock server on 127.0.0.1:43349
+E2E OK   tool loop: tool call, result sent back, final answer :: msgs=3 reqs=2 last=DONE-1 err=null
+E2E OK   truncated text stream is retried from scratch :: content=OK-2 err=null reqs=2
+E2E OK   truncated tool call is retried (no silent drop) :: content=OK-3 calls=0 reqs=2
+E2E OK   in-stream overloaded is retried :: content=OK-4 err=null reqs=2
+E2E OK   in-turn trimming keeps the request under the budget :: reqs=1 bytes=170697 (untrimmed would be about 240000) last=OK-5
+E2E OK   prompt-too-long self-heal: trim and retry :: reqs=2 first=248689 second=73207 last=OK-6 err=null
+E2E OK   planning tools in the real loop (todo, ask, plan mode blocks writes, plan rejected then approved) :: calls=6 reqs=7 last=DONE-7 r=o:Todo list updated (0/2 done). ⏎ [>] Readin… | o:The user answered: ⏎ - Which storage? => S… | o:Plan mode is on. You may only read and s… | E:write_file would change things. Plan mod… | E:The user did not appr
+E2E OK   sub-agent: own context, read-only tools, only the report returns to the parent :: calls=1 err=false msgs=3 reqs=4 sub=2 convs=8/7 res=REPORT-8: needle=42 ⏎  ⏎ [sub-agent: 2 rounds, 1 tool calls, ~0k tokens, 0s]
+E2E OK   sub-agent usage is added to the parent run totals (exact, provider-reported) :: reqs=4 in=480 out=32 noUsage=0
+E2E OK   sub-agent cannot write, save memory or start another sub-agent :: calls=1 sub=4 res=REPORT-9 ⏎  ⏎ [sub-agent: 4 rounds, 3 tool calls, ~1k tokens, 0s] last=DONE-9
+E2E OK   sub-agent policy: read tools and read-only bash pass, everything else is blocked
+E2E OK   sub-agent round cap: a final no-tools turn returns a partial report :: calls=1 reqs=5 sub=3 res=REPORT-11-PARTIAL ⏎  ⏎ [sub-agent: 3 rounds, 2 tool calls, ~0k tokens, 0s — stopped at its limit, so the report may be incom… last=DONE-11
+E2E OK   stopping the parent stops its running sub-agent :: started=true secs=0 calls=1 err=true res=Cancelled by the user running=0
+E2E OK   checkpoint is off by default (no question, run completes) :: asked=0 reqs=6
+E2E OK   checkpoint asks once after N rounds with real numbers, and continues on yes :: asked=1 reqs=6 q=نقطة توقّف: 5 جولة ⏎ عمل الـ Agent 5 جولة خلال 0:00 ⏎ المُعالَج: ~645 توكن (0% منه من الكاش) ⏎ آخر خطوة: current_time()
+E2E OK   run usage totals equal the provider-reported sums :: reqs=6 in=720 out=52 cache=0 think=0 noUsage=0
+E2E OK   checkpoint stops the run on no (history ends cleanly, resumable) :: asked=1 reqs=5 err=أوقفتَ التشغيل عند نقطة التوقّف بعد 5 جولة. اكتب «تابع» لإكمال العمل.
+E2E DONE fails=0 total=17
+PLAN OK   todo_write renders checklist :: OK Todo list updated (1/3 done). ⏎ [x] A ⏎ [>] B... ⏎ [ ] C ⏎ Continue with the in_progress item; mark it completed right after you finish it.
+PLAN OK   todo_write stores per conversation
+PLAN OK   todo_write rejects an unknown status :: ERR todos[0].status must be pending, in_progress or completed (got "doing")
+PLAN OK   todo_write rejects a non-array :: ERR todos must be an array of {content, status, activeForm}
+PLAN OK   todo_write caps the list at 50 :: ERR Too many todos (max 50). Group related steps into one item.
+PLAN OK   todo_write warns about two in_progress :: OK Todo list updated (0/2 done). ⏎ [>] A... ⏎ [>] B... ⏎ Note: 2 items are in_progress. Keep exactly one in_progress at a time.
+PLAN OK   todo_write notes completion :: OK Todo list updated (1/1 done). ⏎ [x] A ⏎ All items are completed.
+PLAN OK   ask rejects an empty question list :: ERR questions must be an array with 1 to 4 questions
+PLAN OK   ask needs at least 2 options :: ERR questions[0] needs 2 to 4 options (the user can always type another answer)
+PLAN OK   ask caps at 4 questions :: ERR At most 4 questions per call
+PLAN OK   ask returns the answers to the model :: OK The user answered: ⏎ - Which one? => Opt1 ⏎ - Which one? => Opt0; Opt1; (own answer) extra
+PLAN OK   ask: dismissal is reported as an error :: ERR The user dismissed the question without answering. Do not ask the same thing again right away: pick the most reasonable option and say which, or stop and wait for their next message.
+PLAN OK   plan mode restored from history
+PLAN OK   a successful exit_plan_mode ends plan mode
+PLAN OK   a rejected plan keeps plan mode
+PLAN OK   plan mode blocks write_file / edit_file / save_memory
+PLAN OK   plan mode allows read tools
+PLAN OK   plan mode bash: read-only commands pass
+PLAN OK   plan mode bash: anything that can change state is blocked
+PLAN OK   plan mode bash: background jobs are blocked
+PLAN OK   outside plan mode nothing is blocked
+PLAN OK   enter_plan_mode: the user can decline :: ERR The user declined plan mode. Continue without it: proceed carefully with the task, or ask what they want.
+PLAN OK   enter_plan_mode: approval turns it on :: OK Plan mode is on. You may only read and search now (read_file, search_files, list_directory, outline_file, read-only bash such as ls, cat, grep, git status/log/diff). Explore the code, then call exit_plan_mode with the
+PLAN OK   enter_plan_mode twice is an error :: ERR Plan mode is already active. Explore, then call exit_plan_mode with your plan.
+PLAN OK   exit_plan_mode: rejection keeps plan mode and carries the comments :: ERR The user did not approve the plan. Their comments: "use SQLite instead". You are still in plan mode: revise the plan and call exit_plan_mode again, or ask a question with ask_user_question.
+PLAN OK   exit_plan_mode: approval turns plan mode off :: OK The user approved the plan. Plan mode is off: you may now edit files and run commands. Start with the first step and track progress with todo_write.
+PLAN OK   exit_plan_mode outside plan mode is an error :: ERR Plan mode is not active (call enter_plan_mode first).
+PLAN OK   four tool definitions :: todo_write,ask_user_question,enter_plan_mode,exit_plan_mode
+PLAN OK   definitions are valid JSON
+PLAN OK   tools are exposed by availableTools :: current_time,save_memory,todo_write,ask_user_question,enter_plan_mode,exit_plan_mode
+PLAN OK   system prompt mentions the planning tools
+PLAN DONE fails=0 total=31
+KEEPALIVE FAIL not running before the test
+KEEPALIVE OK   start accepted
+KEEPALIVE FAIL service is running
+KEEPALIVE info notificationsAllowed=true
+SHOT keepalive
+KEEPALIVE OK   update accepted while running
+KEEPALIVE OK   stop accepted
+KEEPALIVE OK   service stopped
+KEEPALIVE OK   acquire starts the service
+KEEPALIVE OK   one release keeps it running (two holders)
+KEEPALIVE OK   stop is delayed after the last release
+KEEPALIVE OK   last release stops it after the delay
+KEEPALIVE OK   start then immediate stop ends stopped
+KEEPALIVE OK   25 rapid start/update/stop cycles: app alive and service stopped
+KEEPALIVE OK   12 rapid acquire/release cycles end stopped
+KEEPALIVE OK   re-acquire inside the delay keeps it running
+KEEPALIVE OK   and it stops after the final release
+KEEPALIVE OK   a newer start right after a stop keeps it running
+KEEPALIVE OK   final stop ends it
+KEEPALIVE DONE fails=2 total=17
+SKILLS OK   parse quoted :: My-Skill|Does X: and Y|# Body ⏎ hello
+SKILLS OK   parse folded :: folded|line one line two|Body
+SKILLS OK   parse no frontmatter :: |First real line
+SKILLS OK   parse crlf :: crlf|d|B
+SKILLS OK   slug :: hello-world_1
+SKILLS OK   github refs
+SKILLS OK   tool exposed
+SKILLS OK   prompt section :: Skills are reusable expert instructions. When the task matches a skill below, call use_skill with its name BEFORE starting and follow it. ⏎ Installed skills: ⏎ - ci-skill: for tests
+SKILLS OK   load skill :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
+SKILLS OK   load bundled file :: A-OK
+SKILLS OK   unknown skill :: Skill not found: nope. Call use_skill with no name to list the available skills.
+SKILLS OK   list skills :: Available skills (call use_skill with the name): ⏎ - ci-skill: for tests
+SKILLS OK   runTool dispatch :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
+SKILLS OK   NET discover :: ci/skills/hello-ci (ref=merge-a, blobs=2)
+SKILLS OK   NET fetch :: hello-ci | Fixture skill used by the CI to test importing skills from G… | files=notes.md
+SKILLS DONE fails=0 total=13
+SSH OK   bash echo/pwd/id :: hello-ssh ⏎ /tmp/lmci ⏎ runner
+SSH OK   write_file new (relative path) :: Wrote 18 chars to [ci-server] /tmp/lmci/proj/hello.txt
+SSH OK   bash sees the file write_file wrote :: line1 ⏎ line2 ⏎ line3
+SSH OK   read_file :: [/tmp/lmci/proj/hello.txt · lines 1-3 of 3] ⏎ 1	line1 ⏎ 2	line2 ⏎ 3	line3 ⏎ 
+SSH OK   edit_file :: Edited /tmp/lmci/proj/hello.txt: 1 edit(s) applied
+SSH OK   bash sees the edit :: line1 ⏎ LINE-TWO ⏎ line3
+SSH OK   list_directory :: /tmp/lmci/proj ⏎ f hello.txt (21 B)
+SSH OK   search_files pattern+glob :: Found 1 match(es) in 1 file(s) (paths relative to /tmp/lmci; searched on workspace "ci-server") ⏎ proj/hello.txt:2:LINE-TWO
+SSH OK   search_files glob only :: Found 1 file(s) (paths relative to /tmp/lmci; searched on workspace "ci-server") ⏎ proj/hello.txt
+SSH OK   outline_file :: [/tmp/lmci/proj/hello.txt · 3 lines · 0 symbols] ⏎ No structure recognized (the outline is a heuristic for formatted source code and markdown). Use search_files, or read_file with offset/limit.
+SSH OK   write_file overwrite guard (unread file) :: You have not read all of /tmp/lmci/proj/other.txt in this conversation (or it changed on disk since you read it), so overwriting it could destroy content you have not seen. Read it with read_file first, or change only what you need with edit_file. Nothing was 
+SSH OK   write_file append :: Appended 10 chars to [ci-server] /tmp/lmci/proj/hello.txt
+SSH OK   bash sees the append :: tail-line
+SSH OK   write_file creates parent dirs :: Wrote 4 chars to [ci-server] /tmp/lmci/deep/a/b/c.txt
+SSH OK   bash sees deep file :: found-deep
+SSH OK   blocked key path :: Access to /home/runner/.ssh/id_ed25519 is blocked: it holds keys or credentials. Ask the user to run the command themselves if it is really needed.
+SSH OK   read_file on missing file :: File not found: /tmp/lmci/nope/missing.txt
+SSH OK   timeout kills the command :: (no output) ⏎ [timed out after 2s: the process was killed. Use a larger timeout_ms or run_in_background]
+SSH OK   non-zero exit code reported :: (no output) ⏎ [exit code: 3]
+SSH OK   cd persists across calls :: /tmp/lmci/proj
+SSH OK   relative path follows the new cwd :: [/tmp/lmci/proj/hello.txt · lines 1-4 of 4] ⏎ 1	line1 ⏎ 2	LINE-TWO ⏎ 3	line3 ⏎ 4	tail-line ⏎ 
+SSH OK   background job starts :: Started background job je9d559 (pid 4060). Read its output with bash_output, stop it with kill_shell.
+SSH OK   background job output (incremental) :: [job je9d559: running] ⏎ job-start ⏎ [job je9d559: finished, exit code 0] ⏎ job-end ⏎ 
+SSH OK   create workspace skills :: skills-made
+SSH OK   use_skill lists workspace skills :: Available skills (call use_skill with the name): ⏎ - ci-proj [this project]: project skill from cwd ⏎ - ci-start [this project]: skill from start dir
+SSH OK   use_skill loads cwd skill :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
+SSH OK   use_skill loads start-dir skill :: # Skill: ci-start (from this project) ⏎ Skill folder: /tmp/lmci/.claude/skills/ci-start ⏎  ⏎ START-BODY ⏎  ⏎ --- ⏎ Other files in the skill folder: notes.md ⏎ Read them with use_skill {"name": "ci-start", "file": "<relative path>"} or read_file; scripts can be
+SSH OK   use_skill reads a workspace skill file :: NOTE-OK ⏎ 
+SSH OK   use_skill rejects path traversal :: file must be a relative path inside the skill folder
+SSH OK   runTool dispatches use_skill on ssh :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
+SSH DONE fails=0 total=30
+SHOT ask
+SHOT plan
+DONE
+--- crash
+--- package flags (ALLOW_BACKUP must be absent)
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]
+--- keepalive: foreground service (dumpsys activity services)
+--- keepalive: notification
+      AppSettings: com.android.systemui.accessibility.accessibilitymenu (10167)
+      AppSettings: com.android.internal.emulation.pixel_4 (10060)
+      AppSettings: com.lmclient.lm_client (10192) importance=DEFAULT userSet=false
+        NotificationChannel{mId='lmclient_work', mName=LMClient work, mDescription=hasDescription , mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mUserVisibleTaskShown=true, mVibrationEnabled=false, mShowBadge=false, mDeleted=false, mDeletedTimeMs=-1, mGroup='null', mAudioAttributes=AudioAttributes: usage=USAGE_NOTIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null, mBlockableSystem=false, mAllowBubbles=-1, mImportanceLockedDefaultApp=false, mOriginalImp=2, mParent=null, mConversationId=null, mDemoted=false, mImportantConvo=false}
+      AppSettings: com.android.internal.display.cutout.emulation.tall (10065)
+      AppSettings: com.google.android.bluetooth (1002) importance=DEFAULT userSet=false fixedImportance=true
+        NotificationChannel{mId='opp_notification_channel', mName=Bluetooth Share, mDescription=, mImportance=4, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mUserVisibleTaskShown=false, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mDeletedTimeMs=-1, mGroup='null', mAudioAttributes=AudioAttributes: usage=USAGE_NOTIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null, mBlockableSystem=false, mAllowBubbles=-1, mImportanceLockedDefaultApp=true, mOriginalImp=4, mParent=null, mConversationId=null, mDemoted=false, mImportantConvo=false}
+      AppSettings: com.android.camera2 (10149) importance=NONE userSet=false
+      AppSettings: com.android.providers.telephony.auto_generated_rro_product__ (10062)
+      AppSettings: com.google.android.networkstack.tethering (1073) importance=DEFAULT userSet=false fixedImportance=true
+        NotificationChannel{mId='TETHERING_STATUS', mName=Hotspot & tethering status, mDescription=, mImportance=2, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mUserVisibleTaskShown=false, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mDeletedTimeMs=-1, mGroup='null', mAudioAttributes=AudioAttributes: usage=USAGE_NOTIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null, mBlockableSystem=false, mAllowBubbles=-1, mImportanceLockedDefaultApp=true, mOriginalImp=2, mParent=null, mConversationId=null, mDemoted=false, mImportantConvo=false}
+      AppSettings: com.google.android.uwb.resources (10170)
+      AppSettings: com.google.android.webview (10134) importance=NONE userSet=false
+      AppSettings: com.android.musicfx (10087)
+      AppSettings: com.google.android.odad (10121) importance=DEFAULT userSet=false
+      AppSettings: com.google.android.feedback (10162)
+      AppSettings: com.google.android.contacts (10154) importance=NONE userSet=false
+        NotificationChannel{mId='SUGGESTIONS_CHANNEL', mName=Suggestions, mDescription=, mImportance=3, mBypassDnd=false, mLockscreenVisibility=-1000, mSound=content://settings/system/notification_sound, mLights=false, mLightColor=0, mVibration=null, mUserLockedFields=0, mUserVisibleTaskShown=false, mVibrationEnabled=false, mShowBadge=true, mDeleted=false, mDeletedTimeMs=-1, mGroup='null', mAudioAttributes=AudioAttributes: usage=USAGE_NOTIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null, mBlockableSystem=false, mAllowBubbles=-1, mImportanceLockedDefaultApp=false, mOriginalImp=3, mParent=null, mConversationId=null, mDemoted=false, mImportantConvo=false}
+--
+    }
+    AggregatedStats{
+      key='com.lmclient.lm_client',
+      numEnqueuedByApp=20,
+      numPostedByApp=1,
+      numUpdatedByApp=18,
+      numRemovedByApp=1,
+      numPeopleCacheHit=19,
+      numWithStaredPeople=0,
+      numWithValidPeople=0,
+      numPeopleCacheMiss=0,
+--- keepalive: wake lock
+  10-31 18:21:47.601 - 10192 - ACQ lmclient:work (partial)
+  10-31 18:22:02.110 - 10192 - REL lmclient:work
