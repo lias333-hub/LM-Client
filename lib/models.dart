@@ -167,6 +167,8 @@ class ChatMessage {
   String? stopReason;
   String? quote;
   int thinkMs;
+  /// توكنز التفكير كما بلّغ المزوّد (جزء من outTok). 0 = لم يبلّغ أو لا تفكير.
+  int thinkTok;
   /// رسالة كتبها المستخدم أثناء عمل النموذج وسُلّمت بين جولات الأدوات (جزء من نفس الدور لا دور جديد).
   bool injected;
   /// ملخّص أنشأه النموذج لأجزاء قديمة من المحادثة (الأصلية صارت "مستبعدة من السياق").
@@ -195,6 +197,7 @@ class ChatMessage {
     this.stopReason,
     this.quote,
     this.thinkMs = 0,
+    this.thinkTok = 0,
     this.injected = false,
     this.summary = false,
   })  : redacted = redacted ?? <String>[],
@@ -222,6 +225,7 @@ class ChatMessage {
         'stopReason': stopReason,
         'quote': quote,
         'thinkMs': thinkMs,
+        'thinkTok': thinkTok,
         'injected': injected,
         'summary': summary,
       };
@@ -263,6 +267,7 @@ class ChatMessage {
       stopReason: j['stopReason'] is String ? j['stopReason'] as String : null,
       quote: j['quote'] is String ? j['quote'] as String : null,
       thinkMs: (j['thinkMs'] is num) ? (j['thinkMs'] as num).toInt() : 0,
+      thinkTok: (j['thinkTok'] is num) ? (j['thinkTok'] as num).toInt() : 0,
       injected: j['injected'] == true,
       summary: j['summary'] == true,
     );

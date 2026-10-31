@@ -289,6 +289,9 @@ Future<void> runAgentE2E() async {
       rec('sub-agent: own context, read-only tools, only the report returns to the parent', ok8,
           'calls=${c8.length} err=${c8.isNotEmpty ? c8[0].isError : null} msgs=${s8.messages.length} reqs=${mock.bodies.length} sub=${sb8.length} convs=${appContainer.read(convListProvider).length}/$convBefore res=${clip(c8.isNotEmpty ? (c8[0].result ?? '') : '', 80)}');
 
+      rec('sub-agent usage is added to the parent run totals (exact, provider-reported)', s8.runRequests == 4 && s8.runInTok == 480 && s8.runNoUsage == 0 && s8.runThinkTok == 0,
+          'reqs=${s8.runRequests} in=${s8.runInTok} out=${s8.runOutTok} noUsage=${s8.runNoUsage}');
+
       // 9) الكتابة وحفظ الذاكرة وtask داخل task مرفوضة داخل الوكيل الفرعي (ولا تصل إلى الأداة الحقيقية)
       mock.bodies.clear();
       int subN9 = 0;
@@ -451,6 +454,9 @@ Future<void> runAgentE2E() async {
       askedYes.length == 1 && askedYes[0].contains('نقطة توقّف: 5 جولة') && askedYes[0].contains('آخر خطوة: current_time') && askedYes[0].contains('توكن') && s13b.messages.last.content == 'DONE-13' && mock.bodies.length == 6,
       'asked=${askedYes.length} reqs=${mock.bodies.length} q=${askedYes.isEmpty ? '' : askedYes[0]}',
     );
+
+    rec('run usage totals equal the provider-reported sums', s13b.runRequests == 6 && s13b.runInTok == 720 && s13b.runOutTok == 52 && s13b.runCacheTok == 0 && s13b.runThinkTok == 0 && s13b.runNoUsage == 0 && s13b.runThinkMissing == 0,
+        'reqs=${s13b.runRequests} in=${s13b.runInTok} out=${s13b.runOutTok} cache=${s13b.runCacheTok} think=${s13b.runThinkTok} noUsage=${s13b.runNoUsage}');
 
     final List<String> askedNo = <String>[];
     final ChatSession s13c = await runCp(5, false, askedNo);

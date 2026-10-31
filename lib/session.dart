@@ -124,6 +124,11 @@ class ChatSession extends ChangeNotifier {
   DateTime? runStart;
   int _runIn = 0;
   int _runCache = 0;
+  int _runOut = 0;
+  int _runThink = 0;
+  int _runReqs = 0;
+  int _runNoUsage = 0;
+  int _runThinkMissing = 0;
   int lastInTok = 0;
   int lastCacheTok = 0;
   int _lastCheckpoint = 0;
@@ -145,6 +150,18 @@ class ChatSession extends ChangeNotifier {
     }
     return '';
   }
+
+  /// استهلاك التشغيل الحالي كما بلّغ المزوّد حرفياً (بلا أي تقدير): كل ما عدا ذلك يُعرض كأنه غير معروف.
+  /// دخل (يشمل المقروء من الكاش)، منه الكاش، خرج (يشمل التفكير)، منه التفكير، وعدد الطلبات.
+  int get runInTok => _runIn;
+  int get runCacheTok => _runCache;
+  int get runOutTok => _runOut;
+  int get runThinkTok => _runThink;
+  int get runRequests => _runReqs;
+  /// طلبات لم يُرسل المزوّد أرقام استهلاكها إطلاقاً (الإجماليات أعلاه ناقصة بمقدارها).
+  int get runNoUsage => _runNoUsage;
+  /// جولات فيها تفكير ولم يبلّغ المزوّد عن توكنزه (إجمالي التفكير أعلاه ناقص بمقدارها).
+  int get runThinkMissing => _runThinkMissing;
 
   bool get isEmpty => messages.isEmpty;
 
@@ -393,6 +410,11 @@ class ChatSession extends ChangeNotifier {
     runStart = DateTime.now();
     _runIn = 0;
     _runCache = 0;
+    _runOut = 0;
+    _runThink = 0;
+    _runReqs = 0;
+    _runNoUsage = 0;
+    _runThinkMissing = 0;
     _lastCheckpoint = 0;
     runningCall = null;
     try {
@@ -437,6 +459,11 @@ class ChatSession extends ChangeNotifier {
         _runTokens += msg.inTok + msg.outTok;
         _runIn += msg.inTok;
         _runCache += msg.cacheTok;
+        _runOut += msg.outTok;
+        _runThink += msg.thinkTok;
+        _runReqs++;
+        if (msg.inTok == 0 && msg.outTok == 0) _runNoUsage++;
+        if (msg.thinking.trim().isNotEmpty && msg.thinkTok == 0) _runThinkMissing++;
         lastInTok = msg.inTok;
         lastCacheTok = msg.cacheTok;
         if (msg.toolCalls.isEmpty) {
@@ -541,6 +568,7 @@ class ChatSession extends ChangeNotifier {
     m.toolCalls.clear();
     m.stopReason = null;
     m.thinkMs = 0;
+    m.thinkTok = 0;
     _thinkStart = 0;
     _sigSeen = 0;
   }
@@ -674,6 +702,8 @@ class ChatSession extends ChangeNotifier {
       msg.outTok = ot;
       msg.tokExact = true;
     }
+    final tt = ev.thinkTok;
+    if (tt != null && tt > 0) msg.thinkTok = tt;
     final st = ev.stop;
     if (st != null) msg.stopReason = st;
   }
@@ -901,10 +931,29 @@ class ChatSession extends ChangeNotifier {
     int attempt = 0;
     while (true) {
       sb.clear();
+      int uIn = 0;
+      int uCache = 0;
+      int uOut = 0;
+      int uThink = 0;
       try {
         await for (final ev in executeCall(prepareCall(req), req, cancel)) {
           sb.write(ev.text);
+          final int? i = ev.inTok;
+          if (i != null && i > 0) uIn = i;
+          final int? c = ev.cacheTok;
+          if (c != null && c >= 0 && uIn > 0) uCache = c;
+          final int? o = ev.outTok;
+          if (o != null && o > 0) uOut = o;
+          final int? t = ev.thinkTok;
+          if (t != null && t > 0) uThink = t;
         }
+        // طلب التلخيص يستهلك فعلاً: يُضاف إلى أرقام التشغيل (لا إلى ميزانية الحلقة).
+        _runIn += uIn;
+        _runCache += uCache;
+        _runOut += uOut;
+        _runThink += uThink;
+        _runReqs++;
+        if (uIn == 0 && uOut == 0) _runNoUsage++;
         return sb.toString();
       } catch (e) {
         if (isCancel(e)) return null;

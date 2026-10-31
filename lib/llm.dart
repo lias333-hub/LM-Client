@@ -225,7 +225,9 @@ class LlmEvent {
   final int? inTok;
   final int? outTok;
   final int? cacheTok;
-  const LlmEvent({this.text = '', this.thinking = '', this.sig, this.redacted, this.stop, this.call, this.inTok, this.outTok, this.cacheTok});
+  /// توكنز التفكير كما يبلّغ عنها المزوّد (جزء من outTok، ليست إضافة عليه). null = لم يبلّغ.
+  final int? thinkTok;
+  const LlmEvent({this.text = '', this.thinking = '', this.sig, this.redacted, this.stop, this.call, this.inTok, this.outTok, this.cacheTok, this.thinkTok});
 }
 
 class PreparedCall {
@@ -880,7 +882,12 @@ Stream<LlmEvent> parseOpenAi(Stream<Map<String, dynamic>> events, [SseState? st]
     if (usage is Map) {
       // التوكنز المخزّنة: OpenAI تضعها في prompt_tokens_details، وDeepSeek في prompt_cache_hit_tokens.
       final cached = toInt(asMap(usage['prompt_tokens_details'])['cached_tokens']) ?? toInt(usage['prompt_cache_hit_tokens']);
-      yield LlmEvent(inTok: toInt(usage['prompt_tokens']), outTok: toInt(usage['completion_tokens']), cacheTok: cached);
+      yield LlmEvent(
+        inTok: toInt(usage['prompt_tokens']),
+        outTok: toInt(usage['completion_tokens']),
+        cacheTok: cached,
+        thinkTok: toInt(asMap(usage['completion_tokens_details'])['reasoning_tokens']),
+      );
     }
     final choices = j['choices'];
     if (choices is! List || choices.isEmpty) continue;
@@ -998,7 +1005,8 @@ Stream<LlmEvent> parseAnthropic(Stream<Map<String, dynamic>> events, [SseState? 
       final u = asMap(j['usage']);
       final sr = delta['stop_reason'];
       if (sr is String && sr.isNotEmpty) st?.sawEnd = true;
-      yield LlmEvent(stop: sr is String ? sr : null, outTok: toInt(u['output_tokens']));
+      // التفكير: usage.output_tokens_details.thinking_tokens (جزء من output_tokens، ويصل في آخر message_delta).
+      yield LlmEvent(stop: sr is String ? sr : null, outTok: toInt(u['output_tokens']), thinkTok: toInt(asMap(u['output_tokens_details'])['thinking_tokens']));
     }
   }
 }
@@ -1010,7 +1018,8 @@ Stream<LlmEvent> anthropicFull(Map<String, dynamic> j) async* {
   yield LlmEvent(
       inTok: (toInt(u['input_tokens']) ?? 0) + read + (toInt(u['cache_creation_input_tokens']) ?? 0),
       outTok: toInt(u['output_tokens']),
-      cacheTok: read);
+      cacheTok: read,
+      thinkTok: toInt(asMap(u['output_tokens_details'])['thinking_tokens']));
   for (final raw in asList(j['content'])) {
     final b = asMap(raw);
     final t = b['type'];
@@ -1040,6 +1049,7 @@ Stream<LlmEvent> parseGemini(Stream<Map<String, dynamic>> events, [SseState? st]
         inTok: toInt(um['promptTokenCount']),
         outTok: (toInt(um['candidatesTokenCount']) ?? 0) + (toInt(um['thoughtsTokenCount']) ?? 0),
         cacheTok: toInt(um['cachedContentTokenCount']),
+        thinkTok: toInt(um['thoughtsTokenCount']),
       );
     }
     final cands = j['candidates'];

@@ -192,9 +192,21 @@ Future<ToolOutcome> runTaskTool(ChatSession parent, ToolCall c, Agent? agent, Ap
     sub.addListener(onTick);
     final Stopwatch sw = Stopwatch()..start();
     int tokens = 0;
+    int subIn = 0, subCache = 0, subOut = 0, subThink = 0, subReqs = 0, subNoUsage = 0, subThinkMissing = 0;
+    void takeUsage() {
+      subIn += sub._runIn;
+      subCache += sub._runCache;
+      subOut += sub._runOut;
+      subThink += sub._runThink;
+      subReqs += sub._runReqs;
+      subNoUsage += sub._runNoUsage;
+      subThinkMissing += sub._runThinkMissing;
+    }
+
     try {
       await sub.send(prompt, <PendingAtt>[]);
       tokens += sub._runTokens;
+      takeUsage();
       final bool cancelled0 = parent._cancel?.isCancelled ?? false;
       if (sub.subCapHit && !cancelled0) {
         // بلغ السقف: جولة أخيرة بلا أدوات لكتابة تقرير بما وُجد (بدل ضياع كل الاستقصاء).
@@ -203,6 +215,7 @@ Future<ToolOutcome> runTaskTool(ChatSession parent, ToolCall c, Agent? agent, Ap
         sub.subRoundCap = 1;
         await sub._run();
         tokens += sub._runTokens;
+        takeUsage();
       }
     } finally {
       sw.stop();
@@ -216,6 +229,14 @@ Future<ToolOutcome> runTaskTool(ChatSession parent, ToolCall c, Agent? agent, Ap
       sub.deleted = true;
     }
     parent._runTokens += tokens;
+    // أرقام الوكيل الفرعي الفعلية تدخل في أرقام التشغيل الأم (استهلاكه من حساب المستخدم أيضاً).
+    parent._runIn += subIn;
+    parent._runCache += subCache;
+    parent._runOut += subOut;
+    parent._runThink += subThink;
+    parent._runReqs += subReqs;
+    parent._runNoUsage += subNoUsage;
+    parent._runThinkMissing += subThinkMissing;
     if (parent._cancel?.isCancelled ?? false) return const ToolOutcome('Cancelled by the user', true);
 
     int rounds = 0;

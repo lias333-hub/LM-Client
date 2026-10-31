@@ -133,6 +133,60 @@ Future<void> runEngineSelfTest() async {
     rec('trim boundary inside the current turn', trimBoundary(h, 8) == 5 && trimBoundary(h, 1) == 12 && trimBoundary(h, 20) == -1, '${trimBoundary(h, 8)}/${trimBoundary(h, 1)}/${trimBoundary(h, 20)}');
     rec('old result is trimmed hard', trimResult('x' * 5000).length < 700, '${trimResult('x' * 5000).length}');
 
+    // ---- الاستهلاك الفعلي كما يبلّغ المزوّد: دخل، كاش، خرج، تفكير (لا تقدير أبداً؛ غير المبلَّغ يبقى null)
+    Future<String> usageOf(String kind, List<String> lines) async {
+      int? ui;
+      int? uo;
+      int? uc;
+      int? ut;
+      try {
+        await for (final LlmEvent ev in parseStreamLines(kind, Stream<String>.fromIterable(lines), SseState())) {
+          if (ev.inTok != null) ui = ev.inTok;
+          if (ev.outTok != null) uo = ev.outTok;
+          if (ev.cacheTok != null) uc = ev.cacheTok;
+          if (ev.thinkTok != null) ut = ev.thinkTok;
+        }
+      } catch (e) {
+        return 'EXC $e';
+      }
+      return 'in=$ui out=$uo cache=$uc think=$ut';
+    }
+
+    final String u1 = await usageOf(kOpenAI, <String>[
+      'data: {"choices":[{"delta":{"content":"Hi"}}]}',
+      'data: {"choices":[],"usage":{"prompt_tokens":22707,"completion_tokens":2682,"prompt_tokens_details":{"cached_tokens":22528},"completion_tokens_details":{"reasoning_tokens":2400}}}',
+      'data: [DONE]',
+    ]);
+    rec('usage openai-compatible: in, cached, out and reasoning tokens', u1 == 'in=22707 out=2682 cache=22528 think=2400', u1);
+    final String u2 = await usageOf(kOpenAI, <String>[
+      'data: {"choices":[{"delta":{"content":"Hi"}}]}',
+      'data: {"choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":50,"prompt_cache_hit_tokens":900}}',
+      'data: [DONE]',
+    ]);
+    rec('usage deepseek style: cache hit field, reasoning not reported stays null (no guess)', u2 == 'in=1000 out=50 cache=900 think=null', u2);
+    final String u3 = await usageOf(kAnthropic, <String>[
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":10,"cache_read_input_tokens":90,"cache_creation_input_tokens":5}}}',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":300,"output_tokens_details":{"thinking_tokens":250}}}',
+      'data: {"type":"message_stop"}',
+    ]);
+    rec('usage anthropic: input includes cache read and write, thinking tokens from output_tokens_details', u3 == 'in=105 out=300 cache=90 think=250', u3);
+    final String u4 = await usageOf(kAnthropic, <String>[
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}',
+      'data: {"type":"message_stop"}',
+    ]);
+    rec('usage anthropic without a thinking breakdown stays null', u4 == 'in=10 out=7 cache=0 think=null', u4);
+    final String u5 = await usageOf(kGemini, <String>[
+      'data: {"candidates":[{"content":{"parts":[{"text":"Hi"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":500,"candidatesTokenCount":40,"thoughtsTokenCount":160,"cachedContentTokenCount":300}}',
+    ]);
+    rec('usage gemini: thoughts counted inside output and reported separately', u5 == 'in=500 out=200 cache=300 think=160', u5);
+
     // ---- إخفاء الأسرار (المفاتيح تُبنى وقت التشغيل كي لا تظهر حرفياً في الشيفرة)
     final String kGoogle = 'AIza${'aB3dE' * 7}';
     final String kAnt = 'sk-ant-${'a1B2c3' * 6}';
