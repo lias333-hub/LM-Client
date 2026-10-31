@@ -1,0 +1,149 @@
+run=137 sha=6dd99542dbd158af86ccd95eb8a3144a4cd8fc83 branch=merge-a
+sdk=34
+--- install
+Performing Streamed Install
+Success
+--- perm
+--- start
+Starting: Intent { cmp=com.lmclient.lm_client/.MainActivity (has extras) }
+--- probe
+LMClient autoprobe · v2.10.0
+os: sdk_gphone64_x86_64-userdebug 14 UE1A.230829.050 12077443 dev-keys
+LMClient · اختبار التنفيذ · v2.10.0
+
+[OK] تشغيل sh
+المستخدم: u0_a192
+المعمارية: x86_64 · ABI: x86_64
+أندرويد 14 (SDK 34) · sdk_gphone64_x86_64
+
+[NOTE] الأدوات المتاحة
+متوفر (41): sh toybox ls cat cp mv rm mkdir touch chmod ln head tail wc sort uniq cut tr sed awk grep find xargs tar gzip unzip diff patch du df stat date env printf base64 sha256sum md5sum nohup kill ps sleep
+غير متوفر (12): zip curl wget ssh git python3 python node npm make gcc busybox
+toybox: toybox 0.8.9-android · 202 أمراً
+git/python/node غير موجودة، كما هو متوقع في أندرويد العادي.
+
+[OK] الملفات والتخزين
+مجلد HOME الخاص: يعمل
+قراءة التخزين المشترك: تعمل
+كتابة التخزين المشترك: تعمل
+
+[NOTE] تنفيذ ملفات من مجلد التطبيق (W^X)
+تشغيل السكربت عبر sh (sh ملف): يعمل
+تنفيذ السكربت مباشرة (shebang): مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/probe_exec.sh )
+تنفيذ ملف ثنائي منسوخ إلى مجلد التطبيق: مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/sh_copy -c echo ELF_EXEC_OK)
+
+النتيجة: تنفيذ الملفات الثنائية من مجلد التطبيق ممنوع (قيد W^X في أندرويد 10+ للتطبيقات التي تستهدف SDK 29 فأعلى). لا يمكن تنزيل git/python/node وتشغيلها؛ البدائل: sh+toybox النظام، أو ملفات تنفيذية مضمّنة داخل الـAPK، أو SSH.
+
+[OK] المهلة والإيقاف
+أُوقف أمر sleep 30 بعد 1.7 ثانية (المهلة 1.5).
+
+[OK] المهام الخلفية
+المهمة j53b202 اكتملت وقُرئ ناتجها.
+
+[OK] المجلد الحالي ورمز الخروج
+exit=1 ✓ · cwd=/storage/emulated/0/Download ✓
+
+SECRETS OK   keystore round trip :: w=true r=v1
+SECRETS OK   keystore delete :: null
+SECRETS OK   legacy api key still usable after migration :: 1
+SECRETS OK   profiles file no longer holds the key :: [{"id":"sec-p1","name":"legacy","kind":"anthropic","baseUrl":"https://example.invalid","apiKey":"","selectedModel":"m","models":[],"headers":"","streamUsage":true}]
+SECRETS OK   api key is in the keystore :: sk-legacy-123
+SECRETS OK   api key restored after a restart :: 1
+SECRETS OK   removing a profile deletes its key
+SECRETS OK   legacy ssh secrets still usable after migration :: 1
+SECRETS OK   workspaces file holds no secrets :: [{"id":"sec-w1","name":"srv","host":"example.invalid","port":22,"user":"u","keyPem":"","password":"","startDir":"","hostFp":"","isTermux":false}]
+SECRETS OK   ssh secrets restored after a restart :: 1
+SECRETS OK   removing a workspace deletes its secrets
+SECRETS DONE fails=0 total=11
+ENGINE OK   anthropic complete stream :: OK calls=0 text=Hello
+ENGINE OK   anthropic cut mid-text is an error :: ERR status=null retriable=true net=true calls=0 text=Hello
+ENGINE OK   anthropic cut mid-tool_use is an error (no silent drop) :: ERR status=null retriable=true net=true calls=0 text=
+ENGINE OK   anthropic tool_use complete :: OK calls=1 text=
+ENGINE OK   anthropic in-stream overloaded -> 529 retriable :: ERR status=529 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream rate limit -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream api_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic invalid_request stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   openai complete stream :: OK calls=0 text=Hi
+ENGINE OK   openai text without end signal stays lenient (server variance) :: OK calls=0 text=Hi
+ENGINE OK   openai cut mid-tool_call is an error :: ERR status=null retriable=true net=true calls=1 text=
+ENGINE OK   openai tool_call closed by [DONE] without finish_reason is accepted :: OK calls=1 text=
+ENGINE OK   openai in-stream server_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   openai in-stream rate_limit_exceeded -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   openai insufficient_quota stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   gemini complete stream :: OK calls=0 text=Hey
+ENGINE OK   gemini without finishReason is an error :: ERR status=null retriable=true net=true calls=0 text=Hey
+ENGINE OK   gemini in-stream 503 :: ERR status=503 retriable=true net=false calls=0 text=
+ENGINE OK   gemini in-stream 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   too-long detection
+ENGINE OK   trim boundary inside the current turn :: 5/12/-1
+ENGINE OK   old result is trimmed hard :: 503
+ENGINE OK   usage openai-compatible: in, cached, out and reasoning tokens :: in=22707 out=2682 cache=22528 think=2400
+ENGINE OK   usage deepseek style: cache hit field, reasoning not reported stays null (no guess) :: in=1000 out=50 cache=900 think=null
+ENGINE OK   usage anthropic: input includes cache read and write, thinking tokens from output_tokens_details :: in=105 out=300 cache=90 think=250
+ENGINE OK   usage anthropic without a thinking breakdown stays null :: in=10 out=7 cache=0 think=null
+ENGINE OK   usage gemini: thoughts counted inside output and reported separately :: in=500 out=200 cache=300 think=160
+ENGINE OK   redact google key :: key=[REDACTED:google-key] ok
+ENGINE OK   redact anthropic-style key :: x [REDACTED:api-key] y
+ENGINE OK   redact github token :: token [REDACTED:github-token]
+ENGINE OK   redact google AQ. token :: GEMINI=[REDACTED:google-token]
+ENGINE OK   redact jwt :: jwt: [REDACTED:jwt]
+ENGINE OK   redact private key block :: before ⏎ [REDACTED:private-key] ⏎ after
+ENGINE OK   redact bearer header :: curl -H "Authorization: Bearer [REDACTED]" https://x
+ENGINE OK   assignment heuristic keeps the name, hides the value :: export ANTHROPIC_AUTH_TOKEN="[REDACTED]"
+ENGINE OK   assignment heuristic is off by default :: export ANTHROPIC_AUTH_TOKEN="a1b2C3d4C3d4C3d4C3d4"
+ENGINE OK   json key heuristic :: {"apiKey": "[REDACTED]", "name": "x"}
+ENGINE OK   no false positives on ordinary code and text :: final String password = widget.password; ⏎ const tokenizer = buildTokenizer(config); ⏎ id 3f2a9c1e7b4d8a6f0e1c2b3a4d5e6f7a8b9c0d1e uuid 123e4567-e89b-12d3-a456-426614174000 ⏎ task-force-alpha-bravo-charlie-delta-echo-fox
+ENGINE OK   app-known secret is matched literally :: my key is [REDACTED:saved-secret] ok
+ENGINE OK   bash output: hidden + note for the model :: export OPENAI_API_KEY="[REDACTED]" ⏎ alias ll="ls -l" ⏎ [note: the app hid secret values in this output before sending it to the model. Do not try to recover, print or guess them.]
+ENGINE OK   clean output passes through untouched :: a ⏎ b ⏎ 
+ENGINE OK   read_file of source keeps assignment text (no heuristics) :: const API_KEY = "a1b2C3d4C3d4C3d4C3d4";
+ENGINE OK   read_file of a sensitive-named file hides assignments :: export API_KEY="[REDACTED]" ⏎ [note: the app hid secret values in this output before sending it to the model. Do not try to recover, print or guess them.]
+ENGINE OK   sensitive path detection
+ENGINE OK   live summary: empty
+ENGINE OK   live summary: last full sentence :: Then list models in one call.
+ENGINE OK   live summary: a short tail joins the previous sentence :: Check the proxy map first. Ok.
+ENGINE OK   live summary: last non-empty line, markdown stripped :: Plan the next step carefully
+ENGINE OK   live summary: long text is clipped from the start :: 141
+ENGINE OK   live summary: arabic punctuation :: ثم سأقرأ إعدادات الوسيط الآن؟
+ENGINE OK   live note: thinking / tool description / narration / idle :: Now checking the bashrc file for tokens. | Listing skills | Checking the proxy config in one command. | 
+ENGINE OK   display formats :: 4:11 22.7k 680k
+ENGINE OK   no events is not a truncation
+ENGINE DONE fails=0 total=53
+E2E mock server on 127.0.0.1:38191
+E2E OK   tool loop: tool call, result sent back, final answer :: msgs=3 reqs=2 last=DONE-1 err=null
+E2E OK   truncated text stream is retried from scratch :: content=OK-2 err=null reqs=2
+E2E OK   truncated tool call is retried (no silent drop) :: content=OK-3 calls=0 reqs=2
+E2E OK   in-stream overloaded is retried :: content=OK-4 err=null reqs=2
+E2E OK   in-turn trimming keeps the request under the budget :: reqs=1 bytes=170697 (untrimmed would be about 240000) last=OK-5
+E2E OK   prompt-too-long self-heal: trim and retry :: reqs=2 first=248689 second=73207 last=OK-6 err=null
+E2E OK   planning tools in the real loop (todo, ask, plan mode blocks writes, plan rejected then approved) :: calls=6 reqs=7 last=DONE-7 r=o:Todo list updated (0/2 done). ⏎ [>] Readin… | o:The user answered: ⏎ - Which storage? => S… | o:Plan mode is on. You may only read and s… | E:write_file would change things. Plan mod… | E:The user did not appr
+E2E OK   sub-agent: own context, read-only tools, only the report returns to the parent :: calls=1 err=false msgs=3 reqs=4 sub=2 convs=8/7 res=REPORT-8: needle=42 ⏎  ⏎ [sub-agent: 2 rounds, 1 tool calls, ~0k tokens, 0s]
+E2E OK   sub-agent usage is added to the parent run totals (exact, provider-reported) :: reqs=4 in=480 out=32 noUsage=0
+E2E OK   sub-agent cannot write, save memory or start another sub-agent :: calls=1 sub=4 res=REPORT-9 ⏎  ⏎ [sub-agent: 4 rounds, 3 tool calls, ~1k tokens, 0s] last=DONE-9
+E2E OK   sub-agent policy: read tools and read-only bash pass, everything else is blocked
+E2E OK   sub-agent round cap: a final no-tools turn returns a partial report :: calls=1 reqs=5 sub=3 res=REPORT-11-PARTIAL ⏎  ⏎ [sub-agent: 3 rounds, 2 tool calls, ~0k tokens, 0s — stopped at its limit, so the report may be incom… last=DONE-11
+E2E OK   stopping the parent stops its running sub-agent :: started=true secs=0 calls=1 err=true res=Cancelled by the user running=0
+--- crash
+10-31 08:36:15.799  2837  2837 D AndroidRuntime: Shutting down VM
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: FATAL EXCEPTION: main
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: Process: com.lmclient.lm_client, PID: 2837
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: android.app.RemoteServiceException$ForegroundServiceDidNotStartInTimeException: Context.startForegroundService() did not then call Service.startForeground(): ServiceRecord{7ad7639 u0 com.lmclient.lm_client/com.lmclient.keepalive.KeepAliveService}
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.app.ActivityThread.generateForegroundServiceDidNotStartInTimeException(ActivityThread.java:2104)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.app.ActivityThread.throwRemoteServiceException(ActivityThread.java:2075)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.app.ActivityThread.-$$Nest$mthrowRemoteServiceException(Unknown Source:0)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2369)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:205)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:294)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:8177)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:552)
+10-31 08:36:15.799  2837  2837 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:971)
+--- package flags (ALLOW_BACKUP must be absent)
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]
+--- keepalive: foreground service (dumpsys activity services)
+--- keepalive: notification
+--- keepalive: wake lock
