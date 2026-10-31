@@ -24,12 +24,19 @@ class KeepAlive {
 
   static bool get enabled => appContainer.read(settingsProvider).keepAlive;
 
+  static Timer? _stopTimer;
+  // لا نوقف الخدمة فور آخر إفراج: تشغيلات قصيرة متتالية (أو «تابع» بعد توقّف) كانت تبدأ وتوقف الخدمة في أجزاء من الثانية.
+  static const Duration _stopDelay = Duration(seconds: 2);
+
   static Future<void> acquire(String text) async {
     _holds++;
     _text = text;
+    _stopTimer?.cancel();
+    _stopTimer = null;
     if (!enabled || _on) return;
+    _on = true; // قبل الانتظار: حاجزان متزامنان لا يبدآن الخدمة مرتين
     final bool ok = await _call('start', <String, dynamic>{'title': 'LMClient', 'text': text});
-    _on = ok;
+    if (!ok) _on = false;
     if (ok) unawaited(_askNotificationsOnce());
   }
 
@@ -42,8 +49,14 @@ class KeepAlive {
   static Future<void> release() async {
     if (_holds > 0) _holds--;
     if (_holds == 0 && _on) {
-      _on = false;
-      await _call('stop');
+      _stopTimer?.cancel();
+      _stopTimer = Timer(_stopDelay, () {
+        _stopTimer = null;
+        if (_holds == 0 && _on) {
+          _on = false;
+          unawaited(_call('stop'));
+        }
+      });
     }
   }
 
@@ -99,8 +112,51 @@ Future<void> runKeepAliveSelfTest() async {
     await Future<void>.delayed(const Duration(milliseconds: 500));
     rec('one release keeps it running (two holders)', await KeepAlive._call('isRunning'), '');
     await KeepAlive.release();
-    await Future<void>.delayed(const Duration(seconds: 2));
-    rec('last release stops it', !(await KeepAlive._call('isRunning')), '');
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    rec('stop is delayed after the last release', await KeepAlive._call('isRunning'), '');
+    await Future<void>.delayed(const Duration(seconds: 4));
+    rec('last release stops it after the delay', !(await KeepAlive._call('isRunning')), '');
+
+    // ---- سباقات بدء/إيقاف سريعة (v2.12.2): كانت تُسقط التطبيق بـ ForegroundServiceDidNotStartInTimeException ----
+    await KeepAlive._call('start', <String, dynamic>{'title': 'LMClient probe', 'text': 'race 1'});
+    await KeepAlive._call('stop'); // قبل أن تصل الخدمة إلى startForeground: كان الإيقاف يُهمَل والخدمة تبقى عالقة
+    await Future<void>.delayed(const Duration(seconds: 3));
+    rec('start then immediate stop ends stopped', !(await KeepAlive._call('isRunning')), '');
+
+    for (int i = 0; i < 25; i++) {
+      await KeepAlive._call('start', <String, dynamic>{'title': 'LMClient probe', 'text': 'storm $i'});
+      await KeepAlive._call('update', <String, dynamic>{'title': 'LMClient probe', 'text': 'storm update $i'});
+      await KeepAlive._call('stop');
+    }
+    await Future<void>.delayed(const Duration(seconds: 4));
+    rec('25 rapid start/update/stop cycles: app alive and service stopped', !(await KeepAlive._call('isRunning')), '');
+
+    for (int i = 0; i < 12; i++) {
+      await KeepAlive.acquire('rapid $i');
+      await KeepAlive.release();
+    }
+    await Future<void>.delayed(const Duration(seconds: 4));
+    rec('12 rapid acquire/release cycles end stopped', !(await KeepAlive._call('isRunning')), '');
+
+    await KeepAlive.acquire('again 1');
+    await KeepAlive.release();
+    await KeepAlive.acquire('again 2'); // داخل مهلة التأخير: لا يجوز أن تُوقَف الخدمة
+    await Future<void>.delayed(const Duration(seconds: 4));
+    rec('re-acquire inside the delay keeps it running', await KeepAlive._call('isRunning'), '');
+    await KeepAlive.release();
+    await Future<void>.delayed(const Duration(seconds: 4));
+    rec('and it stops after the final release', !(await KeepAlive._call('isRunning')), '');
+
+    // stop ثم start مباشرة (جولة جديدة تبدأ فور انتهاء السابقة): الطلب الأحدث يجب أن يبقي الخدمة حيّة
+    await KeepAlive._call('start', <String, dynamic>{'title': 'LMClient probe', 'text': 'newer start wins 1'});
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await KeepAlive._call('stop');
+    await KeepAlive._call('start', <String, dynamic>{'title': 'LMClient probe', 'text': 'newer start wins 2'});
+    await Future<void>.delayed(const Duration(seconds: 3));
+    rec('a newer start right after a stop keeps it running', await KeepAlive._call('isRunning'), '');
+    await KeepAlive._call('stop');
+    await Future<void>.delayed(const Duration(seconds: 3));
+    rec('final stop ends it', !(await KeepAlive._call('isRunning')), '');
   } catch (e) {
     rec('keepalive tests', false, '$e');
   }

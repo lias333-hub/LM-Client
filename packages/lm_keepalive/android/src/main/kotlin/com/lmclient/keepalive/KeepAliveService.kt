@@ -31,40 +31,64 @@ class KeepAliveService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            shutdown()
-            return START_NOT_STICKY
-        }
+        val stop = intent?.action == ACTION_STOP
         val title = intent?.getStringExtra("title") ?: "LMClient"
         val text = intent?.getStringExtra("text") ?: ""
-        ensureChannel()
-        val n = buildNotification(title, text)
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            startForeground(NOTIF_ID, n)
+        // EVERY start command must reach startForeground(), the stop command included: while a
+        // startForegroundService() request is still waiting for it, stopping the service makes Android kill the
+        // app with ForegroundServiceDidNotStartInTimeException (seen in CI when runs started and ended quickly).
+        val foreground = enterForeground(title, text)
+        if (stop) {
+            // stopSelfResult(startId) refuses to stop when a newer start request is already queued, so a quick
+            // stop-then-start keeps the service alive instead of dropping the newer request.
+            if (stopSelfResult(startId)) {
+                releaseWake()
+                running = false
+                leaveForeground()
+            }
+            return START_NOT_STICKY
+        }
+        if (!foreground) {
+            // Android refused the foreground state; do not linger as a background service.
+            stopSelf()
+            return START_NOT_STICKY
         }
         running = true
         acquireWake()
         return START_NOT_STICKY
     }
 
+    private fun enterForeground(title: String, text: String): Boolean {
+        return try {
+            ensureChannel()
+            val n = buildNotification(title, text)
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIF_ID, n)
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun leaveForeground() {
+        try {
+            if (Build.VERSION.SDK_INT >= 24) {
+                stopForeground(Service.STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (e: Exception) {
+        }
+    }
+
     override fun onDestroy() {
         releaseWake()
         running = false
         super.onDestroy()
-    }
-
-    private fun shutdown() {
-        releaseWake()
-        running = false
-        if (Build.VERSION.SDK_INT >= 24) {
-            stopForeground(Service.STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
-        stopSelf()
     }
 
     private fun acquireWake() {

@@ -16,6 +16,9 @@ import io.flutter.plugin.common.MethodChannel
 class LmKeepalivePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
     companion object {
         private const val CHANNEL = "lmclient/keepalive"
+        // True from the moment a start request is accepted until a stop is sent. `KeepAliveService.running` only turns
+        // true once the service has actually reached startForeground(), so a stop sent in between must not be skipped.
+        @Volatile private var wanted = false
     }
 
     private var channel: MethodChannel? = null
@@ -51,6 +54,7 @@ class LmKeepalivePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activi
                 i.putExtra("text", call.argument<String>("text") ?: "")
                 try {
                     if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
+                    wanted = true
                     result.success(true)
                 } catch (e: Exception) {
                     // Android 12+ refuses to start a foreground service while the app is in the background.
@@ -59,9 +63,14 @@ class LmKeepalivePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activi
             }
             "stop" -> {
                 try {
-                    val i = Intent(ctx, KeepAliveService::class.java)
-                    i.action = KeepAliveService.ACTION_STOP
-                    if (KeepAliveService.running) ctx.startService(i)
+                    if (wanted || KeepAliveService.running) {
+                        wanted = false
+                        val i = Intent(ctx, KeepAliveService::class.java)
+                        i.action = KeepAliveService.ACTION_STOP
+                        // Sent as a foreground start too: the service answers every command with startForeground()
+                        // before it stops, so this can never leave an unanswered foreground request behind.
+                        if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
+                    }
                     result.success(true)
                 } catch (e: Exception) {
                     result.success(false)
