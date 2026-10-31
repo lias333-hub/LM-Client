@@ -89,6 +89,14 @@ Future<void> runKeepAliveSelfTest() async {
   }
 
   try {
+    // أقسام الاختبار السابقة (E2E) تُجري جلسات تحجز الخدمة وتترك إيقافاً مؤجّلاً (2 ث) قد يصل بعد بدئنا فيلغيه.
+    // نُفرّغ الحالة ونوقف الخدمة قبل القياس. (فشل اختبارَي البداية في تشغيل CI 138 كان من هذا التداخل لا من الخدمة.)
+    KeepAlive._stopTimer?.cancel();
+    KeepAlive._stopTimer = null;
+    KeepAlive._holds = 0;
+    KeepAlive._on = false;
+    await KeepAlive._call('stop');
+    await Future<void>.delayed(const Duration(seconds: 3));
     final bool before = await KeepAlive._call('isRunning');
     rec('not running before the test', !before, '');
     final bool started = await KeepAlive._call('start', <String, dynamic>{'title': 'LMClient probe', 'text': 'keepalive self-test'});
