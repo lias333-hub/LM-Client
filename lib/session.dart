@@ -134,19 +134,20 @@ class ChatSession extends ChangeNotifier {
   int _lastCheckpoint = 0;
   ToolCall? runningCall;
 
-  /// سطر التقدّم الحيّ (بلا أي طلب إضافي للنموذج): أثناء التفكير آخر جملة منه، وأثناء أداة وصفها أو آخر سطر كتبه النموذج قبلها.
+  /// سطر التقدّم الحيّ (بلا أي طلب إضافي للنموذج، وبلا نص التفكير): أثناء أداة عنوانها، وأثناء كتابة السرد آخر جملة منه،
+  /// وأثناء التفكير أو الاتصال آخر ما حدث (آخر عنوان خطوة أو جملة سرد) كي يبقى السطر ذا معنى.
   String get liveNote {
-    final ChatMessage? m = streamingMsg;
-    if (status == 'thinking') return m == null ? '' : liveSummary(m.thinking);
     if (status.startsWith('tool:')) {
       final ToolCall? c = runningCall;
-      final String d = c == null ? '' : asStr(c.args['description']).trim();
-      if (d.isNotEmpty) return clip(d, 140);
-      for (int i = messages.length - 1; i >= 0 && i >= messages.length - 3; i--) {
-        final ChatMessage x = messages[i];
-        if (x.role == 'assistant' && x.content.trim().isNotEmpty) return liveSummary(x.content);
-      }
-      return c == null ? '' : toolSummary(c);
+      return c == null ? '' : stepOf(c, live: true).title;
+    }
+    if (status == 'writing') {
+      final ChatMessage? m = streamingMsg;
+      return m == null ? '' : liveSummary(m.content);
+    }
+    if (status == 'thinking' || status == 'connecting' || status.startsWith('retry:')) {
+      final List<RunStep> steps = buildRunSteps(messages, live: true);
+      return steps.isEmpty ? '' : steps.last.title;
     }
     return '';
   }
@@ -735,7 +736,7 @@ class ChatSession extends ChangeNotifier {
       // الأسرار لا تصل النموذج ولا تُحفظ في بطاقة الأداة (انظر redact.dart).
       var text = Redactor.forTool(c.name, c.args, out.text);
       // كاشف الحلقات: نفس الاستدعاء بنفس النتيجة مراراً ⇒ تحذير للنموذج، ثم إيقاف.
-      final sig = '${c.name}|${jsonEncode(c.args)}|${out.error}|${out.text.hashCode}'.hashCode;
+      final sig = '${c.name}|${jsonEncode(argsForSig(c.args))}|${out.error}|${out.text.hashCode}'.hashCode;
       _recentSigs.add(sig);
       if (_recentSigs.length > 10) _recentSigs.removeAt(0);
       final rep = _recentSigs.where((x) => x == sig).length;

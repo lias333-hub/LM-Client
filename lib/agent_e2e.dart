@@ -458,6 +458,14 @@ Future<void> runAgentE2E() async {
     rec('run usage totals equal the provider-reported sums', s13b.runRequests == 6 && s13b.runInTok == 720 && s13b.runOutTok == 52 && s13b.runCacheTok == 0 && s13b.runThinkTok == 0 && s13b.runNoUsage == 0 && s13b.runThinkMissing == 0,
         'reqs=${s13b.runRequests} in=${s13b.runInTok} out=${s13b.runOutTok} cache=${s13b.runCacheTok} think=${s13b.runThinkTok} noUsage=${s13b.runNoUsage}');
 
+    final List<RunStep> st13 = buildRunSteps(s13b.messages);
+    final List<RunStep> st13Tools = st13.where((RunStep x) => !x.note).toList();
+    rec(
+      'summary steps from a real run: one step per tool call, all done, aggregate header',
+      st13Tools.length == 5 && st13Tools.every((RunStep x) => x.status == 'done' && x.title == 'قراءة الوقت') && runSummaryHeader(st13) == '5 خطوات',
+      'steps=${st13Tools.length} first=${st13Tools.isEmpty ? '' : st13Tools.first.title} header=${runSummaryHeader(st13)}',
+    );
+
     final List<String> askedNo = <String>[];
     final ChatSession s13c = await runCp(5, false, askedNo);
     final String err13 = s13c.messages.last.error ?? '';

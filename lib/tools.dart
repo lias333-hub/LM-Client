@@ -41,6 +41,10 @@ Map<String, dynamic> _pInt(String d) => <String, dynamic>{'type': 'integer', 'de
 Map<String, dynamic> _pBool(String d) => <String, dynamic>{'type': 'boolean', 'description': d};
 
 List<ToolDef> availableTools(AppSettings s, Agent? agent, {required bool hasLibrary, required bool hasMemory, WorkspaceConfig? workspace}) {
+  return withStepTitles(_availableToolsRaw(s, agent, hasLibrary: hasLibrary, hasMemory: hasMemory, workspace: workspace));
+}
+
+List<ToolDef> _availableToolsRaw(AppSettings s, Agent? agent, {required bool hasLibrary, required bool hasMemory, WorkspaceConfig? workspace}) {
   if (!s.tools) return <ToolDef>[];
   final t = <ToolDef>[];
   if (s.includeDate) {
@@ -1412,6 +1416,7 @@ const String kRichFormatGuide =
 /// سببها تجربة حقيقية: طلب «حلّل البيئة» تحوّل إلى 29 أمراً منفصلاً بلا أي ظهور للتقدّم وطباعة مفتاح وطلبات حيّة بمفاتيح المستخدم.
 const String kWorkStyleGuide =
     'Working style: before each batch of tool calls write ONE short sentence, in the user\'s language, saying what you are about to check and why; the user watches a live progress line and otherwise cannot tell what you are doing. '
+    'Give every tool call a `description` of at most 8 words, in the user\'s language, naming that step (it is the step title in the progress summary the user watches). '
     'Combine independent commands into a single call instead of one command per round. '
     'For open-ended requests ("analyze", "check", "look into") stay within what was asked: gather what you need, stop, and report, then offer deeper work instead of doing it unasked. '
     'Do not run builds, installs, test suites, servers, or requests to live or paid APIs with the user\'s credentials unless the user asked for that. '

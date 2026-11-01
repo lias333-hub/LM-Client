@@ -250,19 +250,108 @@ Future<void> runEngineSelfTest() async {
     rec('live summary: long text is clipped from the start', longSum.startsWith('…') && longSum.length == 141, '${longSum.length}');
     rec('live summary: arabic punctuation', liveSummary('فحصت الملف. ثم سأقرأ إعدادات الوسيط الآن؟') == 'ثم سأقرأ إعدادات الوسيط الآن؟', liveSummary('فحصت الملف. ثم سأقرأ إعدادات الوسيط الآن؟'));
     final ChatSession ls = ChatSession(ConvMeta(id: newId()));
+    ls.messages.add(ChatMessage(id: 'u0', role: 'user', content: 'analyze'));
     ls.status = 'thinking';
-    ls.streamingMsg = ChatMessage(id: 'lx', role: 'assistant', thinking: 'First. Now checking the bashrc file for tokens.');
+    final String n0 = ls.liveNote;
+    ls.messages.add(ChatMessage(
+      id: 'lm',
+      role: 'assistant',
+      content: 'Checking the proxy config in one command.',
+      toolCalls: <ToolCall>[ToolCall(id: 't1', name: 'bash', args: <String, dynamic>{'command': 'ls', 'description': 'Listing skills'}, status: 'done', result: 'x')],
+    ));
     final String n1 = ls.liveNote;
-    ls.streamingMsg = null;
     ls.status = 'tool:bash';
-    ls.runningCall = ToolCall(id: 'lt', name: 'bash', args: <String, dynamic>{'command': 'ls', 'description': 'Listing skills'});
+    ls.runningCall = ToolCall(id: 'lt', name: 'bash', args: <String, dynamic>{'command': 'cat map.ts | head', 'description': 'Reading the proxy map'}, status: 'running');
     final String n2 = ls.liveNote;
-    ls.messages.add(ChatMessage(id: 'lm', role: 'assistant', content: 'Checking the proxy config in one command.'));
-    ls.runningCall = ToolCall(id: 'lt2', name: 'bash', args: <String, dynamic>{'command': 'ls'});
+    ls.runningCall = ToolCall(id: 'lt2', name: 'read_file', args: <String, dynamic>{'path': '/a/b/session.dart'}, status: 'running');
     final String n3 = ls.liveNote;
-    ls.status = '';
+    ls.status = 'writing';
+    ls.streamingMsg = ChatMessage(id: 'lx', role: 'assistant', content: 'First. Now writing the report for you.');
     final String n4 = ls.liveNote;
-    rec('live note: thinking / tool description / narration / idle', n1 == 'Now checking the bashrc file for tokens.' && n2 == 'Listing skills' && n3 == 'Checking the proxy config in one command.' && n4 == '', '$n1 | $n2 | $n3 | $n4');
+    ls.streamingMsg = null;
+    ls.status = 'thinking';
+    ls.streamingMsg = ChatMessage(id: 'ly', role: 'assistant', thinking: 'SECRET-RAW-THINKING should never be shown. Another raw sentence here.');
+    final String n5 = ls.liveNote;
+    ls.streamingMsg = null;
+    ls.status = '';
+    final String n6 = ls.liveNote;
+    rec(
+      'live note: tool title / derived title / narration / last step while thinking (never the raw thinking) / idle',
+      n0 == '' && n1 == 'Listing skills' && n2 == 'Reading the proxy map' && n3 == 'قراءة session.dart' && n4 == 'Now writing the report for you.' && n5 == 'Listing skills' && n6 == '',
+      '$n0 | $n1 | $n2 | $n3 | $n4 | $n5 | $n6',
+    );
+
+    // ---- لوحة الملخّص: عناوين، خطوات، ترويسة مجمَّعة، وسيط description، بصمة الحلقات
+    final List<ToolDef> raw = <ToolDef>[
+      ToolDef(kToolReadFile, 'read', <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'path': <String, dynamic>{'type': 'string'}}}),
+      ToolDef(kToolBash, 'bash', <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'command': <String, dynamic>{'type': 'string'}, 'description': <String, dynamic>{'type': 'string', 'description': 'own'}}}),
+      ToolDef(kToolTodoWrite, 'todo', <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{'todos': <String, dynamic>{'type': 'array'}}}),
+    ];
+    final List<ToolDef> titled = withStepTitles(raw);
+    rec(
+      'tool schemas: optional description added to file tools only, own description kept, original not mutated',
+      asMap(titled[0].schema['properties']).containsKey('description') && asStr(asMap(asMap(titled[1].schema['properties'])['description'])['description']) == 'own' && !asMap(titled[2].schema['properties']).containsKey('description') && !asMap(raw[0].schema['properties']).containsKey('description'),
+      '',
+    );
+    rec(
+      'loop signature ignores the step title',
+      jsonEncode(argsForSig(<String, dynamic>{'path': 'a', 'description': 'x'})) == jsonEncode(argsForSig(<String, dynamic>{'path': 'a', 'description': 'y'})) && jsonEncode(argsForSig(<String, dynamic>{'path': 'a'})) == '{"path":"a"}',
+      '',
+    );
+    final List<ChatMessage> run = <ChatMessage>[
+      ChatMessage(id: 'a1', role: 'user', content: 'old question'),
+      ChatMessage(id: 'a2', role: 'assistant', content: 'old answer'),
+      ChatMessage(id: 'u1', role: 'user', content: 'do the work'),
+      ChatMessage(id: 's1', role: 'assistant', content: '  Reading the\n   config first.  ', toolCalls: <ToolCall>[
+        ToolCall(id: 'c1', name: 'read_file', args: <String, dynamic>{'path': 'lib/session.dart', 'offset': 655}, status: 'done', result: 'x'),
+        ToolCall(id: 'c2', name: 'bash', args: <String, dynamic>{'command': 'ls -la\nwc -l', 'description': 'Listing the folder'}, status: 'done', result: 'x'),
+      ]),
+      ChatMessage(id: 's2', role: 'assistant', toolCalls: <ToolCall>[
+        ToolCall(id: 'c3', name: 'edit_file', args: <String, dynamic>{'path': 'lib/a.dart', 'old_string': 'int a = 1;\nint b;', 'new_string': 'int a = 2;'}, status: 'done', result: 'ok'),
+        ToolCall(id: 'c4', name: 'edit_file', args: <String, dynamic>{'path': 'lib/a.dart', 'edits': <dynamic>[<String, dynamic>{'old_string': 'x', 'new_string': 'y'}]}, status: 'done', result: 'ok'),
+        ToolCall(id: 'c5', name: 'write_file', args: <String, dynamic>{'path': 'lib/b.dart', 'content': 'c'}, status: 'done', result: 'ok'),
+        ToolCall(id: 'c6', name: 'fetch_url', args: <String, dynamic>{'url': 'https://docs.claude.com/en/docs/x'}, status: 'error', isError: true, result: 'blocked'),
+        ToolCall(id: 'c7', name: 'search_files', args: <String, dynamic>{'pattern': 'liveNote', 'path': '/h/lib'}, status: 'running'),
+      ]),
+      ChatMessage(id: 's3', role: 'assistant', content: 'Final answer, not a step.'),
+    ];
+    final List<RunStep> st = buildRunSteps(run, live: true);
+    final List<RunStep> stDead = buildRunSteps(run, live: false);
+    rec(
+      'run steps: only the last turn, narration then tools, final answer excluded',
+      st.length == 8 && st[0].note && st[0].title == 'Reading the config first.' && !st[1].note && st.last.tool == 'search_files' && st.where((RunStep x) => x.note).length == 1,
+      '${st.length} ${st.map((RunStep x) => x.title).join(' | ')}',
+    );
+    rec(
+      'run step titles: derived, written by the model, and details',
+      st[1].title == 'قراءة session.dart' && st[1].detail == 'lib/session.dart:655' && st[2].title == 'Listing the folder' && st[2].detail == 'ls -la' && st[3].title == 'تعديل a.dart' && st[5].title == 'كتابة b.dart' && st[6].title == 'فتح docs.claude.com' && st[7].title == 'بحث عن «liveNote»',
+      '${st[1].title}/${st[1].detail}/${st[2].title}/${st[2].detail}/${st[3].title}/${st[5].title}/${st[6].title}/${st[7].title}',
+    );
+    rec(
+      'run step status: done / failed / running while live, never stuck as running after the run',
+      st[1].status == 'done' && st[6].failed && st[7].running && stDead[7].failed && st[3].minus == '- int a = 1;' && st[3].plus == '+ int a = 2;' && st[4].minus == '- x' && st[4].plus == '+ y' && st[1].minus == null,
+      '${st[1].status} ${st[6].status} ${st[7].status} ${stDead[7].status} ${st[3].minus} ${st[3].plus}',
+    );
+    final String hd = runSummaryHeader(st);
+    rec('run header counts distinct edited/written files and the other steps', hd == 'عُدّل ملف، وكُتب ملف، و4 خطوات أخرى', hd);
+    RunStep pstep(int i) => RunStep(note: false, title: 't$i', tool: 'bash');
+    RunStep ed(String f) => RunStep(note: false, title: 'e', tool: 'edit_file', file: f, edit: true);
+    RunStep wr(String f) => RunStep(note: false, title: 'w', tool: 'write_file', file: f, write: true);
+    final List<RunStep> big = <RunStep>[ed('a'), ed('b'), wr('c'), ...List<RunStep>.generate(31, pstep)];
+    final List<String> hs = <String>[
+      runSummaryHeader(big),
+      runSummaryHeader(List<RunStep>.generate(12, pstep)),
+      runSummaryHeader(List<RunStep>.generate(1, pstep)),
+      runSummaryHeader(<RunStep>[ed('a'), ed('b'), ed('c'), pstep(0), pstep(1)]),
+      runSummaryHeader(<RunStep>[ed('a'), pstep(0), pstep(1)]),
+      runSummaryHeader(<RunStep>[for (int i = 0; i < 11; i++) ed('f$i')]),
+      runSummaryHeader(<RunStep>[]),
+    ];
+    rec(
+      'run header: Arabic dual and plural forms',
+      hs[0] == 'عُدّل ملفان، وكُتب ملف، و31 خطوة أخرى' && hs[1] == '12 خطوة' && hs[2] == 'خطوة واحدة' && hs[3] == 'عُدّلت 3 ملفات، وخطوتان أخريان' && hs[4] == 'عُدّل ملف، وخطوتان أخريان' && hs[5] == 'عُدّل 11 ملفاً' && hs[6] == '',
+      hs.join(' | '),
+    );
     rec('display formats', fmtElapsed(const Duration(seconds: 251)) == '4:11' && fmtTokShort(22707) == '22.7k' && fmtTokShort(680000) == '680k' && fmtTokShort(999) == '999', '${fmtElapsed(const Duration(seconds: 251))} ${fmtTokShort(22707)} ${fmtTokShort(680000)}');
 
     // ---- الاحتياط: خادم تجاهل البث (لا أحداث) لا يُعدّ مقطوعاً
