@@ -298,7 +298,7 @@ Future<void> runEngineSelfTest() async {
       jsonEncode(argsForSig(<String, dynamic>{'path': 'a', 'description': 'x'})) == jsonEncode(argsForSig(<String, dynamic>{'path': 'a', 'description': 'y'})) && jsonEncode(argsForSig(<String, dynamic>{'path': 'a'})) == '{"path":"a"}',
       '',
     );
-    final List<ChatMessage> run = <ChatMessage>[
+    final List<ChatMessage> sampleRun = <ChatMessage>[
       ChatMessage(id: 'a1', role: 'user', content: 'old question'),
       ChatMessage(id: 'a2', role: 'assistant', content: 'old answer'),
       ChatMessage(id: 'u1', role: 'user', content: 'do the work'),
@@ -315,8 +315,8 @@ Future<void> runEngineSelfTest() async {
       ]),
       ChatMessage(id: 's3', role: 'assistant', content: 'Final answer, not a step.'),
     ];
-    final List<RunStep> st = buildRunSteps(run, live: true);
-    final List<RunStep> stDead = buildRunSteps(run, live: false);
+    final List<RunStep> st = buildRunSteps(sampleRun, live: true);
+    final List<RunStep> stDead = buildRunSteps(sampleRun, live: false);
     rec(
       'run steps: only the last turn, narration then tools, final answer excluded',
       st.length == 8 && st[0].note && st[0].title == 'Reading the config first.' && !st[1].note && st.last.tool == 'search_files' && st.where((RunStep x) => x.note).length == 1,
