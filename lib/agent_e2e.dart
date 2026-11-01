@@ -451,7 +451,7 @@ Future<void> runAgentE2E() async {
     final ChatSession s13b = await runCp(5, true, askedYes);
     rec(
       'checkpoint asks once after N rounds with real numbers, and continues on yes',
-      askedYes.length == 1 && askedYes[0].contains('نقطة توقّف: 5 جولة') && askedYes[0].contains('آخر خطوة: current_time') && askedYes[0].contains('توكن') && s13b.messages.last.content == 'DONE-13' && mock.bodies.length == 6,
+      askedYes.length == 1 && askedYes[0].contains('نقطة توقّف: 5 جولة') && askedYes[0].contains('آخر خطوة: current_time') && askedYes[0].contains('دخل: ') && askedYes[0].contains('خرج: ') && !askedYes[0].contains('~') && s13b.messages.last.content == 'DONE-13' && mock.bodies.length == 6,
       'asked=${askedYes.length} reqs=${mock.bodies.length} q=${askedYes.isEmpty ? '' : askedYes[0]}',
     );
 

@@ -1071,6 +1071,8 @@ class MessageView extends ConsumerStatefulWidget {
   final bool selected;
   final VoidCallback onTapSelect;
   final VoidCallback onEnterSelect;
+  /// 0 = عرض عادي، 1 = جولة أدوات وسطية مطويّة (لا تُعرض)، 2 = مطويّة وأول جولة في تشغيلها: يظهر عندها سطر الملخّص.
+  final int fold;
   const MessageView({
     super.key,
     required this.session,
@@ -1081,6 +1083,7 @@ class MessageView extends ConsumerStatefulWidget {
     required this.selected,
     required this.onTapSelect,
     required this.onEnterSelect,
+    this.fold = 0,
   });
   @override
   ConsumerState<MessageView> createState() => _MessageViewState();
@@ -1121,6 +1124,8 @@ class _MessageViewState extends ConsumerState<MessageView> {
     final m = widget.msg;
     final session = widget.session;
     final streaming = identical(session.streamingMsg, m);
+    if (widget.fold == 1) return const SizedBox.shrink();
+    if (widget.fold == 2) return _foldHeader(context, p);
     Widget body;
     if (m.summary) {
       body = _summaryCard(p, m);
@@ -1160,6 +1165,77 @@ class _MessageViewState extends ConsumerState<MessageView> {
           padding: widget.selected ? const EdgeInsets.all(6) : EdgeInsets.zero,
           decoration: widget.selected ? BoxDecoration(color: p.accent.withAlpha(26), borderRadius: BorderRadius.circular(14), border: Border.all(color: p.accent, width: 1.2)) : null,
           child: IgnorePointer(ignoring: widget.selecting, child: body),
+        ),
+      ),
+    );
+  }
+
+  /// سطر الملخّص الذي تُطوى فيه جولات الأدوات الوسطية: «عُدّل ملفان، وكُتب ملف، و31 خطوة أخرى». الضغط يفتح لوحة الملخّص.
+  Widget _foldHeader(BuildContext context, Pal p) {
+    final ChatSession session = widget.session;
+    final List<ChatMessage> msgs = session.messages;
+    final int idx = msgs.indexWhere((ChatMessage x) => x.id == widget.msg.id);
+    final int? at = idx >= 0 ? idx : null;
+    final RunSpan sp = runSpanAt(msgs, at);
+    final bool live = session.generating && sp.end == msgs.length;
+    final List<RunStep> steps = buildRunSteps(msgs, live: live, at: at);
+    final int tools = steps.where((RunStep x) => !x.note).length;
+    String title = runSummaryHeader(steps);
+    if (live) title = tools > 0 ? 'الملخّص · ${_arSteps(tools, more: false)}' : 'الملخّص';
+    if (title.isEmpty) title = 'الملخّص';
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 7),
+      child: Material(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => showSummarySheet(context, session, msgId: widget.msg.id),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+            child: Row(children: <Widget>[
+              if (live) SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 1.8, color: p.accent)) else Icon(Icons.checklist, size: 18, color: p.muted),
+              const SizedBox(width: 10),
+              Expanded(child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.text, fontSize: 13.5, fontWeight: FontWeight.w600))),
+              Icon(Icons.chevron_right, size: 20, color: p.muted),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// أثناء العمل: [label] (حالة + جولة + زمن) وتحته آخر خطوة؛ الضغط يفتح لوحة الملخّص. label=null أثناء التفكير (له كتلته الخاصة).
+  Widget _liveRow(BuildContext context, Pal p, ChatSession session, {String? label}) {
+    final String note = session.liveNote;
+    final TextStyle dim = TextStyle(color: p.muted, fontSize: 13);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showSummarySheet(context, session),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+            Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+              if (label != null) ...<Widget>[
+                PulseDots(color: p.accent),
+                const SizedBox(width: 8),
+                Text(label, style: dim),
+                const SizedBox(width: 8),
+              ],
+              RunClock(session: session, style: TextStyle(color: p.muted, fontSize: 12)),
+            ]),
+            if (note.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+                  Flexible(child: Text(note, maxLines: 2, overflow: TextOverflow.ellipsis, style: dim)),
+                  Icon(Icons.chevron_right, size: 18, color: p.muted),
+                ]),
+              ),
+          ]),
         ),
       ),
     );
@@ -1240,6 +1316,7 @@ class _MessageViewState extends ConsumerState<MessageView> {
     if (m.thinking.trim().isNotEmpty || m.redacted.isNotEmpty || thinkingNow) {
       kids.add(ThinkingBlock(key: ValueKey<String>('th${m.id}'), msg: m, active: thinkingNow, dir: dir));
     }
+    if (thinkingNow) kids.add(_liveRow(context, p, session));
     if (m.content.isNotEmpty) {
       kids.add(Directionality(textDirection: dir, child: RichMarkdown(key: ValueKey<String>('md${m.id}'), data: m.content, settings: s, streaming: streaming)));
     }
@@ -1247,14 +1324,7 @@ class _MessageViewState extends ConsumerState<MessageView> {
       kids.add(ToolCard(key: ValueKey<String>('tc${c.id}'), call: c));
     }
     if (streaming && (m.content.isEmpty || session.status != 'writing') && !thinkingNow) {
-      kids.add(Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          PulseDots(color: p.accent),
-          const SizedBox(width: 8),
-          Text(statusLabel(session.status), style: TextStyle(color: p.muted, fontSize: 13)),
-        ]),
-      ));
+      kids.add(_liveRow(context, p, session, label: statusLabel(session.status)));
     }
     if (m.error != null) {
       kids.add(ErrorCard(session: session, msg: m, canAct: widget.isLast && !session.generating));
@@ -1291,11 +1361,24 @@ class _MessageViewState extends ConsumerState<MessageView> {
       );
     }
 
-    final tokText = !s.showTokens
-        ? ''
-        : (m.outTok > 0 || m.inTok > 0)
-            ? '${m.tokExact ? '' : '~'}${m.inTok}↑${m.cacheTok > 0 ? ' (⚡${m.cacheTok})' : ''} ${m.tokExact ? '' : '~'}${m.outTok}↓'
-            : '~${estimateTokens(m.content)} tok';
+    final List<ChatMessage> allMsgs = session.messages;
+    final int myIdx = allMsgs.indexWhere((ChatMessage x) => x.id == m.id);
+    final RunUsage mine = usageOfMessages(<ChatMessage>[m]);
+    final RunUsage whole = runUsageAt(allMsgs, myIdx >= 0 ? myIdx : null);
+    final bool multi = whole.requests > 1;
+    final Widget? usage = (s.showTokens && mine.requests > 0)
+        ? Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: UsageTable(
+                rows: <UsageRow>[UsageRow('هذه الرسالة', mine), if (multi) UsageRow('التشغيل كله', whole)],
+                caption: usageCaption(multi ? whole : mine),
+                notes: usageNotes(multi ? whole : mine),
+              ),
+            ),
+          )
+        : null;
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1321,9 +1404,8 @@ class _MessageViewState extends ConsumerState<MessageView> {
           if (widget.isLast) ic(Icons.refresh, 'إعادة التوليد', busy ? null : () => session.regenerate()),
           ic(Icons.bookmark_add_outlined, 'حفظ في الذاكرة', m.content.trim().isEmpty ? null : () => saveMessageToMemory(context, ref, m)),
           ic(Icons.more_horiz, 'المزيد', () => showMessageActions(context, ref, session, m, widget.onEnterSelect)),
-          const Spacer(),
-          if (tokText.isNotEmpty) Text(tokText, style: TextStyle(color: p.muted.withAlpha(200), fontSize: 11.5)),
         ]),
+        if (usage != null) usage,
       ]),
     );
   }
@@ -1414,7 +1496,10 @@ void showMessageInfo(BuildContext context, ChatMessage m) {
     if (m.model != null) <String>['الموديل', m.model!],
     <String>['الوقت', '${fmtDate(m.time)} ${fmtClock(m.time)}'],
     <String>['الطول', '${m.content.length} حرف'],
-    if (m.role == 'assistant') <String>['التوكنز (دخل/خرج)', '${m.tokExact ? '' : '~'}${m.inTok}${m.cacheTok > 0 ? ' (من الكاش ${m.cacheTok})' : ''} / ${m.tokExact ? '' : '~'}${m.outTok}'],
+    if (m.role == 'assistant') <String>['دخل', m.inTok > 0 ? fmtNum(m.inTok) : '—'],
+    if (m.role == 'assistant') <String>['منه من الكاش', m.inTok > 0 ? fmtNum(m.cacheTok) : '—'],
+    if (m.role == 'assistant') <String>['خرج', m.outTok > 0 ? fmtNum(m.outTok) : '—'],
+    if (m.role == 'assistant') <String>['منه تفكير', m.thinkTok > 0 ? fmtNum(m.thinkTok) : '—'],
     if (m.role == 'assistant' && m.thinkMs > 0) <String>['مدة التفكير', '${(m.thinkMs / 1000).toStringAsFixed(1)} ث'],
     if (m.stopReason != null) <String>['سبب التوقف', m.stopReason!],
     if (m.toolCalls.isNotEmpty) <String>['الأدوات المستدعاة', '${m.toolCalls.length}'],

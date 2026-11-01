@@ -72,6 +72,10 @@ class RunStep {
   final String? file;
   final bool edit;
   final bool write;
+  /// سبب الفشل (أول سطر من نتيجة الأداة) إن فشلت الخطوة.
+  final String error;
+  /// استدعاء الأداة نفسه (لعرض الوسائط والنتيجة عند الضغط على الخطوة). null لجملة السرد.
+  final ToolCall? call;
   const RunStep({
     required this.note,
     required this.title,
@@ -83,6 +87,8 @@ class RunStep {
     this.file,
     this.edit = false,
     this.write = false,
+    this.error = '',
+    this.call,
   });
 
   bool get failed => status == 'failed';
@@ -199,20 +205,44 @@ RunStep stepOf(ToolCall c, {required bool live}) {
     file: (isEdit || isWrite) && path.isNotEmpty ? path : null,
     edit: isEdit,
     write: isWrite,
+    error: st == 'failed' ? clip(_firstLine(c.result ?? ''), 140) : '',
+    call: c,
   );
 }
 
-/// خطوات التشغيل الحالي/الأخير (كل ما بعد آخر رسالة بدأها المستخدم). الجواب النهائي (رسالة بلا أدوات) ليس خطوة.
-List<RunStep> buildRunSteps(List<ChatMessage> msgs, {bool live = false}) {
+/// حدود التشغيل الذي تقع فيه الرسالة [at] (بعد آخر رسالة بدأها المستخدم وحتى التي تليها). at=null: التشغيل الأخير.
+class RunSpan {
+  final int start;
+  final int end;
+  const RunSpan(this.start, this.end);
+}
+
+RunSpan runSpanAt(List<ChatMessage> msgs, [int? at]) {
   int start = 0;
-  for (int i = msgs.length - 1; i >= 0; i--) {
+  int end = msgs.length;
+  final int from = (at == null || at >= msgs.length) ? msgs.length - 1 : at;
+  for (int i = from; i >= 0; i--) {
     if (msgs[i].startsTurn) {
       start = i + 1;
       break;
     }
   }
+  if (at != null && at < msgs.length) {
+    for (int i = at + 1; i < msgs.length; i++) {
+      if (msgs[i].startsTurn) {
+        end = i;
+        break;
+      }
+    }
+  }
+  return RunSpan(start, end);
+}
+
+/// خطوات التشغيل (كل ما بعد آخر رسالة بدأها المستخدم؛ أو التشغيل الذي تقع فيه الرسالة [at]). الجواب النهائي (رسالة بلا أدوات) ليس خطوة.
+List<RunStep> buildRunSteps(List<ChatMessage> msgs, {bool live = false, int? at}) {
+  final RunSpan sp = runSpanAt(msgs, at);
   final List<RunStep> out = <RunStep>[];
-  for (int i = start; i < msgs.length; i++) {
+  for (int i = sp.start; i < sp.end; i++) {
     final ChatMessage m = msgs[i];
     if (m.role != 'assistant' || m.excluded || m.toolCalls.isEmpty) continue;
     final String t = m.content.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -221,6 +251,118 @@ List<RunStep> buildRunSteps(List<ChatMessage> msgs, {bool live = false}) {
       out.add(stepOf(c, live: live));
     }
   }
+  return out;
+}
+
+/// جولة أدوات وسطية (يتبعها رد آخر في نفس التشغيل): في وضع الدردشة تُطوى داخل سطر الملخّص بدل عرض بطاقاتها.
+/// لا تُطوى الجولة الأخيرة ولا ما فيه خطأ (يبقى ظاهراً كما هو).
+bool isFoldedRound(List<ChatMessage> msgs, int i) {
+  if (i < 0 || i + 1 >= msgs.length) return false;
+  final ChatMessage m = msgs[i];
+  if (m.role != 'assistant' || m.excluded || m.toolCalls.isEmpty || m.error != null) return false;
+  final ChatMessage n = msgs[i + 1];
+  return n.role == 'assistant' || n.injected;
+}
+
+/// أول جولة مطويّة في تشغيلها: عندها يظهر سطر الملخّص (رسالة المستخدم المحقونة وسط التشغيل لا تكرّره).
+bool isRunHeaderAt(List<ChatMessage> msgs, int i) {
+  if (!isFoldedRound(msgs, i)) return false;
+  int j = i - 1;
+  while (j >= 0 && msgs[j].role == 'user' && msgs[j].injected) {
+    j--;
+  }
+  return j < 0 || !isFoldedRound(msgs, j);
+}
+
+// ---- الاستهلاك الفعلي (كما بلّغ المزوّد حرفياً، بلا أي تقدير) ----
+class RunUsage {
+  final int input;
+  final int cached;
+  final int output;
+  final int thinking;
+  final int requests;
+  /// طلبات لم يُبلَّغ عن أي استهلاك لها (الإجماليات ناقصة بمقدارها).
+  final int noUsage;
+  /// جولات فيها تفكير ولم يُبلَّغ عن توكنزه.
+  final int thinkMissing;
+  final String model;
+  const RunUsage({
+    this.input = 0,
+    this.cached = 0,
+    this.output = 0,
+    this.thinking = 0,
+    this.requests = 0,
+    this.noUsage = 0,
+    this.thinkMissing = 0,
+    this.model = '',
+  });
+
+  bool get reported => input > 0 || output > 0;
+  int get cachePct => input > 0 ? (cached * 100 / input).round() : 0;
+}
+
+RunUsage usageOfMessages(Iterable<ChatMessage> list) {
+  int i = 0;
+  int c = 0;
+  int o = 0;
+  int t = 0;
+  int r = 0;
+  int nu = 0;
+  int tm = 0;
+  String model = '';
+  for (final ChatMessage m in list) {
+    if (m.role != 'assistant' || m.excluded) continue;
+    if (m.content.isEmpty && m.thinking.isEmpty && m.toolCalls.isEmpty && m.inTok == 0 && m.outTok == 0) continue;
+    r++;
+    i += m.inTok;
+    c += m.cacheTok;
+    o += m.outTok;
+    t += m.thinkTok;
+    if (m.inTok == 0 && m.outTok == 0) nu++;
+    if (m.thinking.trim().isNotEmpty && m.thinkTok == 0) tm++;
+    final String? mm = m.model;
+    if (mm != null && mm.isNotEmpty) model = mm;
+  }
+  return RunUsage(input: i, cached: c, output: o, thinking: t, requests: r, noUsage: nu, thinkMissing: tm, model: model);
+}
+
+RunUsage runUsageAt(List<ChatMessage> msgs, [int? at]) {
+  final RunSpan sp = runSpanAt(msgs, at);
+  return usageOfMessages(msgs.sublist(sp.start, sp.end));
+}
+
+/// 612402 -> 612,402
+String fmtNum(int n) {
+  final String s = n.abs().toString();
+  final StringBuffer b = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+    b.write(s[i]);
+  }
+  return n < 0 ? '-$b' : b.toString();
+}
+
+String _arRequests(int n) {
+  if (n == 1) return 'طلب واحد';
+  if (n == 2) return 'طلبان';
+  if (n <= 10) return '$n طلبات';
+  return '$n طلباً';
+}
+
+/// سطر تحت الجدول: الموديل · عدد الطلبات · نسبة الكاش (حساب على أرقام المزوّد نفسها).
+String usageCaption(RunUsage u) {
+  final List<String> parts = <String>[];
+  if (u.model.isNotEmpty) parts.add(u.model);
+  if (u.requests > 0) parts.add(_arRequests(u.requests));
+  if (u.input > 0) parts.add('كاش ${u.cachePct}%');
+  return parts.join(' · ');
+}
+
+/// تنبيهات الصدق: ما لم يبلّغ عنه المزوّد لا نقدّره، ونقول إن الإجمالي ناقص بمقداره.
+List<String> usageNotes(RunUsage u) {
+  final List<String> out = <String>[];
+  if (u.noUsage > 0) out.add('لم يبلّغ المزوّد عن استهلاك ${u.noUsage} من الطلبات، فالإجماليات ناقصة بمقدارها.');
+  if (u.thinkMissing > 0) out.add('لم يبلّغ المزوّد عن توكنز التفكير في ${u.thinkMissing} من الجولات.');
   return out;
 }
 

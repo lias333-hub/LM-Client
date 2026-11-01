@@ -43,6 +43,7 @@ const List<_Cmd> _kCmds = <_Cmd>[
   _Cmd('/agent', 'اختيار Agent'),
   _Cmd('/think', 'مستوى التفكير: off low mid high', arg: true),
   _Cmd('/compact', 'تلخيص السياق الآن'),
+  _Cmd('/summary', 'ملخّص خطوات آخر تشغيل واستهلاكه'),
   _Cmd('/retry', 'إعادة توليد آخر رد'),
   _Cmd('/copy', 'نسخ آخر رد'),
   _Cmd('/cd', 'تحديد مجلد المشروع', arg: true),
@@ -263,6 +264,9 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
         toast('جارٍ تلخيص السياق…');
         s.compactNow();
         break;
+      case '/summary':
+        showSummarySheet(context, s);
+        break;
       case '/retry':
         s.regenerate();
         break;
@@ -470,6 +474,7 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
 
   Widget _approvalCard(Pal p, ApprovalRequest r) {
     final dangerous = r.title.contains('خطير');
+    final bool isCheckpoint = r.title.startsWith('نقطة توقّف');
     void answer(bool v, {bool always = false}) {
       if (always) alwaysAllowed.add('${r.title}|${r.body}');
       inlineApproval.value = null;
@@ -500,7 +505,7 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
               child: Text(r.ok),
             ),
           ),
-          if (!dangerous) ...<Widget>[
+          if (!dangerous && !isCheckpoint) ...<Widget>[
             const SizedBox(width: 8),
             Expanded(
               child: OutlinedButton(
@@ -524,37 +529,22 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
   }
 
   Widget _statusLine(Pal p, ChatSession s, String? agentName) {
-    final st = ref.watch(settingsProvider);
-    final model = ref.watch(profilesProvider).selected?.selectedModel ?? '';
-    var used = 0;
-    for (final m in s.messages) {
-      if (m.excluded) continue;
-      used += estimateTokens(m.content);
-      for (final t in m.toolCalls) {
-        used += estimateTokens(t.result ?? '');
-      }
-    }
-    final budget = st.contextBudget > 0 ? st.contextBudget : 60000;
-    final pct = (used * 100 / budget).clamp(0, 100).round();
-    final hot = pct >= 80;
-    final tx = _mono(p, color: p.muted, size: 11.5);
+    final String model = ref.watch(profilesProvider).selected?.selectedModel ?? '';
+    final RunUsage u = runUsageAt(s.messages);
+    final TextStyle tx = _mono(p, color: p.muted, size: 11.5);
+    String pad(String t) => t.length >= 9 ? t : t + ' ' * (9 - t.length);
+    final String reqs = u.requests > 0 ? ' · ${u.requests} requests' : '';
+    final List<String> lines = <String>[
+      'agent: ${agentName ?? 'none'}${model.isNotEmpty ? ' · $model' : ''}$reqs',
+      if (u.requests > 0) 'in   ${pad(u.input > 0 ? fmtNum(u.input) : '—')} cached ${u.input > 0 ? fmtNum(u.cached) : '—'}${u.input > 0 ? ' · ${u.cachePct}%' : ''}',
+      if (u.requests > 0) 'out  ${pad(u.output > 0 ? fmtNum(u.output) : '—')} thinking ${u.thinking > 0 ? fmtNum(u.thinking) : '—'}',
+    ];
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
-        child: Row(children: <Widget>[
-          Flexible(child: Text('agent: ${agentName ?? 'none'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: tx)),
-          const SizedBox(width: 10),
-          if (model.isNotEmpty) Flexible(child: Text(model, maxLines: 1, overflow: TextOverflow.ellipsis, style: tx)),
-          const SizedBox(width: 10),
-          Text('ctx $pct%', style: tx.copyWith(color: hot ? p.danger : p.muted)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(value: pct / 100, minHeight: 4, backgroundColor: p.border, color: hot ? p.danger : p.accent),
-            ),
-          ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+          for (final String l in lines) Text(l, maxLines: 1, overflow: TextOverflow.ellipsis, style: tx),
         ]),
       ),
     );
@@ -652,15 +642,8 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
     );
   }
 
-  Widget _working(Pal p) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: <Widget>[
-        SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.6, color: p.accent)),
-        const SizedBox(width: 10),
-        Text('working…', style: _mono(p, color: p.muted, size: 12.5)),
-      ]),
-    );
+  Widget _working(Pal p, ChatSession s) {
+    return TerminalWorkLine(session: s, onOpen: () => showSummarySheet(context, s));
   }
 
   Widget _prompt(Pal p, ChatSession s) {
@@ -756,7 +739,7 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
     }
     final req = inlineApproval.value;
     if (req != null) rows.add(() => _approvalCard(p, req));
-    rows.add(() => s.generating ? _working(p) : const SizedBox(height: 4));
+    rows.add(() => s.generating ? _working(p, s) : const SizedBox(height: 4));
     return Column(children: <Widget>[
       Expanded(
         child: NotificationListener<ScrollNotification>(

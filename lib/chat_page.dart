@@ -375,6 +375,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with WidgetsBindingObserver
               selected: _selected.contains(m.id),
               onTapSelect: () => _toggle(m.id),
               onEnterSelect: () => _enterSelect(m.id),
+              fold: isRunHeaderAt(msgs, i) ? 2 : (isFoldedRound(msgs, i) ? 1 : 0),
             );
           },
         ),

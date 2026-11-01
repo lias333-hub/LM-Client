@@ -133,6 +133,14 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       print('LMPROBE|SHOT plan');
       await Future<void>.delayed(const Duration(seconds: 9));
       if (mounted) Navigator.of(context).pop();
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      unawaited(showSummarySheet(context, previewSummarySession()));
+      await Future<void>.delayed(const Duration(seconds: 5));
+      // ignore: avoid_print
+      print('LMPROBE|SHOT summary');
+      await Future<void>.delayed(const Duration(seconds: 9));
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       // ignore: avoid_print
       print('LMPROBE|ui preview exception: $e');

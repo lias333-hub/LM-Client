@@ -354,6 +354,63 @@ Future<void> runEngineSelfTest() async {
     );
     rec('display formats', fmtElapsed(const Duration(seconds: 251)) == '4:11' && fmtTokShort(22707) == '22.7k' && fmtTokShort(680000) == '680k' && fmtTokShort(999) == '999', '${fmtElapsed(const Duration(seconds: 251))} ${fmtTokShort(22707)} ${fmtTokShort(680000)}');
 
+    // ---- v2.13.0: حدود التشغيل، الاستهلاك الفعلي، طيّ الجولات في الدردشة، وحقول الخطوة
+    rec('thousands separators', fmtNum(612402) == '612,402' && fmtNum(0) == '0' && fmtNum(999) == '999' && fmtNum(1000) == '1,000' && fmtNum(22707) == '22,707' && fmtNum(1234567) == '1,234,567' && fmtNum(-1500) == '-1,500', '${fmtNum(612402)} ${fmtNum(1234567)} ${fmtNum(-1500)}');
+    ChatMessage rm(String id, {String content = '', List<ToolCall>? calls, int inTok = 0, int cache = 0, int outTok = 0, int think = 0, String? error, String thinking = ''}) {
+      return ChatMessage(id: id, role: 'assistant', content: content, toolCalls: calls, inTok: inTok, cacheTok: cache, outTok: outTok, thinkTok: think, error: error, thinking: thinking, model: 'm1');
+    }
+
+    ToolCall tcall(String id) => ToolCall(id: id, name: 'current_time', status: 'done', result: 'x');
+    final List<ChatMessage> two = <ChatMessage>[
+      ChatMessage(id: 'q1', role: 'user', content: 'first'),
+      rm('r1', calls: <ToolCall>[tcall('t1')], inTok: 100, cache: 80, outTok: 10, think: 4, thinking: 'hmm'),
+      rm('r2', calls: <ToolCall>[tcall('t2')], inTok: 120, cache: 100, outTok: 12),
+      ChatMessage(id: 'inj', role: 'user', content: 'also this', injected: true),
+      rm('r3', calls: <ToolCall>[tcall('t3')], inTok: 140, cache: 120, outTok: 14),
+      rm('r4', content: 'done 1', inTok: 160, cache: 140, outTok: 20),
+      ChatMessage(id: 'q2', role: 'user', content: 'second'),
+      rm('r5', calls: <ToolCall>[tcall('t5')]),
+      rm('r6', content: 'done 2', inTok: 50, outTok: 5),
+    ];
+    final RunSpan spLast = runSpanAt(two);
+    final RunSpan spFirst = runSpanAt(two, 2);
+    rec(
+      'run spans: last run by default, the run containing a given message otherwise',
+      spLast.start == 7 && spLast.end == 9 && spFirst.start == 1 && spFirst.end == 6 && runSpanAt(<ChatMessage>[]).start == 0,
+      '${spLast.start}-${spLast.end} ${spFirst.start}-${spFirst.end}',
+    );
+    rec('run steps of an older run by index', buildRunSteps(two, at: 2).length == 3 && buildRunSteps(two).length == 1, '${buildRunSteps(two, at: 2).length} ${buildRunSteps(two).length}');
+    final List<int> folds = List<int>.generate(two.length, (int i) => isFoldedRound(two, i) ? (isRunHeaderAt(two, i) ? 2 : 1) : 0);
+    rec('chat folding: middle tool rounds fold, one header per run (an injected user message does not add another)', folds.join(',') == '0,2,1,0,1,0,0,2,0', folds.join(','));
+    final List<ChatMessage> withErr = <ChatMessage>[
+      ChatMessage(id: 'e0', role: 'user', content: 'go'),
+      rm('e1', calls: <ToolCall>[tcall('t1')], error: 'boom'),
+      rm('e2', content: 'after'),
+    ];
+    rec('chat folding: a round with an error stays visible', !isFoldedRound(withErr, 1), '');
+    final RunUsage ru1 = runUsageAt(two, 2);
+    final RunUsage ru2 = runUsageAt(two);
+    rec(
+      'run usage: exact sums, cache share, model; unreported requests counted not estimated',
+      ru1.requests == 4 && ru1.input == 520 && ru1.cached == 440 && ru1.output == 56 && ru1.thinking == 4 && ru1.noUsage == 0 && ru1.thinkMissing == 0 && ru1.cachePct == 85 && ru1.model == 'm1' && ru2.requests == 2 && ru2.noUsage == 1 && ru2.input == 50 && ru2.output == 5 && ru2.cached == 0,
+      '${ru1.requests}/${ru1.input}/${ru1.cached}/${ru1.output}/${ru1.thinking} ${ru2.requests}/${ru2.noUsage}/${ru2.input}',
+    );
+    final RunUsage ru3 = usageOfMessages(<ChatMessage>[rm('x', content: 'a', inTok: 10, outTok: 2, thinking: 'private thoughts')]);
+    rec(
+      'usage captions and notes: Arabic plurals, shortfall notes',
+      usageCaption(ru1) == 'm1 · 4 طلبات · كاش 85%' && usageCaption(ru2) == 'm1 · طلبان · كاش 0%' && usageCaption(const RunUsage(requests: 11)) == '11 طلباً' && usageCaption(const RunUsage(requests: 1)) == 'طلب واحد' && usageNotes(ru1).isEmpty && usageNotes(ru2).length == 1 && ru3.thinkMissing == 1 && usageNotes(ru3).length == 1,
+      '${usageCaption(ru1)} | ${usageCaption(ru2)} | ${usageNotes(ru2).join(' ')}',
+    );
+    rec(
+      'run step carries the failure reason and the call itself',
+      st[6].error == 'blocked' && st[6].call != null && st[6].call!.id == 'c6' && st[0].call == null && stDead[7].error == '' && st[1].error == '',
+      '${st[6].error} ${st[6].call?.id} ${stDead[7].error}',
+    );
+    final ChatSession prev = previewSummarySession();
+    final List<int> pf = List<int>.generate(prev.messages.length, (int i) => isFoldedRound(prev.messages, i) ? (isRunHeaderAt(prev.messages, i) ? 2 : 1) : 0);
+    final String ph = runSummaryHeader(buildRunSteps(prev.messages));
+    rec('preview sample builds the expected header and folds', ph == 'عُدّل ملف، و5 خطوات أخرى' && pf.join(',') == '0,2,1,1,1,0', '$ph ${pf.join(',')}');
+
     // ---- الاحتياط: خادم تجاهل البث (لا أحداث) لا يُعدّ مقطوعاً
     rec('no events is not a truncation', truncationError(kAnthropic, SseState()) == null, '');
   } catch (e) {

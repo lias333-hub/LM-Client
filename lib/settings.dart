@@ -466,6 +466,45 @@ class SettingsScreen extends ConsumerWidget {
           ),
           _SwitchRow(title: 'تسمية المحادثات تلقائياً بالنموذج', subtitle: 'طلب إضافي صغير بعد أول رد (يستهلك توكنز)', value: s.autoTitle, onChanged: (v) => notifier.set('autoTitle', v)),
         ]),
+        _Group(title: 'الحدود والميزانية', children: <Widget>[
+          _SwitchRow(
+            title: 'نقطة توقّف دورية',
+            subtitle: 'يسألك «متابعة أم إيقاف» كل عدد من الجولات، ويعرض الاستهلاك الفعلي. يُطفأ افتراضياً؛ عند التفعيل يتوقف التشغيل عند كل نقطة وينتظر قرارك.',
+            value: s.checkpointRounds > 0,
+            onChanged: (v) => notifier.set('checkpointRounds', v ? 30 : 0),
+          ),
+          if (s.checkpointRounds > 0)
+            _NavRow(
+              icon: Icons.repeat,
+              title: 'عدد الجولات بين النقاط',
+              subtitle: '${s.checkpointRounds} (الافتراضي 30)',
+              onTap: () => _askInt(context, ref, 'checkpointRounds', 'عدد الجولات بين النقاط', 'من 5 إلى 500 (الافتراضي 30)', s.checkpointRounds, min: 5, fallback: 30),
+            ),
+          _NavRow(
+            icon: Icons.alt_route,
+            title: 'أقصى جولات أدوات لكل رسالة',
+            subtitle: '${s.maxToolRounds} — عند بلوغها يتوقف الـ Agent وتكتب «تابع» لإكمال العمل',
+            onTap: () => _askInt(context, ref, 'maxToolRounds', 'أقصى جولات أدوات', 'من 5 إلى 500 (الافتراضي 60)', s.maxToolRounds, min: 5, fallback: 60),
+          ),
+          _NavRow(
+            icon: Icons.savings_outlined,
+            title: 'ميزانية توكنز التشغيل الواحد',
+            subtitle: s.taskBudget > 0 ? '${fmtNum(s.taskBudget)} — مجموع دخل وخرج كل جولات التشغيل' : 'بلا حد',
+            onTap: () => _askInt(context, ref, 'taskBudget', 'ميزانية توكنز التشغيل', 'اتركه فارغاً لإلغاء الحد (الافتراضي 1000000)', s.taskBudget),
+          ),
+          _SwitchRow(
+            title: 'إبقاء الجهاز يعمل أثناء عمل الـ Agent',
+            subtitle: 'خدمة مقدّمة بإشعار دائم تمنع أندرويد من إيقاف العمل عند إغلاق الشاشة',
+            value: s.keepAlive,
+            onChanged: (v) => notifier.set('keepAlive', v),
+          ),
+          _SwitchRow(
+            title: 'إظهار الاستهلاك الفعلي تحت الردود',
+            subtitle: 'جدول دخل/كاش/خرج/تفكير كما يبلّغ به المزوّد، بلا أي تقدير',
+            value: s.showTokens,
+            onChanged: (v) => notifier.set('showTokens', v),
+          ),
+        ]),
 
       ],
       'voice': <Widget>[

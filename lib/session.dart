@@ -551,10 +551,11 @@ class ChatSession extends ChangeNotifier {
 
   Future<bool> _checkpoint(ChatMessage msg) async {
     final Duration el = DateTime.now().difference(runStart ?? DateTime.now());
-    final String cache = _runIn > 0 ? ' (${(_runCache * 100 / _runIn).round()}% منه من الكاش)' : '';
     final ToolCall? last = msg.toolCalls.isEmpty ? null : msg.toolCalls.last;
     final String lastStep = last == null ? '' : '\nآخر خطوة: ${last.name}(${clip(toolSummary(last), 80)})';
-    final String body = 'عمل الـ Agent $runRounds جولة خلال ${fmtElapsed(el)}\nالمُعالَج: ~${fmtTokShort(_runTokens)} توكن$cache$lastStep';
+    final String inLine = _runIn > 0 ? '${fmtNum(_runIn)} (منه كاش ${fmtNum(_runCache)})' : '—';
+    final String outLine = _runOut > 0 ? '${fmtNum(_runOut)} (منه تفكير ${_runThink > 0 ? fmtNum(_runThink) : '—'})' : '—';
+    final String body = 'عمل الـ Agent $runRounds جولة خلال ${fmtElapsed(el)}\nدخل: $inLine\nخرج: $outLine$lastStep';
     return RunCheckpoint.ask('نقطة توقّف: $runRounds جولة', body);
   }
 
