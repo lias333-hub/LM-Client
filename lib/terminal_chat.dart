@@ -543,9 +543,12 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
       textDirection: TextDirection.ltr,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-          for (final String l in lines) Text(l, maxLines: 1, overflow: TextOverflow.ellipsis, style: tx),
-        ]),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+            for (final String l in lines) Text(l, maxLines: 1, overflow: TextOverflow.ellipsis, style: tx),
+          ]),
+        ),
       ),
     );
   }
