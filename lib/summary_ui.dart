@@ -60,7 +60,15 @@ class UsageTable extends StatelessWidget {
       ));
     }
     if (caption.isNotEmpty) {
-      kids.add(Padding(padding: const EdgeInsets.only(top: 6), child: Text(caption, style: TextStyle(color: p.muted, fontSize: 11.5))));
+      // كل جزء نصّ مستقل باتجاهه: خلط اسم الموديل (لاتيني) مع «5 طلبات · كاش 99%» في سطر واحد يبعثر الأرقام.
+      final TextStyle cap = TextStyle(color: p.muted, fontSize: 11.5);
+      final List<String> segs = caption.split(' · ');
+      final List<Widget> ws = <Widget>[];
+      for (int i = 0; i < segs.length; i++) {
+        if (i > 0) ws.add(Text('·', style: cap));
+        ws.add(Directionality(textDirection: detectDir(segs[i]) ?? TextDirection.ltr, child: Text(segs[i], style: cap)));
+      }
+      kids.add(Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: ws)));
     }
     for (final String n in notes) {
       kids.add(Padding(padding: const EdgeInsets.only(top: 4), child: Text(n, style: TextStyle(color: p.muted, fontSize: 11.5, height: 1.4))));
@@ -454,7 +462,7 @@ class _TerminalWorkLineState extends State<TerminalWorkLine> {
 }
 
 // ---- معاينة CI: لوحة الملخّص ببيانات نموذجية (تلتقطها خطوة المحاكي) -----------------
-ChatSession previewSummarySession() {
+ChatSession previewSummarySession({bool live = false}) {
   final ChatSession s = ChatSession(ConvMeta(id: newId(), title: 'فحص بيئة العمل'));
   ToolCall tc(String name, Map<String, dynamic> args, String result, {bool err = false}) {
     return ToolCall(id: newId(), name: name, args: args, result: result, isError: err, status: err ? 'error' : 'done');
@@ -486,5 +494,61 @@ ChatSession previewSummarySession() {
     ], inTok: 26000, cache: 25800, out: 520, think: 300),
     ChatMessage(id: newId(), role: 'assistant', content: 'فحصتُ البيئة كاملة. Node وPython وgit مثبّتة، والوسيط يعمل على المنفذ 8787.', inTok: 26900, cacheTok: 26500, outTok: 380, thinkTok: 150, tokExact: true, model: 'deepseek-v4.1-flash'),
   ]);
+  if (live) {
+    // تشغيل ما زال جارياً: لا جواب نهائي، وآخر أداة قيد التنفيذ.
+    s.messages.removeLast();
+    final ToolCall run = s.messages.last.toolCalls.last;
+    run.status = 'running';
+    run.result = null;
+    s.generating = true;
+    s.status = 'tool:bash';
+    s.runningCall = run;
+    s.runStart = DateTime.now().subtract(const Duration(minutes: 4, seconds: 21));
+    s.runRounds = 8;
+    s.streamingMsg = s.messages.last;
+  }
   return s;
+}
+
+/// معاينة CI لوضعي الدردشة وTerminal بالواجهة الحقيقية وببيانات نموذجية (kind: chatdone | chatlive | termlive).
+class SummaryPreviewPage extends StatelessWidget {
+  final String kind;
+  const SummaryPreviewPage({super.key, required this.kind});
+
+  @override
+  Widget build(BuildContext context) {
+    final ChatSession s = previewSummarySession(live: kind != 'chatdone');
+    final List<ChatMessage> msgs = s.messages;
+    Widget body;
+    if (kind == 'termlive') {
+      body = TerminalChatView(session: s);
+    } else {
+      body = ListView.builder(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 20),
+        itemCount: msgs.length,
+        itemBuilder: (BuildContext c, int i) {
+          final bool last = i == msgs.length - 1;
+          return MessageView(
+            key: ValueKey<String>(msgs[i].id),
+            session: s,
+            msg: msgs[i],
+            isLast: last,
+            showActions: last || msgs[i + 1].role == 'user',
+            selecting: false,
+            selected: false,
+            onTapSelect: () {},
+            onEnterSelect: () {},
+            fold: isRunHeaderAt(msgs, i) ? 2 : (isFoldedRound(msgs, i) ? 1 : 0),
+          );
+        },
+      );
+    }
+    return UncontrolledProviderScope(
+      container: appContainer,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(backgroundColor: pal(context).bg, body: SafeArea(child: body)),
+      ),
+    );
+  }
 }

@@ -135,12 +135,22 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       if (mounted) Navigator.of(context).pop();
       await Future<void>.delayed(const Duration(seconds: 1));
       if (!mounted) return;
-      unawaited(showSummarySheet(context, previewSummarySession()));
+      unawaited(showSheet<void>(context, (BuildContext c) => Directionality(textDirection: TextDirection.rtl, child: SummarySheet(session: previewSummarySession()))));
       await Future<void>.delayed(const Duration(seconds: 5));
       // ignore: avoid_print
       print('LMPROBE|SHOT summary');
       await Future<void>.delayed(const Duration(seconds: 9));
       if (mounted) Navigator.of(context).pop();
+      for (final String kind in <String>['chatdone', 'chatlive', 'termlive']) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        unawaited(Navigator.of(context).push(MaterialPageRoute<void>(builder: (BuildContext c) => SummaryPreviewPage(kind: kind))));
+        await Future<void>.delayed(const Duration(seconds: 5));
+        // ignore: avoid_print
+        print('LMPROBE|SHOT $kind');
+        await Future<void>.delayed(const Duration(seconds: 8));
+        if (mounted) Navigator.of(context).pop();
+      }
     } catch (e) {
       // ignore: avoid_print
       print('LMPROBE|ui preview exception: $e');
