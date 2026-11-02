@@ -155,7 +155,9 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
         if (!mounted) return;
         final bool isSettings = kind == 'settings' || kind == 'behaviour' || kind == 'about';
         unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (BuildContext c) => isSettings ? SettingsScreen(section: kind == 'settings' ? null : kind) : SummaryPreviewPage(kind: kind))));
+            builder: (BuildContext c) => isSettings
+                ? UncontrolledProviderScope(container: appContainer, child: Directionality(textDirection: TextDirection.rtl, child: SettingsScreen(section: kind == 'settings' ? null : kind)))
+                : SummaryPreviewPage(kind: kind))));
         await Future<void>.delayed(Duration(seconds: isSettings ? 3 : 5));
         // ignore: avoid_print
         print('LMPROBE|SHOT $kind');
