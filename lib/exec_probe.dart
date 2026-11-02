@@ -95,6 +95,15 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
 
   /// معاينة بصرية للأوراق الجديدة (سؤال المستخدم، موافقة الخطة): يلتقطها CI عند العلامة SHOT ويحفظها صوراً.
   Future<void> _uiPreview() async {
+    final FlutterExceptionHandler? prevOnError = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails d) {
+      final String st = (d.stack?.toString() ?? '').split('\n').take(8).join(' ⏎ ');
+      final String msg = '${d.exceptionAsString()} ⏎ $st'.replaceAll('\n', ' ⏎ ');
+      // ignore: avoid_print
+      print('LMPROBE|FLUTTER_ERROR ${msg.length > 1800 ? msg.substring(0, 1800) : msg}');
+      final FlutterExceptionHandler? pe = prevOnError;
+      if (pe != null) pe(d);
+    };
     try {
       final List<AskQuestion> qs = <AskQuestion>[
         const AskQuestion('Which storage should the app use for chat history?', 'Storage', false, <AskOption>[
@@ -141,19 +150,23 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       print('LMPROBE|SHOT summary');
       await Future<void>.delayed(const Duration(seconds: 9));
       if (mounted) Navigator.of(context).pop();
-      for (final String kind in <String>['chatdone', 'chatlive', 'termlive', 'about']) {
+      for (final String kind in <String>['chatdone', 'chatlive', 'termlive', 'settings', 'behaviour', 'about']) {
         await Future<void>.delayed(const Duration(seconds: 1));
         if (!mounted) return;
-        unawaited(Navigator.of(context).push(MaterialPageRoute<void>(builder: (BuildContext c) => kind == 'about' ? const SettingsScreen(section: 'about') : SummaryPreviewPage(kind: kind))));
-        await Future<void>.delayed(const Duration(seconds: 5));
+        final bool isSettings = kind == 'settings' || kind == 'behaviour' || kind == 'about';
+        unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (BuildContext c) => isSettings ? SettingsScreen(section: kind == 'settings' ? null : kind) : SummaryPreviewPage(kind: kind))));
+        await Future<void>.delayed(Duration(seconds: isSettings ? 3 : 5));
         // ignore: avoid_print
         print('LMPROBE|SHOT $kind');
-        await Future<void>.delayed(const Duration(seconds: 8));
+        await Future<void>.delayed(Duration(seconds: isSettings ? 6 : 8));
         if (mounted) Navigator.of(context).pop();
       }
     } catch (e) {
       // ignore: avoid_print
       print('LMPROBE|ui preview exception: $e');
+    } finally {
+      FlutterError.onError = prevOnError;
     }
   }
 
