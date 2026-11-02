@@ -106,8 +106,19 @@ jobs:
         run: |
           set +e
           awk -F ' • ' '/^ *error •/ {split($3,a,":"); printf "::error file=%s,line=%s,col=%s,title=%s::%s\n", a[1],a[2],a[3],$4,$2}' ci_logs/2_analyze.txt | head -10
-          MSG=$( (grep -hE '^ *error •' ci_logs/2_analyze.txt | sed 's/^ *//' | head -60; grep -hiE 'error|Could not|Failed|Because|version solving' ci_logs/1_pub_get.txt | head -20; grep -hE 'Error:|error:|FAILURE|What went wrong|e: ' ci_logs/3_build.txt | head -40) | head -c 30000 | awk '{printf "%s%%0A", $0}')
+          # Build/pub-get log lines become an error annotation ONLY when that step really failed.
+          # (Gradle prints non-fatal Kotlin "e: ... incompatible version of Kotlin" metadata lines even in a good build.)
+          MSG=$( (
+            grep -hE '^ *error •' ci_logs/2_analyze.txt | sed 's/^ *//' | head -60
+            if [ "$(cat ci_logs/1_pub_get.rc 2>/dev/null)" != "0" ]; then grep -hiE 'error|Could not|Failed|Because|version solving' ci_logs/1_pub_get.txt | head -20; fi
+            if [ "$(cat ci_logs/3_build.rc 2>/dev/null)" != "0" ]; then grep -hE 'Error:|error:|FAILURE|What went wrong|e: ' ci_logs/3_build.txt | head -40; fi
+            if [ "$(cat ci_logs/0_version.rc 2>/dev/null)" != "0" ]; then cat ci_logs/0_version.txt; fi
+          ) | head -c 30000 | awk '{printf "%s%%0A", $0}')
           if [ -n "$MSG" ]; then echo "::error title=CI summary::$MSG"; fi
+          if [ "$(cat ci_logs/3_build.rc 2>/dev/null)" = "0" ]; then
+            K=$(grep -c '^e: .*incompatible version of Kotlin' ci_logs/3_build.txt)
+            if [ "$K" != "0" ]; then echo "::notice title=Build OK::APK built. $K non-fatal Kotlin metadata lines (AndroidX libraries newer than the Kotlin compiler of the Flutter 3.22 template); they do not affect the result."; fi
+          fi
       - name: publish logs
         if: always()
         run: |
