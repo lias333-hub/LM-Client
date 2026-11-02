@@ -95,13 +95,13 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
 
   /// معاينة بصرية للأوراق الجديدة (سؤال المستخدم، موافقة الخطة): يلتقطها CI عند العلامة SHOT ويحفظها صوراً.
   Future<void> _uiPreview() async {
-    final FlutterExceptionHandler? prevOnError = FlutterError.onError;
+    final void Function(FlutterErrorDetails)? prevOnError = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails d) {
       final String st = (d.stack?.toString() ?? '').split('\n').take(8).join(' ⏎ ');
       final String msg = '${d.exceptionAsString()} ⏎ $st'.replaceAll('\n', ' ⏎ ');
       // ignore: avoid_print
       print('LMPROBE|FLUTTER_ERROR ${msg.length > 1800 ? msg.substring(0, 1800) : msg}');
-      final FlutterExceptionHandler? pe = prevOnError;
+      final void Function(FlutterErrorDetails)? pe = prevOnError;
       if (pe != null) pe(d);
     };
     try {
