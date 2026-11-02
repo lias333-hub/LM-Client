@@ -31,6 +31,33 @@ jobs:
           sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />\n    <queries><package android:name="com.termux" /></queries>\n    <application|' $MANIFEST
           sed -i '0,/<application/s|<application|<application android:allowBackup="false" android:fullBackupContent="false"|' $MANIFEST
           cat $MANIFEST
+      - name: version check
+        run: |
+          set +e
+          PV=$(grep -E '^version:' pubspec.yaml | sed -E 's/^version:[[:space:]]*([0-9.]+).*/\1/')
+          KV=$(grep -E "^const String kAppVersion" lib/core.dart | sed -E "s/.*'([^']+)'.*/\1/")
+          echo "pubspec=$PV kAppVersion=$KV" > ci_logs/0_version.txt
+          if [ -n "$PV" ] && [ "$PV" = "$KV" ]; then echo 0 > ci_logs/0_version.rc; else echo "MISMATCH: bump kAppVersion in lib/core.dart to match pubspec version" >> ci_logs/0_version.txt; echo 1 > ci_logs/0_version.rc; fi
+          exit 0
+      - name: signing key
+        env:
+          KS_B64: ${{ secrets.LM_DEBUG_KEYSTORE_B64 }}
+        run: |
+          set +e
+          if [ -n "$KS_B64" ]; then
+            mkdir -p ~/.android
+            echo "$KS_B64" | base64 -d > ~/.android/debug.keystore
+            if keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey > /dev/null 2>&1; then
+              echo "signing=stable (repo secret)" > ci_logs/0_signing.txt
+            else
+              rm -f ~/.android/debug.keystore
+              echo "signing=stable key unreadable -> FAILED" > ci_logs/0_signing.txt
+              echo 1 > ci_logs/0_signing.rc
+            fi
+          else
+            echo "signing=runner-generated debug key (no LM_DEBUG_KEYSTORE_B64 secret)" > ci_logs/0_signing.txt
+          fi
+          exit 0
       - name: pub get
         run: |
           set +e
@@ -52,11 +79,26 @@ jobs:
         run: |
           set +e
           if [ "$(cat ci_logs/2_analyze.rc)" = "0" ]; then
-            flutter build apk --release > ci_logs/3_build.txt 2>&1
+            flutter build apk --release --build-number=${{ github.run_number }} --dart-define=LM_BUILD=${{ github.run_number }}-${GITHUB_SHA::7} > ci_logs/3_build.txt 2>&1
             echo $? > ci_logs/3_build.rc
           else
             echo "skipped (analyze failed)" > ci_logs/3_build.txt
             echo 99 > ci_logs/3_build.rc
+          fi
+          exit 0
+      - name: signing fingerprint
+        if: always()
+        run: |
+          set +e
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          if [ -f "$APK" ]; then
+            echo "apk_bytes=$(stat -c %s $APK)" >> ci_logs/0_signing.txt
+            AS=$(ls -d ${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+            if [ -n "$AS" ]; then
+              "$AS" verify --print-certs "$APK" 2>&1 | grep -E "certificate (DN|SHA-256)" | head -4 >> ci_logs/0_signing.txt
+            else
+              keytool -printcert -jarfile "$APK" 2>&1 | grep -E "Owner|SHA256" | head -3 >> ci_logs/0_signing.txt
+            fi
           fi
           exit 0
       - name: annotate errors

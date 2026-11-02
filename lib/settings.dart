@@ -567,7 +567,19 @@ class SettingsScreen extends ConsumerWidget {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
             leading: Icon(Icons.auto_awesome, color: p.accent),
             title: Text('$kAppName  v$kAppVersion', style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w600)),
-            subtitle: Text('عميل API عام: Anthropic · OpenAI-compatible · Gemini. مفاتيحك تُحفظ على جهازك فقط، نصاً غير مشفّر داخل تخزين التطبيق.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
+            subtitle: Text('عميل API عام: Anthropic · OpenAI-compatible · Gemini. مفاتيح الـ API وكلمات السر في Android Keystore على جهازك؛ المحادثات والإعدادات داخل تخزين التطبيق وتُرسل إلى المزوّد الذي تضبطه فقط.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            leading: Icon(Icons.tag, color: p.muted),
+            title: Text('رقم البناء', style: TextStyle(color: p.text, fontSize: 14.5)),
+            subtitle: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: SelectableText(kBuildId == 'local' ? 'local (بناء محلي، ليس من CI)' : kBuildId, style: TextStyle(color: p.muted, fontSize: 12.5, fontFamily: 'monospace')),
+              ),
+            ),
           ),
         ]),
       ],
@@ -592,7 +604,7 @@ class SettingsScreen extends ConsumerWidget {
         NavRow(icon: Icons.toggle_on_outlined, title: titles['behaviour']!, subtitle: 'الأدوات، الموافقات، التلخيص', onTap: () => _open(context, 'behaviour')),
         NavRow(icon: Icons.mic_none, title: titles['voice']!, subtitle: 'سرعة القراءة، لغة الإملاء', onTap: () => _open(context, 'voice')),
         NavRow(icon: Icons.storage_outlined, title: titles['data']!, subtitle: 'نسخ احتياطي، الصلاحيات، الحذف', onTap: () => _open(context, 'data')),
-        NavRow(icon: Icons.info_outline, title: titles['about']!, subtitle: '$kAppName v$kAppVersion', onTap: () => _open(context, 'about')),
+        NavRow(icon: Icons.info_outline, title: titles['about']!, subtitle: '$kAppName v$kAppVersion · $kBuildId', onTap: () => _open(context, 'about')),
       ];
       final kids = <Widget>[];
       for (int i = 0; i < rows.length; i++) {
