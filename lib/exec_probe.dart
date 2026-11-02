@@ -69,7 +69,7 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
     try {
       await _runAll();
       final StringBuffer out = StringBuffer();
-      out.writeln('LMClient autoprobe · v$kAppVersion');
+      out.writeln('LMClient autoprobe · v$kAppVersion · build $kBuildId');
       out.writeln('os: ${Platform.operatingSystemVersion}');
       out.writeln(_report());
       for (final String line in out.toString().split('\n')) {
@@ -141,10 +141,10 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       print('LMPROBE|SHOT summary');
       await Future<void>.delayed(const Duration(seconds: 9));
       if (mounted) Navigator.of(context).pop();
-      for (final String kind in <String>['chatdone', 'chatlive', 'termlive']) {
+      for (final String kind in <String>['chatdone', 'chatlive', 'termlive', 'about']) {
         await Future<void>.delayed(const Duration(seconds: 1));
         if (!mounted) return;
-        unawaited(Navigator.of(context).push(MaterialPageRoute<void>(builder: (BuildContext c) => SummaryPreviewPage(kind: kind))));
+        unawaited(Navigator.of(context).push(MaterialPageRoute<void>(builder: (BuildContext c) => kind == 'about' ? const SettingsScreen(section: 'about') : SummaryPreviewPage(kind: kind))));
         await Future<void>.delayed(const Duration(seconds: 5));
         // ignore: avoid_print
         print('LMPROBE|SHOT $kind');
