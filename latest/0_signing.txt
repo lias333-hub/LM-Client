@@ -1,4 +1,1 @@
 signing=runner-generated debug key (no LM_DEBUG_KEYSTORE_B64 secret)
-apk_bytes=27527748
-V2 Signer: certificate DN: C=US, O=Android, CN=Android Debug
-V2 Signer: certificate SHA-256 digest: b0eec88c3402bf9be5396e07010e47e5a3460bb78254e438d21a578f842ea583
