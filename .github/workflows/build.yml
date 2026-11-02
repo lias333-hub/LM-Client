@@ -190,6 +190,7 @@ jobs:
           OUT=probe_out
           mkdir -p $OUT
           adb wait-for-device
+          adb shell settings put global hide_error_dialogs 1 > $OUT/dialogs.txt 2>&1
           adb shell getprop ro.build.version.sdk > $OUT/sdk.txt
           adb install -r apk/app-release.apk > $OUT/install.txt 2>&1
           adb shell appops set --uid $PKG MANAGE_EXTERNAL_STORAGE allow > $OUT/perm.txt 2>&1
