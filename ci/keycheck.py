@@ -70,3 +70,42 @@ for n in cands:
         note("model=%s http=%s status=%s message=%s" % (n, code, err.get("status"), str(err.get("message", r))[:220]), "warning")
     time.sleep(PAUSE)
 note("RESULT: models that answered with a tool call: %s" % (", ".join(ok) if ok else "none"))
+
+# ---- Interactions API probe (discovery: prints the real shapes so an adapter is built from data, not guesses)
+def interactions_probe(names):
+    pref = [n for n in names if "3.8-flash" in n and "lite" not in n] + [n for n in names if "3.5-flash" in n and "lite" not in n] + [n for n in names if "2.5-flash" in n and "lite" not in n]
+    seen = []
+    for n in pref:
+        if n not in seen:
+            seen.append(n)
+    ftool = {"type": "function", "name": "get_weather", "description": "Get the current weather of a city", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}
+    sysi = "You are a concise assistant."
+    for n in seen[:2]:
+        code, r = call("POST", "/interactions", {"model": n, "system_instruction": sysi, "tools": [ftool], "input": "What is the weather in Paris right now? Use the tool."})
+        if code != 200:
+            err = r.get("error", {}) if isinstance(r, dict) else {}
+            note("INTERACTIONS model=%s http=%s status=%s message=%s" % (n, code, err.get("status"), str(err.get("message", r))[:300]), "warning")
+            time.sleep(PAUSE)
+            continue
+        steps = [x for x in (r.get("steps") or []) if isinstance(x, dict)]
+        note("INTERACTIONS model=%s http=200 top_keys=%s id=%s status=%s step_types=%s usage=%s" % (n, sorted(r.keys()), bool(r.get("id")), r.get("status"), [x.get("type") for x in steps], json.dumps(r.get("usage", {}))[:400]))
+        fcs = [x for x in steps if "function_call" in str(x.get("type", ""))]
+        if not fcs:
+            time.sleep(PAUSE)
+            continue
+        note("INTERACTIONS function_call step=%s" % json.dumps(fcs[0])[:500])
+        cid = fcs[0].get("id") or fcs[0].get("call_id")
+        time.sleep(PAUSE)
+        code2, r2 = call("POST", "/interactions", {"model": n, "system_instruction": sysi, "tools": [ftool], "previous_interaction_id": r.get("id"),
+                                                     "input": [{"type": "function_result", "name": fcs[0].get("name"), "call_id": cid, "result": "sunny, 18 C"}]})
+        if code2 == 200:
+            st2 = [x for x in (r2.get("steps") or []) if isinstance(x, dict)]
+            note("INTERACTIONS follow-up (stateful function_result) http=200 step_types=%s text=%s" % ([x.get("type") for x in st2], json.dumps(st2)[:400]))
+        else:
+            err2 = r2.get("error", {}) if isinstance(r2, dict) else {}
+            note("INTERACTIONS follow-up (stateful function_result) http=%s status=%s message=%s" % (code2, err2.get("status"), str(err2.get("message", r2))[:400]), "warning")
+        time.sleep(PAUSE)
+
+
+interactions_probe([n for n, i, o in models])
+note("DONE")
