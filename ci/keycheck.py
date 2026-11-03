@@ -5,8 +5,28 @@ KEY = os.environ.get("GEMINI_KEY", "")
 PAUSE = float(os.environ.get("KC_PAUSE", "7"))
 
 
+import atexit
+
+# GitHub keeps only 10 notice + 10 warning annotations per step, so collect everything and emit ONE annotation at exit.
+REPORT = []
+HAS_PROBLEM = []
+
+
 def note(msg, level="notice"):
-    print("::%s title=keycheck::%s" % (level, msg.replace("\n", " ")[:900]))
+    line = ("[%s] " % level.upper() if level != "notice" else "") + msg.replace("\n", " ")[:1500]
+    REPORT.append(line)
+    print(line)
+
+
+def _esc(t):
+    return t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _flush():
+    print("::notice title=keycheck-report::" + _esc("\n".join(REPORT))[:60000])
+
+
+atexit.register(_flush)
 
 
 def call(method, path, body=None):
