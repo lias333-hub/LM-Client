@@ -1,0 +1,22 @@
+name: Key check (eval key)
+# Verifies that the repo secret LM_EVAL_GEMINI_KEY works and that tool calling answers on the free tier.
+# It prints only model names, HTTP codes and token counts (never the key) as annotations of the run.
+on:
+  workflow_dispatch:
+  push:
+    branches: [merge-a]
+    paths:
+      - '.github/workflows/keycheck.yml'
+      - 'ci/keycheck.py'
+permissions:
+  contents: read
+jobs:
+  keycheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: check the Gemini eval key and tool calling
+        env:
+          GEMINI_KEY: ${{ secrets.LM_EVAL_GEMINI_KEY }}
+        run: python3 -I ci/keycheck.py
