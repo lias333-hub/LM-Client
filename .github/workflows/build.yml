@@ -2,6 +2,9 @@ name: Build APK (dev)
 on:
   push:
     branches: [terminal-plus, merge-a]
+    paths-ignore:
+      - '.github/workflows/keycheck.yml'
+      - 'ci/keycheck.py'
   workflow_dispatch:
 permissions:
   contents: write
