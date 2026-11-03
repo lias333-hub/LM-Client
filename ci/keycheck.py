@@ -17,7 +17,7 @@ def call(method, path, body=None):
         data = json.dumps(body).encode()
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, data=data, timeout=60) as r:
+        with urllib.request.urlopen(req, data=data, timeout=90) as r:
             return r.status, json.loads(r.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         raw = e.read().decode(errors="replace")
@@ -53,8 +53,9 @@ tool = {"functionDeclarations": [{"name": "get_weather", "description": "Get the
 body = {"contents": [{"role": "user", "parts": [{"text": "What is the weather in Paris right now? Use the tool."}]}], "tools": [tool]}
 
 # stable-looking candidates first (not previews/experimental/image/tts), capped to respect ~10 requests per minute
-cands = [n for n, i, o in models if not any(x in n for x in ("preview", "exp", "image", "tts", "live", "audio", "thinking", "latest-"))]
-cands = cands[:8]
+# skip retired 2.x models (404 "no longer available to new users"), media/preview variants; always include Gemma (weak-model candidates)
+cands = [n for n, i, o in models if n.startswith("gemini-3") and not any(x in n for x in ("preview", "exp", "image", "tts", "live", "audio", "thinking", "omni"))][:10]
+cands += [n for n, i, o in models if n.startswith("gemma")][:3]
 ok = []
 for n in cands:
     code, r = call("POST", "/models/%s:generateContent" % n, body)
@@ -73,11 +74,7 @@ note("RESULT: models that answered with a tool call: %s" % (", ".join(ok) if ok 
 
 # ---- Interactions API probe (discovery: prints the real shapes so an adapter is built from data, not guesses)
 def interactions_probe(names):
-    pref = [n for n in names if "3.8-flash" in n and "lite" not in n] + [n for n in names if "3.5-flash" in n and "lite" not in n] + [n for n in names if "2.5-flash" in n and "lite" not in n]
-    seen = []
-    for n in pref:
-        if n not in seen:
-            seen.append(n)
+    seen = list(names)
     ftool = {"type": "function", "name": "get_weather", "description": "Get the current weather of a city", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}
     sysi = "You are a concise assistant."
     for n in seen[:2]:
@@ -107,5 +104,6 @@ def interactions_probe(names):
         time.sleep(PAUSE)
 
 
-interactions_probe([n for n, i, o in models])
+# Interactions probe on models that answered the tool call above (3.8-flash timed out in the first real run)
+interactions_probe(ok[:2] if ok else [n for n, i, o in models if n.startswith("gemini-3")][:2])
 note("DONE")
