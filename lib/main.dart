@@ -60,3 +60,5 @@ part 'subagent.dart';
 part 'redact.dart';
 part 'summary.dart';
 part 'summary_ui.dart';
+part 'run_trace.dart';
+part 'run_trace_ui.dart';

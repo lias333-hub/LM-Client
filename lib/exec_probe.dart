@@ -79,6 +79,7 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       await runSecretsSelfTest();
       await runEngineSelfTest();
       await runAgentE2E();
+      await runTraceSelfTest();
       await runPlanningSelfTest();
       await runKeepAliveSelfTest();
       await runSkillsSelfTest(ghBranch: widget.ghBranch);

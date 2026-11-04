@@ -108,6 +108,11 @@ class ChatSession extends ChangeNotifier {
   /// أول رسالة داخل نافذة السياق. تتحرك دفعة واحدة (لا مع كل رسالة) كي يبقى مطلع الطلب ثابتاً فيعمل الكاش.
   String? _ctxStartId;
 
+  // سجل التشغيل (run_trace.dart): معرّف التشغيل الحالي وعدّاد الطلبات الفعلية فيه. الوكيل الفرعي يكتب في ملف أمّه.
+  String _runId = '';
+  int _reqNo = 0;
+  void _tr(String ev, Map<String, dynamic> d) => RunTrace.log(sub?.parentId ?? meta.id, _runId, ev, d, sub: sub != null);
+
   /// حدّ قصّ داخل الدور الحالي: نتائج الأدوات في الرسائل قبل هذه الرسالة تُقصّ (ثابت بين الجولات كي يعمل الكاش).
   String? _trimBeforeId;
   /// عدد الرسائل القديمة المستبعدة من آخر طلب بسبب ميزانية السياق (للعرض فقط).
@@ -280,6 +285,7 @@ class ChatSession extends ChangeNotifier {
     // نخزّن المرفقات أولاً؛ إن فشل ذلك تبقى الرسائل في الطابور ولا تضيع.
     final atts = await _storeAttachments(pend);
     queue.removeWhere((q) => items.contains(q));
+    _tr('queue', <String, dynamic>{'n': items.length, 'inLoop': inLoop, 'atts': atts.length});
     messages.add(ChatMessage(
       id: newId(),
       role: 'user',
@@ -418,6 +424,11 @@ class ChatSession extends ChangeNotifier {
     _runThinkMissing = 0;
     _lastCheckpoint = 0;
     runningCall = null;
+    _runId = RunTrace.newRunId();
+    _reqNo = 0;
+    String endReason = 'done';
+    String endErr = '';
+    _traceRunStart();
     try {
       // تجاوزنا ميزانية السياق: نلخّص الأقدم بدل حذفه (طلب إضافي واحد). عند الفشل يعمل القصّ الاحتياطي.
       final cs = appContainer.read(settingsProvider);
@@ -451,6 +462,8 @@ class ChatSession extends ChangeNotifier {
               c.result = 'Interrupted';
             }
           }
+          endReason = msg.stopReason == 'cancelled' ? 'cancelled' : 'error';
+          endErr = msg.error ?? '';
           if (await _afterAbort()) {
             rounds = 0;
             continue;
@@ -479,6 +492,8 @@ class ChatSession extends ChangeNotifier {
         final int maxRounds = sub != null ? subRoundCap : appContainer.read(settingsProvider).maxToolRounds;
         if (rounds >= maxRounds) {
           if (sub != null) subCapHit = true;
+          endReason = 'round_cap';
+          _tr('round_cap', <String, dynamic>{'cap': maxRounds});
           msg.error = 'تم إيقاف حلقة الأدوات بعد $maxRounds جولات. اكتب «تابع» لإكمال العمل.';
           for (final c in msg.toolCalls) {
             c.status = 'error';
@@ -491,6 +506,8 @@ class ChatSession extends ChangeNotifier {
         notifyListeners();
         await persist();
         if (_cancel?.isCancelled ?? false) {
+          endReason = 'cancelled';
+          _tr('cancel', <String, dynamic>{'where': 'after_tools'});
           if (await _afterAbort()) {
             rounds = 0;
             continue;
@@ -498,12 +515,16 @@ class ChatSession extends ChangeNotifier {
           break;
         }
         if (_loopAbort) {
+          endReason = 'loop_abort';
+          _tr('loop_abort', <String, dynamic>{'sigs': _recentSigs.length});
           if (sub != null) subCapHit = true;
           msg.error = 'توقف الـ Agent لأنه كرّر نفس الاستدعاء بنفس النتيجة عدة مرات. أعطه توجيهاً جديداً أو غيّر المقاربة.';
           break;
         }
         final int budget = sub?.tokenBudget ?? appContainer.read(settingsProvider).taskBudget;
         if (budget > 0 && _runTokens >= budget) {
+          endReason = 'budget';
+          _tr('budget_stop', <String, dynamic>{'used': _runTokens, 'budget': budget});
           if (sub != null) subCapHit = true;
           msg.error = 'بلغ التشغيل ميزانية التوكنز ($_runTokens من $budget). اكتب «تابع» للمتابعة أو ارفع الميزانية من الإعدادات.';
           break;
@@ -512,7 +533,10 @@ class ChatSession extends ChangeNotifier {
         final int cpEvery = sub != null ? 0 : appContainer.read(settingsProvider).checkpointRounds;
         if (cpEvery > 0 && runRounds - _lastCheckpoint >= cpEvery) {
           _lastCheckpoint = runRounds;
-          if (!await _checkpoint(msg)) {
+          final bool cpGo = await _checkpoint(msg);
+          _tr('checkpoint', <String, dynamic>{'round': runRounds, 'continue': cpGo});
+          if (!cpGo) {
+            endReason = 'checkpoint_stop';
             msg.error = 'أوقفتَ التشغيل عند نقطة التوقّف بعد $runRounds جولة. اكتب «تابع» لإكمال العمل.';
             break;
           }
@@ -523,7 +547,23 @@ class ChatSession extends ChangeNotifier {
     } catch (e) {
       final m = ChatMessage(id: newId(), role: 'assistant', error: 'خطأ غير متوقع: $e');
       messages.add(m);
+      endReason = 'exception';
+      endErr = '$e';
     } finally {
+      _tr('run_end', <String, dynamic>{
+        'reason': endReason,
+        'err': endErr,
+        'rounds': runRounds,
+        'reqs': _runReqs,
+        'ms': DateTime.now().difference(runStart ?? DateTime.now()).inMilliseconds,
+        'in': _runIn,
+        'cache': _runCache,
+        'out': _runOut,
+        'thinkTok': _runThink,
+        'noUsage': _runNoUsage,
+        'thinkMissing': _runThinkMissing,
+        'msgsAfter': messages.length,
+      });
       if (sub == null) unawaited(KeepAlive.release());
       runningCall = null;
       generating = false;
@@ -559,6 +599,153 @@ class ChatSession extends ChangeNotifier {
     return RunCheckpoint.ask('نقطة توقّف: $runRounds جولة', body);
   }
 
+  // ---- سجل التشغيل: تسجيل آمن (لا يرمي أبداً) ----------------------------------------------
+  void _traceRunStart() {
+    try {
+      final AppSettings s = appContainer.read(settingsProvider);
+      final ApiProfile? p = appContainer.read(profilesProvider).selected;
+      String lastUser = '';
+      for (int i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role == 'user') {
+          lastUser = messages[i].content;
+          break;
+        }
+      }
+      String host = '';
+      if (p != null) host = Uri.tryParse(_normBase(p.baseUrl))?.host ?? '';
+      final SubAgentSpec? sp = sub;
+      _tr('run_start', <String, dynamic>{
+        'app': kAppVersion,
+        'build': kBuildId,
+        'conv': meta.id,
+        'ttl': meta.title,
+        'msgs': messages.length,
+        'provider': p?.kind ?? '',
+        'host': host,
+        'model': p?.selectedModel ?? '',
+        'cfg': <String, dynamic>{
+          'thinkLevel': s.thinkLevel,
+          'thinkMode': s.thinkMode,
+          'contextBudget': s.contextBudget,
+          'contextLimit': s.contextLimit,
+          'autoCompact': s.autoCompact,
+          'maxTokens': s.maxTokens,
+          'temperature': s.temperature,
+          'topP': s.topP,
+          'promptCache': s.promptCache,
+          'trimOldResults': s.trimOldResults,
+          'maxToolRounds': s.maxToolRounds,
+          'taskBudget': s.taskBudget,
+          'checkpointRounds': s.checkpointRounds,
+          'confirm': s.confirm,
+          'bashApproval': s.bashApproval,
+          'tools': s.tools,
+        },
+        if (sp != null) 'subSpec': <String, dynamic>{'maxRounds': sp.maxRounds, 'tokenBudget': sp.tokenBudget, 'tools': sp.tools.length},
+        'user': lastUser,
+      });
+      unawaited(RunTrace.maintain(sub?.parentId ?? meta.id));
+    } catch (_) {}
+  }
+
+  void _traceRequest(int n, GenRequest req, PreparedCall call, {required int attempt, required int heals, required int tooLong}) {
+    try {
+      final int bytes = jsonEncode(call.body).length;
+      final bool firstOfRun = n == 1;
+      _tr('request', <String, dynamic>{
+        'n': n,
+        'attempt': attempt,
+        'heals': heals,
+        'tooLong': tooLong,
+        'kind': req.profile.kind,
+        'model': req.model,
+        'path': call.url.path,
+        'msgs': req.msgs.length,
+        'hist': messages.length,
+        'dropped': ctxDropped,
+        'bytes': bytes,
+        'sysLen': req.system.length,
+        'sysHash': traceHash(req.system),
+        'tools': req.tools.length,
+        if (firstOfRun) 'toolNames': req.tools.map((ToolDef t) => t.name).toList(),
+        'thinkLevel': req.thinkLevel,
+        'thinkMode': req.thinkMode,
+        'capTokens': req.capTokens,
+        'healed': req.heal.toList(),
+        'cache': req.cache,
+        if (firstOfRun) 'system': req.system,
+        if (firstOfRun) 'body': call.body,
+      });
+    } catch (_) {}
+  }
+
+  void _traceResponse(int n, ChatMessage msg, Stopwatch sw, int ttfe, int ttft, String result) {
+    try {
+      _tr('response', <String, dynamic>{
+        'n': n,
+        'ok': result,
+        'ms': sw.elapsedMilliseconds,
+        'ttfe': ttfe,
+        'ttft': ttft,
+        'in': msg.inTok,
+        'cache': msg.cacheTok,
+        'out': msg.outTok,
+        'thinkTok': msg.thinkTok,
+        'thinkMs': msg.thinkMs,
+        'exact': msg.tokExact,
+        'stop': msg.stopReason,
+        'textLen': msg.content.length,
+        'thinkLen': msg.thinking.length,
+        'calls': <Map<String, dynamic>>[
+          for (final ToolCall c in msg.toolCalls) <String, dynamic>{'id': c.id, 'name': c.name, 'argLen': jsonEncode(c.args).length, 'bad': c.args.length == 1 && c.args.containsKey('_raw')},
+        ],
+        'text': msg.content,
+        'think': msg.thinking,
+        'err': msg.error,
+      });
+    } catch (_) {}
+  }
+
+  void _traceErr(int n, ApiException ae, String action, Stopwatch sw, {Map<String, dynamic>? extra, bool withBody = false}) {
+    try {
+      final int? st = ae.status;
+      final bool clientErr = st != null && st >= 400 && st < 500 && st != 408 && st != 409 && st != 429;
+      _tr('req_error', <String, dynamic>{
+        'n': n,
+        'action': action,
+        'status': st,
+        'net': ae.netError,
+        'retriable': ae.retriable,
+        'ms': sw.elapsedMilliseconds,
+        'err': ae.message,
+        'errBody': ae.body,
+        if (extra != null) ...extra,
+        if (withBody || clientErr) 'body': lastCall?.body,
+      });
+    } catch (_) {}
+  }
+
+  void _traceTool(ToolCall c, String text, bool isErr, int ms, int rep) {
+    try {
+      final List<Map<String, dynamic>> ap = RunTrace.takeApprovals();
+      _tr('tool', <String, dynamic>{
+        'id': c.id,
+        'name': c.name,
+        'ms': ms,
+        'isErr': isErr,
+        'argLen': jsonEncode(c.args).length,
+        'argKeys': c.args.keys.toList(),
+        'resLen': text.length,
+        'rep': rep,
+        'approvals': <Map<String, dynamic>>[for (final Map<String, dynamic> a in ap) <String, dynamic>{'how': a['how'], 'ok': a['ok'], 'ms': a['ms']}],
+        if (ap.isNotEmpty) 'ttl': <dynamic>[for (final Map<String, dynamic> a in ap) a['ttl']],
+        'args': c.args,
+        'raw': c.rawArgs,
+        'result': text,
+      });
+    } catch (_) {}
+  }
+
   bool _hasOutput(ChatMessage m) => m.content.isNotEmpty || m.thinking.isNotEmpty || m.toolCalls.isNotEmpty;
 
   /// يمسح ناتج جولة انقطعت (نص وتفكير وأدوات لم تُنفَّذ) ليعاد توليدها من الصفر.
@@ -589,26 +776,38 @@ class ChatSession extends ChangeNotifier {
     int tooLong = 0;
     _thinkStart = 0;
     while (true) {
+      final Stopwatch sw = Stopwatch()..start();
+      int ttfe = -1;
+      int ttft = -1;
+      int n = 0;
       try {
         final call = prepareCall(req);
         lastCall = call;
+        n = ++_reqNo;
+        _traceRequest(n, req, call, attempt: attempt, heals: heals, tooLong: tooLong);
         _sigSeen = 0;
         status = 'connecting';
         notifyListeners();
         await for (final ev in executeCall(call, req, _cancel!)) {
+          if (ttfe < 0) ttfe = sw.elapsedMilliseconds;
+          if (ttft < 0 && (ev.text.isNotEmpty || ev.thinking.isNotEmpty || ev.call != null)) ttft = sw.elapsedMilliseconds;
           _apply(msg, ev);
           _bump();
         }
         _finishThink(msg);
         if (_cancel?.isCancelled ?? false) {
           msg.stopReason = 'cancelled';
+          _traceResponse(n, msg, sw, ttfe, ttft, 'cancelled');
           return false;
         }
-        return _finalizeRound(msg);
+        final bool fin = _finalizeRound(msg);
+        _traceResponse(n, msg, sw, ttfe, ttft, fin ? 'ok' : 'empty_or_blocked');
+        return fin;
       } catch (e) {
         if (isCancel(e) || (_cancel?.isCancelled ?? false)) {
           _finishThink(msg);
           msg.stopReason = 'cancelled';
+          _tr('cancel', <String, dynamic>{'where': 'request', 'n': n, 'ms': sw.elapsedMilliseconds});
           return false;
         }
         final ae = await toApiException(e);
@@ -618,6 +817,7 @@ class ChatSession extends ChangeNotifier {
           if (await _shrinkContext(tooLong)) {
             try {
               req = await _buildRequest(msg);
+              _traceErr(n, ae, 'shrink', sw, extra: <String, dynamic>{'step': tooLong, 'dropped': ctxDropped});
               toast('السياق أطول من نافذة الموديل: قُصّت نتائج الأدوات القديمة وأُعيدت المحاولة');
               continue;
             } catch (_) {}
@@ -625,6 +825,7 @@ class ChatSession extends ChangeNotifier {
         }
         if (!partial && heals < 6 && req.tryHeal(ae)) {
           heals++;
+          _traceErr(n, ae, 'heal', sw, extra: <String, dynamic>{'healed': req.heal.toList(), 'mode': req.forcedMode});
           continue;
         }
         if (ae.retriable && attempt < 3) {
@@ -636,6 +837,7 @@ class ChatSession extends ChangeNotifier {
           // يحترم Retry-After إن أرسله الخادم، وإلا تأخير متصاعد (4، 8، 16 ثانية). الانتظار قابل للإلغاء بزر الإيقاف.
           final ra = ae.retryAfter;
           final wait = ra != null ? clampInt(ra, 1, 60) : clampInt(2 << attempt, 2, 20);
+          _traceErr(n, ae, 'retry', sw, extra: <String, dynamic>{'attempt': attempt, 'wait': wait, 'retryAfter': ra, 'partial': partial});
           for (int i = 0; i < wait; i++) {
             if (_cancel?.isCancelled ?? false) break;
             await Future<void>.delayed(const Duration(seconds: 1));
@@ -644,6 +846,7 @@ class ChatSession extends ChangeNotifier {
           continue;
         }
         _finishThink(msg);
+        _traceErr(n, ae, 'fail', sw, extra: <String, dynamic>{'partial': partial, 'heals': heals, 'attempt': attempt, 'tooLong': tooLong}, withBody: true);
         msg.error = isContextTooLong(ae) ? '${ae.message}\n\nالسياق أطول من نافذة الموديل حتى بعد القصّ والتلخيص. لخّص المحادثة من قائمتها أو ابدأ محادثة جديدة.' : ae.message;
         return false;
       }
@@ -725,6 +928,7 @@ class ChatSession extends ChangeNotifier {
         c.status = 'error';
         c.isError = true;
         c.result = 'Cancelled by the user';
+        _tr('tool', <String, dynamic>{'id': c.id, 'name': c.name, 'skipped': 'cancelled'});
         continue;
       }
       c.status = 'running';
@@ -732,6 +936,8 @@ class ChatSession extends ChangeNotifier {
       status = 'tool:${c.name}';
       if (sub == null) unawaited(KeepAlive.note(statusLabel(status)));
       notifyListeners();
+      final Stopwatch toolSw = Stopwatch()..start();
+      RunTrace.takeApprovals();
       // أداة task تحتاج الجلسة الأم نفسها (إيقافها وميزانيتها)؛ بقية الأدوات تمرّ على runTool.
       final out = (c.name == kToolTask && sub == null) ? await runTaskTool(this, c, agent, s) : await runTool(c, agent, s, convId: meta.id);
       // الأسرار لا تصل النموذج ولا تُحفظ في بطاقة الأداة (انظر redact.dart).
@@ -748,6 +954,7 @@ class ChatSession extends ChangeNotifier {
       c.result = text;
       c.isError = out.error;
       c.status = out.error ? 'error' : 'done';
+      _traceTool(c, text, out.error, toolSw.elapsedMilliseconds, rep);
       notifyListeners();
     }
     runningCall = null;
@@ -977,6 +1184,21 @@ class ChatSession extends ChangeNotifier {
   /// يلخّص الأجزاء القديمة (يبقى الدور الحالي وذيل حديث)، يستبعدها من السياق ويضع الملخّص مكانها.
   /// يعيد عدد الرسائل الملخّصة: 0 = لا حاجة، -1 = فشل (السبب في lastCompactError).
   Future<int> compact(AppSettings s, {required bool manual}) async {
+    final Stopwatch sw = Stopwatch()..start();
+    int before = 0;
+    try {
+      before = _included().length;
+    } catch (_) {}
+    int n = 0;
+    try {
+      n = await _compactImpl(s, manual: manual);
+      return n;
+    } finally {
+      _tr('compact', <String, dynamic>{'manual': manual, 'summarized': n, 'before': before, 'after': _included().length, 'ms': sw.elapsedMilliseconds, 'err': lastCompactError});
+    }
+  }
+
+  Future<int> _compactImpl(AppSettings s, {required bool manual}) async {
     lastCompactError = '';
     final h = _included();
     if (h.length < 3) return 0;
@@ -1232,6 +1454,7 @@ class SessionHub {
       s.stop();
     }
     await LocalStorage.remove('chats', id);
+    await RunTrace.purge(id);
     await CheckpointStore.purge(id);
     ReadLedger.forget(id);
     BashRuntime.forget(id);

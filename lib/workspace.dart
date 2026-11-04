@@ -753,23 +753,30 @@ class BashDecision {
 
 Future<BashDecision> approveBash(WorkspaceConfig w, String cwd, String command, String description, String convId, AppSettings s) async {
   final bool danger = BashPolicy.isDangerous(command) || (w.isLocal && LocalExec.touchesPrivate(command));
+  final Stopwatch apSw = Stopwatch()..start();
+  // سجل التشغيل: كيف اتُّخذ قرار هذا الأمر (تلقائي/مسموح مسبقاً/سُئل المستخدم) وكم انتظر.
+  BashDecision noted(String how, BashDecision d) {
+    RunTrace.noteApproval(how, d.allow, apSw.elapsedMilliseconds, danger ? 'bash:danger' : 'bash');
+    return d;
+  }
+
   if (!danger) {
-    if (BashPolicy.isQuiet(command)) return BashDecision(allow: true, command: command);
-    if (s.bashApproval == 'auto') return BashDecision(allow: true, command: command);
+    if (BashPolicy.isQuiet(command)) return noted('quiet', BashDecision(allow: true, command: command));
+    if (s.bashApproval == 'auto') return noted('auto', BashDecision(allow: true, command: command));
     final String? pre = BashPolicy.prefixFor(command);
-    if (pre != null && BashRuntime.isAllowed(convId, pre)) return BashDecision(allow: true, command: command);
+    if (pre != null && BashRuntime.isAllowed(convId, pre)) return noted('prefix-allowed', BashDecision(allow: true, command: command));
   }
   // وضع Terminal: الموافقة داخل السجل نفسه (نفس آلية askConfirm) بدل نافذة سفلية.
   if (inlineApprovalHosts > 0) {
     final List<String> tags = BashPolicy.riskTags(command, local: w.isLocal);
     final String title = danger ? 'أمر bash خطير' : 'أمر bash';
     final String body = '${w.name} · ${cwd.isEmpty ? '~' : cwd}\n\$ $command' + (description.trim().isEmpty ? '' : '\n— ${description.trim()}') + (tags.isEmpty ? '' : '\n[${tags.join(' · ')}]');
-    if (!danger && alwaysAllowed.contains('$title|$body')) return BashDecision(allow: true, command: command);
+    if (!danger && alwaysAllowed.contains('$title|$body')) return noted('always', BashDecision(allow: true, command: command));
     final bool ok = await requestInlineApproval(title, body, 'تنفيذ', 'رفض');
-    return BashDecision(allow: ok, command: command);
+    return noted('inline', BashDecision(allow: ok, command: command));
   }
   final BuildContext? ctx = navKey.currentContext;
-  if (ctx == null) return BashDecision(allow: false, command: command, reason: 'no UI available to ask the user');
+  if (ctx == null) return noted('no-ui', BashDecision(allow: false, command: command, reason: 'no UI available to ask the user'));
   final BashDecision? d = await showModalBottomSheet<BashDecision>(
     context: ctx,
     isScrollControlled: true,
@@ -780,7 +787,7 @@ Future<BashDecision> approveBash(WorkspaceConfig w, String cwd, String command, 
   );
   final BashDecision r = d ?? BashDecision(allow: false, command: command);
   if (r.allow && r.prefix.isNotEmpty) BashRuntime.allow(convId, r.prefix);
-  return r;
+  return noted(r.allow && r.prefix.isNotEmpty ? 'asked+remember' : 'asked', r);
 }
 
 // ---------------------------------------------------------------------

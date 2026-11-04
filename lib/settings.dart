@@ -540,6 +540,30 @@ class SettingsScreen extends ConsumerWidget {
               toast('تم نسخ: ${d.path}');
             },
           ),
+          _SwitchRow(
+            title: 'تسجيل سجل التشغيل (للتشخيص)',
+            subtitle: 'يحفظ على هاتفك فقط أزمنة وأحجام واستهلاك كل طلب ونتائج الأدوات (الأسرار محجوبة) لتصدّرها عند الحاجة لتشخيص الأداء. لا يُرسل لأي جهة. يُحذف الأقدم تلقائياً فوق 20 MB.',
+            value: s.traceOn,
+            onChanged: (v) => notifier.set('traceOn', v),
+          ),
+          _NavRow(
+            icon: Icons.tune,
+            title: 'مستوى تفاصيل تصدير السجل',
+            subtitle: '${traceLevelLabel(s.traceLevel)} — يمكن تغييره عند كل تصدير',
+            onTap: () => showTraceLevelSheet(context),
+          ),
+          _NavRow(
+            icon: Icons.delete_outline,
+            title: 'حذف سجلات التشغيل',
+            subtitle: 'يمحو سجلات كل المحادثات (لا يمسّ المحادثات نفسها)',
+            danger: true,
+            onTap: () async {
+              final bool ok = await confirmDialog(context, 'حذف سجلات التشغيل', 'سيُحذف سجل التشغيل لكل المحادثات. المحادثات نفسها لا تتأثر.', ok: 'حذف');
+              if (!ok) return;
+              final int n = await RunTrace.clearAll();
+              toast(n == 0 ? 'لا توجد سجلات' : 'حُذف $n ملف سجل');
+            },
+          ),
           _NavRow(
             icon: Icons.delete_sweep_outlined,
             title: 'حذف كل المحادثات',

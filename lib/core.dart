@@ -6,7 +6,7 @@ part of 'main.dart';
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
 // يجب أن يطابق `version:` في pubspec.yaml (يفحصه CI ويُفشل البناء عند الاختلاف).
-const String kAppVersion = '2.13.0';
+const String kAppVersion = '2.14.0';
 // رقم البناء الحقيقي: يحقنه CI عبر --dart-define=LM_BUILD=<run>-<sha7>؛ 'local' خارج CI.
 const String kBuildId = String.fromEnvironment('LM_BUILD', defaultValue: 'local');
 const String kOpenAI = 'openai';
@@ -313,11 +313,19 @@ void toast(String msg) {
 }
 
 Future<bool> askConfirm(String title, String body, {String ok = 'موافقة', String cancel = 'رفض'}) async {
+  final Stopwatch sw = Stopwatch()..start();
   if (inlineApprovalHosts > 0) {
-    if (alwaysAllowed.contains('$title|$body')) return true;
-    return requestInlineApproval(title, body, ok, cancel);
+    if (alwaysAllowed.contains('$title|$body')) {
+      RunTrace.noteApproval('always', true, 0, title);
+      return true;
+    }
+    final bool r = await requestInlineApproval(title, body, ok, cancel);
+    RunTrace.noteApproval('inline', r, sw.elapsedMilliseconds, title);
+    return r;
   }
-  return askConfirmDialog(title, body, ok: ok, cancel: cancel);
+  final bool r = await askConfirmDialog(title, body, ok: ok, cancel: cancel);
+  RunTrace.noteApproval('dialog', r, sw.elapsedMilliseconds, title);
+  return r;
 }
 
 Future<bool> askConfirmDialog(String title, String body, {String ok = 'موافقة', String cancel = 'رفض'}) async {

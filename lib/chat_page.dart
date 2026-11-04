@@ -294,6 +294,7 @@ class _ChatPageState extends ConsumerState<ChatPage> with WidgetsBindingObserver
             _menuItem('select', Icons.checklist, 'تحديد رسائل', p),
             _menuItem('rename', Icons.drive_file_rename_outline, 'إعادة تسمية', p),
             _menuItem('export', Icons.ios_share, 'تصدير المحادثة', p),
+            _menuItem('trace', Icons.receipt_long_outlined, 'تصدير سجل التشغيل', p),
             _menuItem('delete', Icons.delete_outline, 'حذف المحادثة', p),
           ],
         ),
@@ -331,6 +332,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with WidgetsBindingObserver
         break;
       case 'export':
         exportConversation(context, session);
+        break;
+      case 'trace':
+        showTraceExportSheet(context, session.meta.id, session.meta.title);
         break;
       case 'delete':
         if (session.messages.isEmpty) {

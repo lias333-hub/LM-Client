@@ -64,6 +64,13 @@ class AppSettings {
     final int v = _i('checkpointRounds', 0);
     return v <= 0 ? 0 : (v < 5 ? 5 : (v > 500 ? 500 : v));
   }
+  /// سجل التشغيل المحلي (run_trace.dart): تسجيل دائم لكل طلب وأداة، يُصدَّر عند الحاجة. لا يُرسل لأي جهة.
+  bool get traceOn => _b('traceOn', true);
+  /// مستوى تفاصيل التصدير: numbers | standard | full (التسجيل نفسه يخزّن المحتوى بسقوف؛ المستوى يفلتر التصدير فقط).
+  String get traceLevel {
+    final String v = _s('traceLevel', 'standard');
+    return v == 'numbers' || v == 'full' ? v : 'standard';
+  }
   bool get promptCache => _b('promptCache', true);
   bool get trimOldResults => _b('trimOldResults', true);
   // behaviour

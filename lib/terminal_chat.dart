@@ -44,6 +44,7 @@ const List<_Cmd> _kCmds = <_Cmd>[
   _Cmd('/think', 'مستوى التفكير: off low mid high', arg: true),
   _Cmd('/compact', 'تلخيص السياق الآن'),
   _Cmd('/summary', 'ملخّص خطوات آخر تشغيل واستهلاكه'),
+  _Cmd('/trace', 'تصدير سجل التشغيل (للتشخيص)'),
   _Cmd('/retry', 'إعادة توليد آخر رد'),
   _Cmd('/copy', 'نسخ آخر رد'),
   _Cmd('/cd', 'تحديد مجلد المشروع', arg: true),
@@ -266,6 +267,9 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
         break;
       case '/summary':
         showSummarySheet(context, s);
+        break;
+      case '/trace':
+        showTraceExportSheet(context, s.meta.id, s.meta.title);
         break;
       case '/retry':
         s.regenerate();
