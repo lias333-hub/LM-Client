@@ -151,10 +151,18 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       print('LMPROBE|SHOT summary');
       await Future<void>.delayed(const Duration(seconds: 9));
       if (mounted) Navigator.of(context).pop();
-      for (final String kind in <String>['chatdone', 'chatlive', 'termlive', 'settings', 'behaviour', 'about']) {
+      final String traceConv = await seedPreviewTrace();
+      if (!mounted) return;
+      unawaited(showTraceExportSheet(context, traceConv, 'Fix the failing test', dir: TextDirection.rtl));
+      await Future<void>.delayed(const Duration(seconds: 4));
+      // ignore: avoid_print
+      print('LMPROBE|SHOT tracesheet');
+      await Future<void>.delayed(const Duration(seconds: 6));
+      if (mounted) Navigator.of(context).pop();
+      for (final String kind in <String>['data', 'chatdone', 'chatlive', 'termlive', 'settings', 'behaviour', 'about']) {
         await Future<void>.delayed(const Duration(seconds: 1));
         if (!mounted) return;
-        final bool isSettings = kind == 'settings' || kind == 'behaviour' || kind == 'about';
+        final bool isSettings = kind == 'data' || kind == 'settings' || kind == 'behaviour' || kind == 'about';
         unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
             builder: (BuildContext c) => isSettings
                 ? UncontrolledProviderScope(container: appContainer, child: Directionality(textDirection: TextDirection.rtl, child: SettingsScreen(section: kind == 'settings' ? null : kind)))

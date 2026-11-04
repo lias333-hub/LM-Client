@@ -5,7 +5,7 @@ part of 'main.dart';
 // =====================================================================
 
 /// ورقة التصدير: تعرض حجم السجل وتتيح اختيار المستوى لهذا التصدير (المسبق من الإعدادات)، ثم نسخ أو حفظ كملف.
-Future<void> showTraceExportSheet(BuildContext context, String convId, String title) async {
+Future<void> showTraceExportSheet(BuildContext context, String convId, String title, {TextDirection? dir}) async {
   final TraceInfo info = await RunTrace.info(convId);
   if (info.records == 0) {
     toast('لا يوجد سجل تشغيل لهذه المحادثة بعد. شغّل مهمة أولاً ثم صدّره.');
@@ -16,7 +16,7 @@ Future<void> showTraceExportSheet(BuildContext context, String convId, String ti
   await showSheet<void>(context, (BuildContext c) {
     return StatefulBuilder(builder: (BuildContext c2, StateSetter setS) {
       final Pal p = pal(c2);
-      return SafeArea(
+      final Widget sheet = SafeArea(
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
             const SheetHandle(),
@@ -72,6 +72,8 @@ Future<void> showTraceExportSheet(BuildContext context, String convId, String ti
           ]),
         ),
       );
+      // dir: للمعاينة في فحص CI فقط (تطبيقه الحقيقي يرث الاتجاه من الواجهة).
+      return dir == null ? sheet : Directionality(textDirection: dir, child: sheet);
     });
   });
 }

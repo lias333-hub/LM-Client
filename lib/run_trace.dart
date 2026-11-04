@@ -429,6 +429,25 @@ class RunTrace {
   }
 }
 
+/// بيانات معاينة لفحص CI البصري فقط: تشغيل واقعي مختصر في محادثة وهمية. يعيد معرّفها.
+Future<String> seedPreviewTrace() async {
+  const String conv = 'preview-trace';
+  const String run = 'rpreview1';
+  await RunTrace.purge(conv);
+  final bool prev = appContainer.read(settingsProvider).traceOn;
+  appContainer.read(settingsProvider.notifier).set('traceOn', true);
+  RunTrace.log(conv, run, 'run_start', <String, dynamic>{'app': kAppVersion, 'build': kBuildId, 'msgs': 5, 'provider': 'gemini', 'host': 'generativelanguage.googleapis.com', 'model': 'gemini-3.5-flash', 'user': 'fix the failing test in lib/store.dart'});
+  for (int i = 1; i <= 3; i++) {
+    RunTrace.log(conv, run, 'request', <String, dynamic>{'n': i, 'attempt': 0, 'msgs': 4 + 2 * i, 'bytes': 18000 + 9000 * i, 'tools': 14});
+    RunTrace.log(conv, run, 'response', <String, dynamic>{'n': i, 'ok': 'ok', 'ms': 2400 + 700 * i, 'ttfe': 600, 'ttft': 900, 'in': 5200 * i, 'cache': 4100 * i, 'out': 140, 'thinkTok': 0, 'exact': true, 'stop': i < 3 ? 'tool_use' : 'end_turn'});
+    if (i < 3) RunTrace.log(conv, run, 'tool', <String, dynamic>{'name': i == 1 ? 'read_file' : 'edit_file', 'ms': 80 * i, 'isErr': false, 'argLen': 60, 'resLen': 2400, 'args': <String, dynamic>{'path': 'lib/store.dart'}, 'result': 'ok'});
+  }
+  RunTrace.log(conv, run, 'run_end', <String, dynamic>{'reason': 'done', 'rounds': 3, 'reqs': 3, 'ms': 11800, 'in': 31200, 'cache': 24600, 'out': 420, 'thinkTok': 0, 'noUsage': 0});
+  await RunTrace.flush(conv);
+  appContainer.read(settingsProvider.notifier).set('traceOn', prev);
+  return conv;
+}
+
 // ---------------------------------------------------------------------
 //  اختبار ذاتي (يُشغَّل من فحص المحاكي في الـ CI): تسجيل حقيقي عبر خادم وهمي، حجب الأسرار، مستويات التصدير، الأسقف.
 // ---------------------------------------------------------------------
