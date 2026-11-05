@@ -1,4 +1,4 @@
 signing=stable (repo secret)
-apk_bytes=27688620
+apk_bytes=27688486
 V2 Signer: certificate DN: CN=LMClient Debug, O=LMClient, C=US
 V2 Signer: certificate SHA-256 digest: 33a10b9d7dee8ba9adc39832649325e10fb579ebcff10d265b3757a4e3ad3f33
