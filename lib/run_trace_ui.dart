@@ -4,6 +4,9 @@ part of 'main.dart';
 //  واجهة سجل التشغيل: ورقة التصدير (من قائمة المحادثة ⋮ ومن الأمر /trace) وورقة اختيار المستوى الافتراضي (الإعدادات).
 // =====================================================================
 
+/// يعزل مقطعاً لاتينياً/رقمياً (مثل «1.5 KB») عن اتجاه النص العربي المحيط، وإلا يُعرض معكوساً («KB 1.5»).
+String _ltrIso(String s) => '\u2066$s\u2069';
+
 /// ورقة التصدير: تعرض حجم السجل وتتيح اختيار المستوى لهذا التصدير (المسبق من الإعدادات)، ثم نسخ أو حفظ كملف.
 Future<void> showTraceExportSheet(BuildContext context, String convId, String title, {TextDirection? dir}) async {
   final TraceInfo info = await RunTrace.info(convId);
@@ -22,7 +25,7 @@ Future<void> showTraceExportSheet(BuildContext context, String convId, String ti
             const SheetHandle(),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-              child: Text('سجل التشغيل · ${info.runs} تشغيل · ${fmtBytes(info.bytes)}', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w600)),
+              child: Text('سجل التشغيل · ${info.runs} تشغيل · ${_ltrIso(fmtBytes(info.bytes))}', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w600)),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -44,12 +47,12 @@ Future<void> showTraceExportSheet(BuildContext context, String convId, String ti
               onTap: () async {
                 final String txt = await RunTrace.build(convId, title, level);
                 if (txt.length > 300000) {
-                  toast('الحجم كبير للنسخ (${fmtBytes(txt.length)}). احفظه كملف بدلاً من ذلك.');
+                  toast('الحجم كبير للنسخ (${_ltrIso(fmtBytes(txt.length))}). احفظه كملف بدلاً من ذلك.');
                   return;
                 }
                 await Clipboard.setData(ClipboardData(text: txt));
                 if (c2.mounted) Navigator.pop(c2);
-                toast('تم نسخ سجل التشغيل (${fmtBytes(txt.length)})');
+                toast('تم نسخ سجل التشغيل (${_ltrIso(fmtBytes(txt.length))})');
               },
             ),
             SheetAction(
