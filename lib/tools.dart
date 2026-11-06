@@ -199,6 +199,10 @@ class PathGuard {
 
   static bool _under(String r, String root) => r == root || r.startsWith('$root/');
 
+  /// حاجز ثابت لا يعتمد على التهيئة: بيانات أي تطبيق خاصة (ومنها مفاتيح هذا التطبيق) لا تُفتح أبداً عبر أدوات الملفات،
+  /// حتى لو فشلت [init] أو أعطى المستخدم وكيلاً مجلداً مسموحاً داخل /data.
+  static final RegExp _appData = RegExp(r'^/data/(data|user|user_de)(/|$)');
+
   static String normalize(String raw) {
     var p = raw.trim();
     if (p == '/sdcard' || p.startsWith('/sdcard/')) p = PhoneStorage.root + p.substring('/sdcard'.length);
@@ -244,6 +248,7 @@ class PathGuard {
 
   /// مسار حقيقي (بعد حلّ الروابط) داخل مجلدات التطبيق الخاصة أو مسارات النظام؟ (للبحث المتكرر: لا ندخلها أبداً.)
   static bool isDenied(String realPath) {
+    if (_appData.hasMatch(realPath)) return true;
     for (final d in _denied) {
       if (_under(realPath, d)) return true;
     }
@@ -258,6 +263,7 @@ class PathGuard {
     if (raw.trim().isEmpty) throw const ToolError('Path is empty');
     final n = normalize(raw);
     final r = realOf(n);
+    if (_appData.hasMatch(r)) throw const ToolError("Access to the app's private data is blocked");
     for (final d in _denied) {
       if (_under(r, d)) throw const ToolError("Access to the app's private data is blocked");
     }

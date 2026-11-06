@@ -502,6 +502,12 @@ final quoteProvider = NotifierProvider<QuoteNotifier, String?>(QuoteNotifier.new
 // ---------------------------------------------------------------------
 Future<void> bootstrap() async {
   final c = appContainer;
+  // حارس المسارات أولاً وبمعزل عن بقية التحميل: فشل أي مخزن لا يجوز أن يترك مجلدات التطبيق الخاصة بلا حماية.
+  try {
+    await PathGuard.init();
+  } catch (e) {
+    debugPrint('path guard init failed: $e');
+  }
   try {
     await c.read(settingsProvider.notifier).load();
     await c.read(profilesProvider.notifier).load();
@@ -519,7 +525,6 @@ Future<void> bootstrap() async {
     } catch (e) {
       debugPrint('migrate failed: $e');
     }
-    await PathGuard.init();
   } catch (e) {
     debugPrint('bootstrap failed: $e');
   } finally {

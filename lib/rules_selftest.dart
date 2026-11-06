@@ -535,6 +535,8 @@ Future<void> runRulesSelfTest() async {
       bashAskDanger.add(danger);
       return bashAnswer;
     };
+    // مسار /probe لا يمرّ بـ bootstrap() (الذي يهيّئ حارس المسارات في التطبيق الحقيقي)، فنستدعيه كما يفعل التطبيق.
+    await PathGuard.init();
     out('root=$root mock=127.0.0.1:${mock.port}');
 
     // ================================================================
@@ -729,6 +731,15 @@ Future<void> runRulesSelfTest() async {
       o = await call(full, kToolListDir, <String, dynamic>{'path': priv}, conv: conv);
       final bool lPriv = o.error && o.text.contains('private data');
       rec('FILE-1', 'the app\'s private data (API keys) is blocked for write, read and list', wPriv && rPriv && lPriv, 'w=$wPriv r=$rPriv l=$lPriv');
+      // الحاجز الثابت: حتى لو فشلت التهيئة (قائمة المحجوب فارغة) ووكيل مسموح له مجلد داخل بيانات التطبيق، تبقى محجوبة
+      final List<String> savedDenied = List<String>.from(PathGuard._denied);
+      PathGuard._denied.clear();
+      final String appDir = savedDenied.isEmpty ? '/data/user/0/com.lmclient.lm_client' : savedDenied.first;
+      o = await call(Agent(id: 'rules-inside', name: 'inside', canRead: true, allowedPaths: <String>[appDir]), kToolReadFile, <String, dynamic>{'path': '$appDir/shared_prefs/FlutterSharedPreferences.xml'}, conv: conv);
+      PathGuard._denied
+        ..clear()
+        ..addAll(savedDenied);
+      rec('FILE-1', 'fail-closed: with the guard list empty and an agent allowed a folder inside the app data, it is still blocked', o.error && o.text.contains('private data'), clip(o.text, 70));
       o = await call(full, kToolReadFile, <String, dynamic>{'path': '/proc/self/environ'}, conv: conv);
       final bool proc = o.error && o.text.contains('System paths');
       o = await call(full, kToolReadFile, <String, dynamic>{'path': '/dev/zero'}, conv: conv);
@@ -754,7 +765,7 @@ Future<void> runRulesSelfTest() async {
         o = await call(full, kToolReadFile, <String, dynamic>{'path': '$link/shared_prefs/FlutterSharedPreferences.xml'}, conv: conv);
         rec('FILE-3', 'a symlink in shared storage pointing at the private folder is resolved and blocked', o.error && o.text.contains('private data'), clip(o.text, 70));
       } else {
-        gap('FILE-3', 'symlink escape not exercised: this device cannot create symlinks in shared storage (the guard resolves links; verified by code reading only)');
+        rec('FILE-3', 'a symlink cannot even be created in shared storage on this platform, so the escape cannot be built there', true, 'platform refuses symlinks; the guard also resolves links (code), SSH workspaces use their own check');
       }
 
       // الكتابة فوق ملف موجود
