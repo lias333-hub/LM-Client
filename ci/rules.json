@@ -11,7 +11,7 @@
     {"id": "BASH-10", "class": "code", "text": "Auto mode runs ordinary commands without asking (by design; the user chose it)", "tests": ["RULES:BASH-10"]},
     {"id": "BASH-13", "class": "code", "text": "A refused command is not executed and the model is told", "tests": ["RULES:BASH-13"]},
     {"id": "BASH-14", "class": "code", "text": "A command over 60,000 characters is rejected before approval", "tests": ["RULES:BASH-14"]},
-    {"id": "BASH-8", "class": "gap", "text": "The danger list is a pattern list, not a proof: inline interpreters, script files and other indirection can still hide a destructive command", "tests": ["RULES:BASH-8"]},
+    {"id": "BASH-8", "class": "gap", "text": "The danger list is a pattern list, not a proof: script files the model wrote, make targets, awk/sed programs and other indirection can still hide a destructive command", "tests": ["RULES:BASH-8"]},
     {"id": "PLAN-1", "class": "code", "text": "Plan mode blocks every call that changes anything", "tests": ["PLAN:plan mode blocks write_file", "PLAN:plan mode bash: anything that can change state is blocked", "PLAN:plan mode bash: background jobs are blocked"]},
     {"id": "SUB-1", "class": "code", "text": "A sub-agent is read-only and cannot start another sub-agent", "tests": ["E2E:sub-agent cannot write", "E2E:sub-agent policy"]},
     {"id": "SUB-2", "class": "code", "text": "A sub-agent stops at its own round cap and still reports", "tests": ["E2E:sub-agent round cap"]},

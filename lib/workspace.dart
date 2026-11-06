@@ -725,6 +725,8 @@ class BashPolicy {
     _DangerRule('fork-bomb', RegExp(r':\(\)\s*\{')),
     _DangerRule('docker', RegExp(r'\bdocker(?:-compose)?\s+(?:\S+\s+)*?(?:prune|rm|rmi|kill)(?=\s|$)|\bdocker\s+run\b[^|;&\n]*(?:--privileged|\s-v\s*/:|--pid=host|docker\.sock)')),
     _DangerRule('pkg-remove-publish', RegExp(r'\b(?:apt(?:-get)?|yum|dnf|pacman|apk|brew|snap|pip3?|npm|pnpm|yarn|cargo|gem)\s+(?:-\S+\s+)*(?:remove|purge|uninstall|autoremove|erase|publish|unpublish|deprecate)\b|\btwine\s+upload\b')),
+    _DangerRule('inline-code', RegExp(r'\b(?:python[0-9.]*\s+(?:-\S+\s+)*-[a-zA-Z]*c|(?:node|nodejs)\s+(?:-\S+\s+)*(?:-e|-p|--eval|--print)|perl\s+(?:-\S+\s+)*-[a-zA-Z]*[eE]|ruby\s+(?:-\S+\s+)*-[a-zA-Z]*e|lua\s+(?:-\S+\s+)*-e|php\s+(?:-\S+\s+)*-r)(?=\s|$)|\b(?:python[0-9.]*|perl|ruby|node|nodejs|php)\s+(?:-\s+)?<<')),
+    _DangerRule('net-write', RegExp(r'\b(?:curl|wget|http|https|xh)\s+(?:[^|;&\n]*\s)?(?:-X\s*\S+|--request(?:=|\s)\S+|--method(?:=|\s)\S+|-d(?=\s|$)|--data[a-z-]*|-F(?=\s|$)|--form|-T(?=\s|$)|--upload-file|--post-(?:data|file)|-u(?=\s|$)|--user(?:=|\s)|--password|-b(?=\s|$)|--cookie|--oauth2-bearer|--netrc|(?:-H|--header)(?:=|\s+)[^|;&\n]*?(?:[Aa]uthorization|[Aa][Pp][Ii][-_ ]?[Kk]ey|[Bb]earer|[Tt]oken|[Cc]ookie))')),
     _DangerRule('gh-write', RegExp(r'\bgh\s+(?:repo\s+(?:delete|edit|create)|release\s+delete|secret|auth\s+token|api\s+(?:[^|;&\n]*\s)?-X\s*(?:DELETE|PUT|PATCH|POST))')),
   ];
 

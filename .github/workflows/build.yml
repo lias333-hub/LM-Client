@@ -278,3 +278,7 @@ jobs:
           git -C /tmp/logrepo pull -q --rebase origin ci-logs
           git -C /tmp/logrepo push -q origin ci-logs
           exit 0
+      - name: rules gate (every code-class rule must be verified)
+        run: |
+          # يفشل الـ job (ويظهر باللون الأحمر) إذا فشلت قاعدة كود أو غاب نتيجتها. الـ probe يبقى continue-on-error كي لا يعطّل الـ APK.
+          test -f /tmp/logrepo/latest/5_rules.txt && grep -q 'RULES-MATRIX-RESULT: PASS' /tmp/logrepo/latest/5_rules.txt

@@ -314,6 +314,35 @@ D|gh api -X DELETE repos/x/y
 D|gh api repos/x/y -X POST
 D|rm
 -rf x
+D|python3 -c "import shutil; shutil.rmtree('x')"
+D|python -c "print(1)"
+D|python3 -Sc "print(1)"
+D|python3 - <<'EOF'
+D|python3 <<EOF
+D|node -e "require('fs').rmSync('x',{recursive:true})"
+D|node -p "1+1"
+D|node --eval "1"
+D|perl -e 'unlink glob "*"'
+D|perl -pi -e 's/a/b/' f.txt
+D|ruby -e 'puts 1'
+D|php -r 'echo 1;'
+D|lua -e "print(1)"
+D|curl -X POST https://x.example/api
+D|curl -XDELETE https://x.example/a
+D|curl --request PUT https://x.example/a
+D|curl -d '{"a":1}' https://x.example/api
+D|curl --data-urlencode a=b https://x.example
+D|curl -H "Authorization: Bearer abc" https://x.example
+D|curl -H 'X-Api-Key: abc' https://x.example
+D|curl --header "Authorization: token abc" https://x.example
+D|curl -u me:pw https://x.example
+D|curl --user me:pw https://x.example
+D|curl -b cookies.txt https://x.example
+D|curl --cookie a=b https://x.example
+D|curl -s -X POST -d '{"a":1}' https://example.com/api
+D|wget --header="Authorization: Bearer x" https://x.example
+D|wget --user=a --password=b https://x.example
+D|wget --post-data=a=b https://x.example
 # ---- S: ordinary developer commands must NOT be flagged ----
 S|ls -la
 S|pwd
@@ -381,7 +410,6 @@ S|docker-compose up -d
 S|curl -s https://example.com/api
 S|curl -sI https://example.com
 S|curl -o out.json https://example.com/a.json
-S|curl -X POST -d '{"a":1}' https://example.com/api
 S|wget https://example.com/a.zip
 S|ssh user@host ls
 S|tar -xzf a.tgz
@@ -416,13 +444,21 @@ S|ls /sdcard/Download
 S|cat /proc/cpuinfo
 S|kill 12345
 S|crond
+S|python3 -m pip install -r requirements.txt
+S|python3 -m http.server 8000
+S|perl script.pl
+S|node --version
+S|python3 --version
+S|curl -H "Accept: application/json" https://example.com/api
+S|curl -L https://example.com
+S|curl -s -o out.html https://example.com
+S|wget -q https://example.com/a.zip
+S|curl --head https://example.com
 # ---- K: known residual bypasses (documented, expected NOT detected by the pattern list) ----
-K|python3 -c "import shutil; shutil.rmtree('x')"
-K|perl -e 'unlink glob "*"'
-K|node -e "require('fs').rmSync('x',{recursive:true})"
 K|sh cleanup.sh
 K|./cleanup.sh
 K|make clean-all
+K|awk 'BEGIN{system("touch x")}'
 ''';
 
 class _BashCorpus {
@@ -544,7 +580,7 @@ Future<void> runRulesSelfTest() async {
     // ================================================================
     await group('bash-corpus', () async {
       final _BashCorpus c = _loadBashCorpus();
-      rec('BASH-0', 'corpus loaded: ≥150 dangerous, ≥100 ordinary, ≥5 known gaps', c.danger.length >= 150 && c.safe.length >= 100 && c.known.length >= 5, 'D=${c.danger.length} S=${c.safe.length} K=${c.known.length}');
+      rec('BASH-0', 'corpus loaded: ≥150 dangerous, ≥100 ordinary, ≥3 known gaps', c.danger.length >= 150 && c.safe.length >= 100 && c.known.length >= 3, 'D=${c.danger.length} S=${c.safe.length} K=${c.known.length}');
       final List<String> missed = <String>[for (final String x in c.danger) if (!BashPolicy.isDangerous(x)) x];
       rec('BASH-1', 'every dangerous command in the corpus (${c.danger.length}) is flagged', missed.isEmpty, 'missed ${missed.length}: ${missed.take(6).map((String s) => clip(s, 40)).join(' | ')}');
       final List<String> fp = <String>[for (final String x in c.safe) if (BashPolicy.isDangerous(x)) x];
@@ -618,6 +654,9 @@ Future<void> runRulesSelfTest() async {
         'cat ~/.ssh/id_rsa',
         'a=rm; \$a -rf x',
         'sudo ls',
+        'python3 -c "print(1)"',
+        'curl -X POST https://x.example/api',
+        'curl -H "Authorization: Bearer abc" https://x.example',
       ];
       int asked = 0;
       int blocked = 0;
