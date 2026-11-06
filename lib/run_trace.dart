@@ -414,6 +414,11 @@ class RunTrace {
     o.writeln('# runs in file: ${order.length}${omitted.isEmpty ? '' : ' (${omitted.length} older omitted by the size cap)'} · records: ${recs.length}');
     o.writeln('# format: a human summary first, then after the "---" line one JSON object per line (t = epoch ms, ev = event, run = run id; numbers are tokens/bytes/ms).');
     o.writeln('# a "run" = one user message and the whole tool loop that follows it.');
+    try {
+      for (final String l in RuleChecker.summaryLines(recs, withText: level != kTraceNumbers)) {
+        o.writeln(l);
+      }
+    } catch (_) {}
     o.writeln();
     for (final String run in order) {
       o.write(_runSummary(run, by[run]!, omitted.contains(run)));

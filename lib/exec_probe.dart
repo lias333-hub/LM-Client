@@ -83,6 +83,7 @@ class _ExecProbeScreenState extends State<ExecProbeScreen> {
       await runPlanningSelfTest();
       await runKeepAliveSelfTest();
       await runSkillsSelfTest(ghBranch: widget.ghBranch);
+      await runRulesSelfTest();
       final Map<String, dynamic>? cfg = widget.sshCfg;
       if (cfg != null) await runSshSelfTest(cfg);
       await _uiPreview();

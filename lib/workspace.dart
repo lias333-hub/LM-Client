@@ -671,6 +671,12 @@ done
 // ---------------------------------------------------------------------
 //  Approval policy
 // ---------------------------------------------------------------------
+class _DangerRule {
+  final String id;
+  final RegExp re;
+  const _DangerRule(this.id, this.re);
+}
+
 class BashPolicy {
   static final RegExp _compound = RegExp(r'[;&|<>`\n]|\$\(|\$\{');
 
@@ -682,29 +688,59 @@ class BashPolicy {
   };
   static const Set<String> _quiet = <String>{'pwd', 'ls', 'date', 'whoami', 'uname'};
 
-  static final List<RegExp> _danger = <RegExp>[
-    RegExp(r'\brm\s+(-[a-zA-Z]*[rR][a-zA-Z]*\s+|--recursive\s+)'),
-    RegExp(r'\bsudo\b'),
-    RegExp(r'\bsu\s'),
-    RegExp(r'\bmkfs'),
-    RegExp(r'\bdd\s+[^|;]*of='),
-    RegExp(r'>\s*/dev/(sd|nvme|mmcblk)'),
-    RegExp(r'\bchmod\s+-R\b'),
-    RegExp(r'\bchown\s+-R\b'),
-    RegExp(r'git\s+push\s+[^|;]*(--force|-f\b)'),
-    RegExp(r'git\s+(reset\s+--hard|clean\s+-[a-z]*f)'),
-    RegExp(r'(curl|wget)\s[^|;]*\|\s*(sudo\s+)?(ba|z)?sh\b'),
-    RegExp(r':\(\)\s*\{'),
-    RegExp(r'\b(shutdown|reboot|halt|poweroff)\b'),
-    RegExp(r'\bkillall\b|\bpkill\b'),
+  /// قواعد الأوامر الخطرة: تُسأل دائماً (حتى في وضع auto) ولا تُحفظ بادئة لها. قائمة أنماط، لا برهان أمان: الثغرات المعروفة مدرجة في فحص RULES (known-gap).
+  static final List<_DangerRule> _danger = <_DangerRule>[
+    _DangerRule('rm-recursive', RegExp(r'\brm\s+(?:[^|;&\n]*\s)?(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?=\s|$)')),
+    _DangerRule('rm-wildcard-root', RegExp(r'\brm\s+(?:[^|;&\n]*\s)?(?:/\*?|~/?\*?|\$HOME/?\*?|\*)(?=\s|$)')),
+    _DangerRule('sudo', RegExp(r'\b(?:sudo|doas)\b')),
+    _DangerRule('su', RegExp(r'(?:^|[;&|\s(])su(?:\s|$)')),
+    _DangerRule('disk', RegExp(r'\b(?:mkfs[a-z0-9.]*|fdisk|sfdisk|parted|wipefs|cryptsetup|mkswap|blkdiscard|shred)\b')),
+    _DangerRule('dd', RegExp(r'\bdd\s+[^|;]*of=')),
+    _DangerRule('redir-dev', RegExp(r'>\s*/dev/(?!null\b|stdout\b|stderr\b|tty\b|zero\b|fd/)')),
+    _DangerRule('chmod-chown-R', RegExp(r'\b(?:chmod|chown|chgrp)\s+(?:[^|;&\n]*\s)?(?:-[a-zA-Z]*R[a-zA-Z]*|--recursive)(?=\s|$)')),
+    _DangerRule('chmod-777', RegExp(r'\bchmod\s+(?:-\S+\s+)*(?:0?777|a\+rwx|ugo\+rwx)\b')),
+    _DangerRule('git-push-force', RegExp(r'\bgit\s+(?:[^|;&\n]*\s)?push\b[^|;&\n]*(?:--force|--mirror|--delete|\s-[a-zA-Z]*f[a-zA-Z]*(?=\s|$)|\s\+\S|\s:\S)')),
+    _DangerRule('git-reset-hard', RegExp(r'\bgit\s+(?:[^|;&\n]*\s)?reset\s+(?:[^|;&\n]*\s)?--hard')),
+    _DangerRule('git-clean-force', RegExp(r'\bgit\s+(?:[^|;&\n]*\s)?clean\s+(?:[^|;&\n]*\s)?(?:-[a-zA-Z]*f|--force)')),
+    _DangerRule('git-checkout-discard', RegExp(r'\bgit\s+(?:[^|;&\n]*\s)?checkout\s+(?:[^|;&\n]*\s)?(?:-f|--force|--)(?=\s|$)')),
+    _DangerRule('git-restore', RegExp(r'\bgit\s+(?:[^|;&\n]*\s)?restore\b(?![^|;&\n]*--staged)')),
+    _DangerRule('git-destroy', RegExp(r'\bgit\s+(?:[^|;&\n]*\s)?(?:branch\s+(?:[^|;&\n]*\s)?-D(?=\s|$)|stash\s+(?:drop|clear)|reflog\s+expire|filter-branch|update-ref\s+-d|gc\s+--prune|remote\s+(?:set-url|add|rm|remove))')),
+    _DangerRule('fetch-pipe-exec', RegExp(r'\b(?:curl|wget|fetch|aria2c)\b[^;&\n]*\|\s*(?:sudo\s+|env\s+)*(?:(?:ba|z|da|k|c)?sh|python[0-9.]*|perl|ruby|node|php|lua|source|eval|xargs)\b')),
+    _DangerRule('pipe-to-shell', RegExp(r'\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh(?:\s|$)')),
+    _DangerRule('pipe-to-interp-stdin', RegExp(r'\|\s*(?:python[0-9.]*|perl|ruby|node|php)(?:\s+-)?\s*(?:$|[;&|])')),
+    _DangerRule('subst-fetch', RegExp(r'(?:\$\(|<\(|`)\s*(?:curl|wget)\b')),
+    _DangerRule('eval', RegExp(r'\beval\b')),
+    _DangerRule('source-process', RegExp(r'(?:\bsource|^\.)\s+<')),
+    _DangerRule('dynamic-command', RegExp(r'(?:^|[;&|(]\s*)(?:\$\{?[A-Za-z_]\w*\}?(?:\$|\s|$)|\$\(|`)')),
+    _DangerRule('upload-file', RegExp(r'\b(?:curl|wget)\b[^|;&\n]*(?:\s-[dF]\s*\S*@|\s--(?:data[a-z-]*|form|json)(?:=|\s+)\S*@|\s(?:-T|--upload-file|--post-file)(?:=|\s))')),
+    _DangerRule('raw-sockets', RegExp(r'\b(?:nc|ncat|netcat|socat|telnet)\b')),
+    _DangerRule('credential-paths', RegExp(r'(?:\.ssh(?:/|\s|$)|\.gnupg|\.aws/|\.netrc|\.git-credentials|\.npmrc|\.pgpass|\.docker/config|\.kube/config|id_(?:rsa|dsa|ecdsa|ed25519)|/etc/shadow|\.config/gcloud|\.claude\.json)')),
+    _DangerRule('find-destroy', RegExp(r'\bfind\b[^|;&\n]*(?:-delete\b|-exec(?:dir)?\s+(?:rm|shred|mv|chmod|chown|dd)\b|-ok\s)')),
+    _DangerRule('xargs-destroy', RegExp(r'\bxargs\b[^|;&\n]*\b(?:rm|shred|mv|chmod|chown|dd|kill)\b')),
+    _DangerRule('write-system-dir', RegExp(r'(?:>|\btee\b(?:\s+-a)?)\s*/(?:etc|boot|usr|bin|sbin|lib|lib64|system|vendor|proc|sys)/')),
+    _DangerRule('persistence', RegExp(r'(?:>|\btee\b(?:\s+-a)?)\s*\S*(?:\.bashrc|\.bash_profile|\.profile|\.zshrc|authorized_keys|\.git/hooks/|/etc/cron)|\bcrontab\b')),
+    _DangerRule('system-control', RegExp(r'\b(?:shutdown|reboot|halt|poweroff|systemctl\s+(?:stop|disable|mask|kill|isolate|poweroff|reboot)|setenforce|iptables|ip6tables|nft|ufw|firewall-cmd|mount|umount|swapoff|insmod|rmmod|modprobe|sysctl\s+-w|passwd|userdel|usermod|groupdel|visudo|useradd|adduser)\b|\binit\s+[06]\b|\bservice\s+\S+\s+(?:stop|disable)\b')),
+    _DangerRule('android-control', RegExp(r'\b(?:pm\s+(?:uninstall|clear|disable|disable-user|hide|suspend)|settings\s+put|setprop|am\s+(?:force-stop|kill|kill-all|crash)|svc|locksettings|fastboot|recovery)\b')),
+    _DangerRule('kill', RegExp(r'\bkillall\b|\bpkill\b|\bkill\s+(?:-\S+\s+)*(?:-1|1)(?=\s|$)')),
+    _DangerRule('fork-bomb', RegExp(r':\(\)\s*\{')),
+    _DangerRule('docker', RegExp(r'\bdocker(?:-compose)?\s+(?:\S+\s+)*?(?:prune|rm|rmi|kill)(?=\s|$)|\bdocker\s+run\b[^|;&\n]*(?:--privileged|\s-v\s*/:|--pid=host|docker\.sock)')),
+    _DangerRule('pkg-remove-publish', RegExp(r'\b(?:apt(?:-get)?|yum|dnf|pacman|apk|brew|snap|pip3?|npm|pnpm|yarn|cargo|gem)\s+(?:-\S+\s+)*(?:remove|purge|uninstall|autoremove|erase|publish|unpublish|deprecate)\b|\btwine\s+upload\b')),
+    _DangerRule('gh-write', RegExp(r'\bgh\s+(?:repo\s+(?:delete|edit|create)|release\s+delete|secret|auth\s+token|api\s+(?:[^|;&\n]*\s)?-X\s*(?:DELETE|PUT|PATCH|POST))')),
   ];
 
-  static bool isDangerous(String cmd) {
-    for (final RegExp r in _danger) {
-      if (r.hasMatch(cmd)) return true;
+  /// يُزيل علامات الاقتباس والشرطة المائلة العكسية كي لا يُخفي `'rm' -rf` أو `r\\m -rf` الأمر عن الأنماط.
+  static String _norm(String c) => c.replaceAll(RegExp(r'''["'\\]'''), '');
+
+  /// اسم أول قاعدة خطر تطابق الأمر، أو null.
+  static String? dangerRule(String cmd) {
+    final String n = _norm(cmd);
+    for (final _DangerRule r in _danger) {
+      if (r.re.hasMatch(cmd) || r.re.hasMatch(n)) return r.id;
     }
-    return false;
+    return null;
   }
+
+  static bool isDangerous(String cmd) => dangerRule(cmd) != null;
 
   static bool isCompound(String cmd) => _compound.hasMatch(cmd);
 
@@ -751,6 +787,9 @@ class BashDecision {
   const BashDecision({required this.allow, required this.command, this.prefix = '', this.reason = ''});
 }
 
+/// خطّاف للاختبار الآلي فقط.
+Future<bool> Function(String command, bool danger)? approveBashAskHook;
+
 Future<BashDecision> approveBash(WorkspaceConfig w, String cwd, String command, String description, String convId, AppSettings s) async {
   final bool danger = BashPolicy.isDangerous(command) || (w.isLocal && LocalExec.touchesPrivate(command));
   final Stopwatch apSw = Stopwatch()..start();
@@ -765,6 +804,12 @@ Future<BashDecision> approveBash(WorkspaceConfig w, String cwd, String command, 
     if (s.bashApproval == 'auto') return noted('auto', BashDecision(allow: true, command: command));
     final String? pre = BashPolicy.prefixFor(command);
     if (pre != null && BashRuntime.isAllowed(convId, pre)) return noted('prefix-allowed', BashDecision(allow: true, command: command));
+  }
+  // خطّاف للاختبار الآلي فقط: يحلّ محل السؤال البشري بعد أن تقرّر السياسة أن السؤال لازم.
+  final Future<bool> Function(String command, bool danger)? askHook = approveBashAskHook;
+  if (askHook != null) {
+    final bool ok = await askHook(command, danger);
+    return noted('hook', BashDecision(allow: ok, command: command));
   }
   // وضع Terminal: الموافقة داخل السجل نفسه (نفس آلية askConfirm) بدل نافذة سفلية.
   if (inlineApprovalHosts > 0) {

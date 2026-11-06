@@ -6,7 +6,7 @@ part of 'main.dart';
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
 // يجب أن يطابق `version:` في pubspec.yaml (يفحصه CI ويُفشل البناء عند الاختلاف).
-const String kAppVersion = '2.14.0';
+const String kAppVersion = '2.14.1';
 // رقم البناء الحقيقي: يحقنه CI عبر --dart-define=LM_BUILD=<run>-<sha7>؛ 'local' خارج CI.
 const String kBuildId = String.fromEnvironment('LM_BUILD', defaultValue: 'local');
 const String kOpenAI = 'openai';
@@ -312,8 +312,17 @@ void toast(String msg) {
   m.showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 3)));
 }
 
+/// خطّاف للاختبار الآلي فقط (لا يضبطه النموذج ولا أي إعداد): يحلّ محل نافذة الموافقة البشرية.
+Future<bool> Function(String title, String body)? askConfirmHook;
+
 Future<bool> askConfirm(String title, String body, {String ok = 'موافقة', String cancel = 'رفض'}) async {
   final Stopwatch sw = Stopwatch()..start();
+  final Future<bool> Function(String, String)? hook = askConfirmHook;
+  if (hook != null) {
+    final bool r = await hook(title, body);
+    RunTrace.noteApproval('hook', r, sw.elapsedMilliseconds, title);
+    return r;
+  }
   if (inlineApprovalHosts > 0) {
     if (alwaysAllowed.contains('$title|$body')) {
       RunTrace.noteApproval('always', true, 0, title);

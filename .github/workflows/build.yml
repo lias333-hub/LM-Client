@@ -165,6 +165,9 @@ jobs:
     timeout-minutes: 30
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ci
       - uses: actions/download-artifact@v4
         with:
           name: LMClient-APK
@@ -264,6 +267,7 @@ jobs:
             echo "--- keepalive: notification"; head -30 probe_out/ka_notif.txt 2>/dev/null
             echo "--- keepalive: wake lock"; cat probe_out/ka_wake.txt 2>/dev/null
           } > /tmp/logrepo/latest/4_probe.txt
+          python3 ci/rules_matrix.py /tmp/logrepo/latest/4_probe.txt ci/rules.json > /tmp/logrepo/latest/5_rules.txt 2>&1
           cp probe_out/screen.png /tmp/logrepo/latest/4_screen.png 2>/dev/null
           cp probe_out/screen_ask.png /tmp/logrepo/latest/4_screen_ask.png 2>/dev/null
           cp probe_out/screen_plan.png /tmp/logrepo/latest/4_screen_plan.png 2>/dev/null
