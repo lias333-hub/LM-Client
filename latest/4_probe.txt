@@ -1,0 +1,403 @@
+run=162 sha=bdf0769761e7eed9dab4fe43c2622c861f700098 branch=merge-a
+sdk=34
+--- install
+Performing Streamed Install
+Success
+--- perm
+--- start
+Starting: Intent { cmp=com.lmclient.lm_client/.MainActivity (has extras) }
+--- probe
+LMClient autoprobe · v2.14.2 · build 162-bdf0769
+os: sdk_gphone64_x86_64-userdebug 14 UE1A.230829.050 12077443 dev-keys
+LMClient · اختبار التنفيذ · v2.14.2
+
+[OK] تشغيل sh
+المستخدم: u0_a192
+المعمارية: x86_64 · ABI: x86_64
+أندرويد 14 (SDK 34) · sdk_gphone64_x86_64
+
+[NOTE] الأدوات المتاحة
+متوفر (41): sh toybox ls cat cp mv rm mkdir touch chmod ln head tail wc sort uniq cut tr sed awk grep find xargs tar gzip unzip diff patch du df stat date env printf base64 sha256sum md5sum nohup kill ps sleep
+غير متوفر (12): zip curl wget ssh git python3 python node npm make gcc busybox
+toybox: toybox 0.8.9-android · 202 أمراً
+git/python/node غير موجودة، كما هو متوقع في أندرويد العادي.
+
+[OK] الملفات والتخزين
+مجلد HOME الخاص: يعمل
+قراءة التخزين المشترك: تعمل
+كتابة التخزين المشترك: تعمل
+
+[NOTE] تنفيذ ملفات من مجلد التطبيق (W^X)
+تشغيل السكربت عبر sh (sh ملف): يعمل
+تنفيذ السكربت مباشرة (shebang): مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/probe_exec.sh )
+تنفيذ ملف ثنائي منسوخ إلى مجلد التطبيق: مرفوض (ProcessException: Permission denied
+  Command: /data/user/0/com.lmclient.lm_client/files/lmhome/sh_copy -c echo ELF_EXEC_OK)
+
+النتيجة: تنفيذ الملفات الثنائية من مجلد التطبيق ممنوع (قيد W^X في أندرويد 10+ للتطبيقات التي تستهدف SDK 29 فأعلى). لا يمكن تنزيل git/python/node وتشغيلها؛ البدائل: sh+toybox النظام، أو ملفات تنفيذية مضمّنة داخل الـAPK، أو SSH.
+
+[OK] المهلة والإيقاف
+أُوقف أمر sleep 30 بعد 1.7 ثانية (المهلة 1.5).
+
+[OK] المهام الخلفية
+المهمة j4fd7c7 اكتملت وقُرئ ناتجها.
+
+[OK] المجلد الحالي ورمز الخروج
+exit=1 ✓ · cwd=/storage/emulated/0/Download ✓
+
+SECRETS OK   keystore round trip :: w=true r=v1
+SECRETS OK   keystore delete :: null
+SECRETS OK   legacy api key still usable after migration :: 1
+SECRETS OK   profiles file no longer holds the key :: [{"id":"sec-p1","name":"legacy","kind":"anthropic","baseUrl":"https://example.invalid","apiKey":"","selectedModel":"m","models":[],"headers":"","streamUsage":true}]
+SECRETS OK   api key is in the keystore :: sk-legacy-123
+SECRETS OK   api key restored after a restart :: 1
+SECRETS OK   removing a profile deletes its key
+SECRETS OK   legacy ssh secrets still usable after migration :: 1
+SECRETS OK   workspaces file holds no secrets :: [{"id":"sec-w1","name":"srv","host":"example.invalid","port":22,"user":"u","keyPem":"","password":"","startDir":"","hostFp":"","isTermux":false}]
+SECRETS OK   ssh secrets restored after a restart :: 1
+SECRETS OK   removing a workspace deletes its secrets
+SECRETS DONE fails=0 total=11
+ENGINE OK   anthropic complete stream :: OK calls=0 text=Hello
+ENGINE OK   anthropic cut mid-text is an error :: ERR status=null retriable=true net=true calls=0 text=Hello
+ENGINE OK   anthropic cut mid-tool_use is an error (no silent drop) :: ERR status=null retriable=true net=true calls=0 text=
+ENGINE OK   anthropic tool_use complete :: OK calls=1 text=
+ENGINE OK   anthropic in-stream overloaded -> 529 retriable :: ERR status=529 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream rate limit -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic in-stream api_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   anthropic invalid_request stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   openai complete stream :: OK calls=0 text=Hi
+ENGINE OK   openai text without end signal stays lenient (server variance) :: OK calls=0 text=Hi
+ENGINE OK   openai cut mid-tool_call is an error :: ERR status=null retriable=true net=true calls=1 text=
+ENGINE OK   openai tool_call closed by [DONE] without finish_reason is accepted :: OK calls=1 text=
+ENGINE OK   openai in-stream server_error -> 500 :: ERR status=500 retriable=true net=false calls=0 text=
+ENGINE OK   openai in-stream rate_limit_exceeded -> 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   openai insufficient_quota stays non-retriable :: ERR status=null retriable=false net=false calls=0 text=
+ENGINE OK   gemini complete stream :: OK calls=0 text=Hey
+ENGINE OK   gemini without finishReason is an error :: ERR status=null retriable=true net=true calls=0 text=Hey
+ENGINE OK   gemini in-stream 503 :: ERR status=503 retriable=true net=false calls=0 text=
+ENGINE OK   gemini in-stream 429 :: ERR status=429 retriable=true net=false calls=0 text=
+ENGINE OK   too-long detection
+ENGINE OK   trim boundary inside the current turn :: 5/12/-1
+ENGINE OK   old result is trimmed hard :: 503
+ENGINE OK   usage openai-compatible: in, cached, out and reasoning tokens :: in=22707 out=2682 cache=22528 think=2400
+ENGINE OK   usage deepseek style: cache hit field, reasoning not reported stays null (no guess) :: in=1000 out=50 cache=900 think=null
+ENGINE OK   usage anthropic: input includes cache read and write, thinking tokens from output_tokens_details :: in=105 out=300 cache=90 think=250
+ENGINE OK   usage anthropic without a thinking breakdown stays null :: in=10 out=7 cache=0 think=null
+ENGINE OK   usage gemini: thoughts counted inside output and reported separately :: in=500 out=200 cache=300 think=160
+ENGINE OK   redact google key :: key=[REDACTED:google-key] ok
+ENGINE OK   redact anthropic-style key :: x [REDACTED:api-key] y
+ENGINE OK   redact github token :: token [REDACTED:github-token]
+ENGINE OK   redact google AQ. token :: GEMINI=[REDACTED:google-token]
+ENGINE OK   redact jwt :: jwt: [REDACTED:jwt]
+ENGINE OK   redact private key block :: before ⏎ [REDACTED:private-key] ⏎ after
+ENGINE OK   redact bearer header :: curl -H "Authorization: Bearer [REDACTED]" https://x
+ENGINE OK   assignment heuristic keeps the name, hides the value :: export ANTHROPIC_AUTH_TOKEN="[REDACTED]"
+ENGINE OK   assignment heuristic is off by default :: export ANTHROPIC_AUTH_TOKEN="a1b2C3d4C3d4C3d4C3d4"
+ENGINE OK   json key heuristic :: {"apiKey": "[REDACTED]", "name": "x"}
+ENGINE OK   no false positives on ordinary code and text :: final String password = widget.password; ⏎ const tokenizer = buildTokenizer(config); ⏎ id 3f2a9c1e7b4d8a6f0e1c2b3a4d5e6f7a8b9c0d1e uuid 123e4567-e89b-12d3-a456-426614174000 ⏎ task-force-alpha-bravo-charlie-delta-echo-fox
+ENGINE OK   app-known secret is matched literally :: my key is [REDACTED:saved-secret] ok
+ENGINE OK   bash output: hidden + note for the model :: export OPENAI_API_KEY="[REDACTED]" ⏎ alias ll="ls -l" ⏎ [note: the app hid secret values in this output before sending it to the model. Do not try to recover, print or guess them.]
+ENGINE OK   clean output passes through untouched :: a ⏎ b ⏎ 
+ENGINE OK   read_file of source keeps assignment text (no heuristics) :: const API_KEY = "a1b2C3d4C3d4C3d4C3d4";
+ENGINE OK   read_file of a sensitive-named file hides assignments :: export API_KEY="[REDACTED]" ⏎ [note: the app hid secret values in this output before sending it to the model. Do not try to recover, print or guess them.]
+ENGINE OK   sensitive path detection
+ENGINE OK   live summary: empty
+ENGINE OK   live summary: last full sentence :: Then list models in one call.
+ENGINE OK   live summary: a short tail joins the previous sentence :: Check the proxy map first. Ok.
+ENGINE OK   live summary: last non-empty line, markdown stripped :: Plan the next step carefully
+ENGINE OK   live summary: long text is clipped from the start :: 141
+ENGINE OK   live summary: arabic punctuation :: ثم سأقرأ إعدادات الوسيط الآن؟
+ENGINE OK   live note: tool title / derived title / narration / last step while thinking (never the raw thinking) / idle ::  | Listing skills | Reading the proxy map | قراءة session.dart | Now writing the report for you. | Listing skills | 
+ENGINE OK   tool schemas: optional description added to file tools only, own description kept, original not mutated
+ENGINE OK   loop signature ignores the step title
+ENGINE OK   run steps: only the last turn, narration then tools, final answer excluded :: 8 Reading the config first. | قراءة session.dart | Listing the folder | تعديل a.dart | تعديل a.dart | كتابة b.dart | فتح docs.claude.com | بحث عن «liveNote»
+ENGINE OK   run step titles: derived, written by the model, and details :: قراءة session.dart/lib/session.dart:655/Listing the folder/ls -la/تعديل a.dart/كتابة b.dart/فتح docs.claude.com/بحث عن «liveNote»
+ENGINE OK   run step status: done / failed / running while live, never stuck as running after the run :: done failed running failed - int a = 1; + int a = 2;
+ENGINE OK   run header counts distinct edited/written files and the other steps :: عُدّل ملف، وكُتب ملف، و4 خطوات أخرى
+ENGINE OK   run header: Arabic dual and plural forms :: عُدّل ملفان، وكُتب ملف، و31 خطوة أخرى | 12 خطوة | خطوة واحدة | عُدّلت 3 ملفات، وخطوتان أخريان | عُدّل ملف، وخطوتان أخريان | عُدّل 11 ملفاً | 
+ENGINE OK   display formats :: 4:11 22.7k 680k
+ENGINE OK   thousands separators :: 612,402 1,234,567 -1,500
+ENGINE OK   run spans: last run by default, the run containing a given message otherwise :: 7-9 1-6
+ENGINE OK   run steps of an older run by index :: 3 1
+ENGINE OK   chat folding: middle tool rounds fold, one header per run (an injected user message does not add another) :: 0,2,1,0,1,0,0,2,0
+ENGINE OK   chat folding: a round with an error stays visible
+ENGINE OK   run usage: exact sums, cache share, model; unreported requests counted not estimated :: 4/520/440/56/4 2/1/50
+ENGINE OK   usage captions and notes: Arabic plurals, shortfall notes :: m1 · 4 طلبات · كاش 85% | m1 · طلبان · كاش 0% | لم يبلّغ المزوّد عن استهلاك 1 من الطلبات، فالإجماليات ناقصة بمقدارها.
+ENGINE OK   run step carries the failure reason and the call itself :: blocked c6 
+ENGINE OK   preview sample builds the expected header and folds :: عُدّل ملف، و5 خطوات أخرى 0,2,1,1,1,0
+ENGINE OK   no events is not a truncation
+ENGINE DONE fails=0 total=69
+E2E mock server on 127.0.0.1:38865
+E2E OK   tool loop: tool call, result sent back, final answer :: msgs=3 reqs=2 last=DONE-1 err=null
+E2E OK   truncated text stream is retried from scratch :: content=OK-2 err=null reqs=2
+E2E OK   truncated tool call is retried (no silent drop) :: content=OK-3 calls=0 reqs=2
+E2E OK   in-stream overloaded is retried :: content=OK-4 err=null reqs=2
+E2E OK   in-turn trimming keeps the request under the budget :: reqs=1 bytes=171032 (untrimmed would be about 240000) last=OK-5
+E2E OK   prompt-too-long self-heal: trim and retry :: reqs=2 first=249024 second=73542 last=OK-6 err=null
+E2E OK   planning tools in the real loop (todo, ask, plan mode blocks writes, plan rejected then approved) :: calls=6 reqs=7 last=DONE-7 r=o:Todo list updated (0/2 done). ⏎ [>] Readin… | o:The user answered: ⏎ - Which storage? => S… | o:Plan mode is on. You may only read and s… | E:write_file would change things. Plan mod… | E:The user did not appr
+E2E OK   sub-agent: own context, read-only tools, only the report returns to the parent :: calls=1 err=false msgs=3 reqs=4 sub=2 convs=8/7 res=REPORT-8: needle=42 ⏎  ⏎ [sub-agent: 2 rounds, 1 tool calls, ~0k tokens, 0s]
+E2E OK   sub-agent usage is added to the parent run totals (exact, provider-reported) :: reqs=4 in=480 out=32 noUsage=0
+E2E OK   sub-agent cannot write, save memory or start another sub-agent :: calls=1 sub=4 res=REPORT-9 ⏎  ⏎ [sub-agent: 4 rounds, 3 tool calls, ~1k tokens, 0s] last=DONE-9
+E2E OK   sub-agent policy: read tools and read-only bash pass, everything else is blocked
+E2E OK   sub-agent round cap: a final no-tools turn returns a partial report :: calls=1 reqs=5 sub=3 res=REPORT-11-PARTIAL ⏎  ⏎ [sub-agent: 3 rounds, 2 tool calls, ~0k tokens, 0s — stopped at its limit, so the report may be incom… last=DONE-11
+E2E OK   stopping the parent stops its running sub-agent :: started=true secs=0 calls=1 err=true res=Cancelled by the user running=0
+E2E OK   checkpoint is off by default (no question, run completes) :: asked=0 reqs=6
+E2E OK   checkpoint asks once after N rounds with real numbers, and continues on yes :: asked=1 reqs=6 q=نقطة توقّف: 5 جولة ⏎ عمل الـ Agent 5 جولة خلال 0:00 ⏎ دخل: 600 (منه كاش 0) ⏎ خرج: 45 (منه تفكير —) ⏎ آخر خطوة: current_time()
+E2E OK   run usage totals equal the provider-reported sums :: reqs=6 in=720 out=52 cache=0 think=0 noUsage=0
+E2E OK   summary steps from a real run: one step per tool call, all done, aggregate header :: steps=5 first=قراءة الوقت header=5 خطوات
+E2E OK   checkpoint stops the run on no (history ends cleanly, resumable) :: asked=1 reqs=5 err=أوقفتَ التشغيل عند نقطة التوقّف بعد 5 جولة. اكتب «تابع» لإكمال العمل.
+E2E DONE fails=0 total=18
+TRACE OK   records: start, 2 requests, 2 responses, 1 tool, end :: start=1 req=2 resp=2 tool=1 end=1
+TRACE OK   run_end: reason done, 2 responses :: {t: 1794049069230, ev: run_end, run: rmw6ahta6k, reason: done, err: , rounds: 2, reqs: 2, ms: 47, in: 240, cache: 0, out: 16, thinkTok: 0, noUsage: 0, thinkMissing: 0, msgsAfter: 3}
+TRACE OK   exact usage recorded :: {t: 1794049069202, ev: response, run: rmw6ahta6k, n: 1, ok: ok, ms: 19, ttfe: 19, ttft: 19, in: 120, cache: 0, out: 9, thinkTok: 0, thinkMs: 0, exact: true, stop: tool_use, textLen: 0, thinkLen: 0, calls: [{id: tu1, name: current_time, argL
+TRACE OK   first request carries body + system, second only sizes :: keys0=t,ev,run,n,attempt,heals,tooLong,kind,model,path,msgs,hist,dropped,bytes,sysLen,sysHash,tools,toolNames,thinkLevel,thinkMode,capTokens,healed,cache,system,body
+TRACE OK   tool record: name, args, result length, duration :: {t: 1794049069202, ev: tool, run: rmw6ahta6k, id: tu1, name: current_time, ms: 0, isErr: false, argLen: 49, argKeys: [note], resLen: 39, rep: 1, approvals: [], args: {note: [REDACTED:api-key]}, raw: {"note":"[REDACTED:api-key]"}, result: 20
+TRACE OK   no secret reaches the disk (typed, tool args, saved key) :: len=11877
+TRACE OK   info: one run :: 1/7/11880
+TRACE OK   export numbers: structure only, no content :: len=3167
+TRACE OK   export standard: args/results/text, no body/system/thinking :: len=3631
+TRACE OK   export full: body + system included :: len=13153
+TRACE OK   every export level is redacted
+TRACE OK   summary header lists the run with usage :: # LMClient run trace ⏎ # app: v2.14.2 · build 162-bdf0769 · exported 2026-11-07T10:57:49.352909 ⏎ # level: standard (قياسي) · secrets are redacted at every level ⏎ # conversation: My chat title ⏎ # runs in file: 1 · records: 7 ⏎ # format: a
+TRACE OK   corrupt lines are skipped :: 7 vs 7
+TRACE OK   failed request: req_error with status, action fail and the request body :: t,ev,run,n,action,status,net,retriable,ms,err,errBody,partial,heals,attempt,tooLong,body
+TRACE OK   failed run ends with reason error :: {t: 1794049069405, ev: run_end, run: rmw6ahtg5l, reason: error, err: [400] quota nonsense 12345, rounds: 1, reqs: 0, ms: 8, in: 0, cache: 0, out: 0, thinkTok: 0, noUsage: 0, thinkMissing: 0, msgsAfter: 2}
+TRACE OK   per-conversation cap trims the oldest, keeps the newest :: size=9864 n=36 first=114
+TRACE OK   total cap deletes the oldest conversation first, keeps the current one :: gone0=true keep1=true keep2=true
+TRACE OK   traceOn=false writes nothing
+TRACE OK   purge removes a conversation trace
+TRACE OK   clearAll removes everything :: cleared=1
+TRACE DONE fails=0 total=20
+PLAN OK   todo_write renders checklist :: OK Todo list updated (1/3 done). ⏎ [x] A ⏎ [>] B... ⏎ [ ] C ⏎ Continue with the in_progress item; mark it completed right after you finish it.
+PLAN OK   todo_write stores per conversation
+PLAN OK   todo_write rejects an unknown status :: ERR todos[0].status must be pending, in_progress or completed (got "doing")
+PLAN OK   todo_write rejects a non-array :: ERR todos must be an array of {content, status, activeForm}
+PLAN OK   todo_write caps the list at 50 :: ERR Too many todos (max 50). Group related steps into one item.
+PLAN OK   todo_write warns about two in_progress :: OK Todo list updated (0/2 done). ⏎ [>] A... ⏎ [>] B... ⏎ Note: 2 items are in_progress. Keep exactly one in_progress at a time.
+PLAN OK   todo_write notes completion :: OK Todo list updated (1/1 done). ⏎ [x] A ⏎ All items are completed.
+PLAN OK   ask rejects an empty question list :: ERR questions must be an array with 1 to 4 questions
+PLAN OK   ask needs at least 2 options :: ERR questions[0] needs 2 to 4 options (the user can always type another answer)
+PLAN OK   ask caps at 4 questions :: ERR At most 4 questions per call
+PLAN OK   ask returns the answers to the model :: OK The user answered: ⏎ - Which one? => Opt1 ⏎ - Which one? => Opt0; Opt1; (own answer) extra
+PLAN OK   ask: dismissal is reported as an error :: ERR The user dismissed the question without answering. Do not ask the same thing again right away: pick the most reasonable option and say which, or stop and wait for their next message.
+PLAN OK   plan mode restored from history
+PLAN OK   a successful exit_plan_mode ends plan mode
+PLAN OK   a rejected plan keeps plan mode
+PLAN OK   plan mode blocks write_file / edit_file / save_memory
+PLAN OK   plan mode allows read tools
+PLAN OK   plan mode bash: read-only commands pass
+PLAN OK   plan mode bash: anything that can change state is blocked
+PLAN OK   plan mode bash: background jobs are blocked
+PLAN OK   outside plan mode nothing is blocked
+PLAN OK   enter_plan_mode: the user can decline :: ERR The user declined plan mode. Continue without it: proceed carefully with the task, or ask what they want.
+PLAN OK   enter_plan_mode: approval turns it on :: OK Plan mode is on. You may only read and search now (read_file, search_files, list_directory, outline_file, read-only bash such as ls, cat, grep, git status/log/diff). Explore the code, then call exit_plan_mode with the
+PLAN OK   enter_plan_mode twice is an error :: ERR Plan mode is already active. Explore, then call exit_plan_mode with your plan.
+PLAN OK   exit_plan_mode: rejection keeps plan mode and carries the comments :: ERR The user did not approve the plan. Their comments: "use SQLite instead". You are still in plan mode: revise the plan and call exit_plan_mode again, or ask a question with ask_user_question.
+PLAN OK   exit_plan_mode: approval turns plan mode off :: OK The user approved the plan. Plan mode is off: you may now edit files and run commands. Start with the first step and track progress with todo_write.
+PLAN OK   exit_plan_mode outside plan mode is an error :: ERR Plan mode is not active (call enter_plan_mode first).
+PLAN OK   four tool definitions :: todo_write,ask_user_question,enter_plan_mode,exit_plan_mode
+PLAN OK   definitions are valid JSON
+PLAN OK   tools are exposed by availableTools :: current_time,save_memory,todo_write,ask_user_question,enter_plan_mode,exit_plan_mode
+PLAN OK   system prompt mentions the planning tools
+PLAN DONE fails=0 total=31
+KEEPALIVE OK   not running before the test
+KEEPALIVE OK   start accepted
+KEEPALIVE OK   service is running
+KEEPALIVE info notificationsAllowed=true
+SHOT keepalive
+KEEPALIVE OK   update accepted while running
+KEEPALIVE OK   stop accepted
+KEEPALIVE OK   service stopped
+KEEPALIVE OK   acquire starts the service
+KEEPALIVE OK   one release keeps it running (two holders)
+KEEPALIVE OK   stop is delayed after the last release
+KEEPALIVE OK   last release stops it after the delay
+KEEPALIVE OK   start then immediate stop ends stopped
+KEEPALIVE OK   25 rapid start/update/stop cycles: app alive and service stopped
+KEEPALIVE OK   12 rapid acquire/release cycles end stopped
+KEEPALIVE OK   re-acquire inside the delay keeps it running
+KEEPALIVE OK   and it stops after the final release
+KEEPALIVE OK   a newer start right after a stop keeps it running
+KEEPALIVE OK   final stop ends it
+KEEPALIVE DONE fails=0 total=17
+SKILLS OK   parse quoted :: My-Skill|Does X: and Y|# Body ⏎ hello
+SKILLS OK   parse folded :: folded|line one line two|Body
+SKILLS OK   parse no frontmatter :: |First real line
+SKILLS OK   parse crlf :: crlf|d|B
+SKILLS OK   slug :: hello-world_1
+SKILLS OK   github refs
+SKILLS OK   tool exposed
+SKILLS OK   prompt section :: Skills are reusable expert instructions. When the task matches a skill below, call use_skill with its name BEFORE starting and follow it. ⏎ Installed skills: ⏎ - ci-skill: for tests
+SKILLS OK   load skill :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
+SKILLS OK   load bundled file :: A-OK
+SKILLS OK   unknown skill :: Skill not found: nope. Call use_skill with no name to list the available skills.
+SKILLS OK   list skills :: Available skills (call use_skill with the name): ⏎ - ci-skill: for tests
+SKILLS OK   runTool dispatch :: # Skill: ci-skill ⏎ for tests ⏎  ⏎ BODY-OK ⏎  ⏎ --- ⏎ Bundled files (read one with use_skill {"name": "ci-skill", "file": "<path>"}): ⏎ - ref/a.md (4 chars)
+SKILLS OK   NET discover :: ci/skills/hello-ci (ref=merge-a, blobs=2)
+SKILLS OK   NET fetch :: hello-ci | Fixture skill used by the CI to test importing skills from G… | files=notes.md
+SKILLS DONE fails=0 total=13
+RULES root=/storage/emulated/0/Download/lm_rules_70ec017c-f126-454b-b39a-c253609670a5 mock=127.0.0.1:46111
+RULES OK   [BASH-0] corpus loaded: ≥150 dangerous, ≥100 ordinary, ≥3 known gaps :: D=213 S=110 K=4
+RULES OK   [BASH-1] every dangerous command in the corpus (213) is flagged :: missed 0: 
+RULES OK   [BASH-2] ordinary developer commands (110) are not over-flagged :: flagged 0: 
+RULES OK   [BASH-3] every danger rule (38) is exercised by at least one corpus command :: untested rules: 
+RULES OK   [BASH-4] a dangerous command never yields a remembered prefix
+RULES OK   [BASH-4] compound commands and unknown programs never yield a prefix; plain ones do :: git status/npm test
+RULES OK   [BASH-5] quiet commands: pwd yes; with a path argument or chained no
+RULES OK   [BASH-6] local: the app's private data is danger; shared storage is not
+RULES GAP  [BASH-8] not detected by the pattern list (regexes cannot prove a command safe): sh cleanup.sh
+RULES GAP  [BASH-8] not detected by the pattern list (regexes cannot prove a command safe): ./cleanup.sh
+RULES GAP  [BASH-8] not detected by the pattern list (regexes cannot prove a command safe): make clean-all
+RULES GAP  [BASH-8] not detected by the pattern list (regexes cannot prove a command safe): awk 'BEGIN{system("touch x")}'
+RULES OK   [BASH-9] ask mode: a quiet command (pwd) runs without asking :: asks=0
+RULES OK   [BASH-9] ask mode: any other command asks, and a refusal blocks it :: allow=false asks=1
+RULES OK   [BASH-9] ask mode: an approval lets it run :: allow=true
+RULES OK   [BASH-10] auto mode: an ordinary command runs without asking :: asks=0
+RULES OK   [BASH-11] auto mode: dangerous commands still ask (15) and a refusal blocks them :: asked=15 blocked=15
+RULES OK   [BASH-12] a remembered prefix lets the same command through without asking
+RULES OK   [BASH-12] a remembered prefix does not cover a chained or redirected command :: compound=true redirect=true
+RULES OK   [BASH-12] a remembered "git push" never covers a force/delete push (6 variants) :: asked=6
+RULES OK   [BASH-13] a refused command is not executed (marker file absent) and the model is told :: err=true text=The user denied this command. Do not retry it as is: ask wha…
+RULES OK   [BASH-13] positive control: an approved command is executed on the device :: err=false text=(no output)
+RULES OK   [BASH-10] auto mode: an ordinary command is executed without any question :: asks=0
+RULES OK   [BASH-11] auto mode: "rm -f -r" asks as danger; refused, the folder survives :: asks=1 err=true
+RULES OK   [BASH-6] the app's private folder is danger: asks even in auto mode :: asks=1
+RULES OK   [BASH-14] a command over 60,000 characters is rejected before any approval :: Command is too long (over 60,000 characters). Write the cont…
+RULES OK   [TOOL-1] malformed JSON arguments: nothing runs, the model gets the error :: Invalid JSON arguments: {"path":"/storage/emulated/0/Downloa…
+RULES OK   [TOOL-2] an unknown tool name is refused :: Tool not available: format_disk
+RULES OK   [TOOL-3] a read-only agent cannot write, run bash or fetch (nothing happens on disk or network) :: write=true bash=true fetch=true
+RULES OK   [TOOL-2] with tools switched off in settings, a tool call is refused :: Tool not available: write_file
+RULES OK   [FILE-0] the private app folders are known to the guard (PathGuard.init ran) :: /data/data/com.lmclient.lm_client,/data/data/com.lmclient.lm_client,/storage/emulated/0/Android/data/com.lmclient.lm_client
+RULES OK   [FILE-1] the app's private data (API keys) is blocked for write, read and list :: w=true r=true l=true
+RULES OK   [FILE-1] fail-closed: with the guard list empty and an agent allowed a folder inside the app data, it is still blocked :: Access to the app's private data is blocked
+RULES OK   [FILE-1] /proc and /dev are blocked :: proc=true dev=true
+RULES OK   [FILE-2] paths outside shared storage and ../ traversal are blocked (4 forms) :: blocked=4
+RULES OK   [FILE-2] an agent limited to a folder cannot read outside it :: Path not allowed for this agent: /storage/emulated/0/Download/lm_rules…
+RULES OK   [FILE-3] a symlink cannot even be created in shared storage on this platform, so the escape cannot be built there :: platform refuses symlinks; the guard also resolves links (code), SSH workspaces use their own check
+RULES OK   [FILE-4] overwriting a file never read in this conversation is refused; the file is untouched :: You have not read all of /storage/emulated/0/Download/lm_rules_70ec017…
+RULES OK   [FILE-5] after a full read, shrinking a large file by more than half needs confirm_overwrite :: This write would shrink /storage/emulated/0/Download/lm_rules_70ec017c…
+RULES OK   [FILE-5] with confirm_overwrite=true the same write goes through :: Wrote 4 chars to /storage/emulated/0/Download/lm_rules_70ec017c-f126-4…
+RULES OK   [FILE-7] edit_file: ambiguous match refused, missing text refused, multi-edit all-or-nothing, unique edit applied :: dup=true missing=true atomic=true good=true
+RULES OK   [FILE-6] confirm on + refusal: write_file, edit_file and save_memory change nothing :: write=true edit=true memory=true asks=3
+RULES OK   [FILE-6] positive control: the same write after approval succeeds :: Wrote 5 chars to /storage/emulated/0/Download/lm_rules_70ec0…
+RULES OK   [NET-0] oracle: a direct request does reach the local mock server :: bodies=1
+RULES OK   [NET-1] fetch_url refuses loopback, private, link-local and metadata hosts in 21 spellings; the local server saw nothing :: succeeded=0 server hits=0 other-messages=http://0177.0.0.1:46111/a -> Error: DioException [connection timeout]: The requ…
+RULES OK   [NET-2] only http/https URLs with a host are accepted (8 bad forms refused) :: refused=8
+RULES OK   [NET-3] confirm on: opening a link asks first; a refusal stops it before any request :: asks=1 The user denied this action
+RULES GAP  [NET-4] redirect hops are re-checked in code, but no test: it needs a controllable PUBLIC server that redirects to a private address
+RULES OK   [NET-5] a rebinding name is resolved exactly once and the checked (public) address is the one returned :: lookups=1 93.184.216.34
+RULES OK   [NET-5] a public-looking name that resolves to loopback is refused at connect time and the local server sees nothing :: blocked=true hits=0
+RULES OK   [NET-5] one private address among public ones is enough to refuse the host
+RULES FAIL [NET-6] positive control through the pinned connection: a public HTTPS page is fetched (TLS upgrade on a checked address works) :: HTTP 400
+RULES OK   [NET-6] and so is a public HTTP page :: Example Domain This domain is for use in documentation examples withou…
+RULES OK   [SEC-1] secrets in a .env file, a note and bash output never reach the provider (4 requests inspected) :: reqs=4 leaked=false hidden=true
+RULES OK   [SEC-1] and they are not kept in the saved tool results either :: len=713
+RULES OK   [SEC-2] nor in the run trace on disk :: len=26597
+RULES OK   [CHK-1] the trace checker, run on this real session, flags the missing narration and finds no code-rule violation :: DESC-MISSING,NARR
+RULES OK   [LOOP-1] the same call with the same result: warned at 3, the run is stopped at 5 requests :: reqs=5 warned=true err=توقف الـ Agent لأنه كرّر نفس الاستدعاء بنفس النتيج…
+RULES OK   [LOOP-2] the tool-round cap stops a run that keeps calling tools (cap 5) :: reqs=5 err=تم إيقاف حلقة الأدوات بعد 5 جولات. اكتب «تابع» لإكمال العمل.
+RULES OK   [LOOP-3] the token budget stops the run once it is exceeded (budget 200, ~129 tokens per round) :: reqs=2 err=بلغ التشغيل ميزانية التوكنز (258 من 200). اكتب «تابع» للمتاب…
+RULES OK   [LOOP-4] the stop button interrupts a running command and ends the run without another model request :: waited=100ms stop=32ms reqs=1
+RULES OK   [CHK-2] a clean trace has no violation and no review item
+RULES OK   [CHK-3] NARR: tool calls without a narration sentence
+RULES OK   [CHK-3] DESC-LONG: a step title over 8 words
+RULES OK   [CHK-3] DESC-MISSING: a bash call without a step title
+RULES OK   [CHK-3] BASH-DANGER-NO-ASK: a dangerous command executed in auto mode
+RULES OK   [CHK-3] a dangerous command that was asked about is not a violation
+RULES OK   [CHK-3] WRITE-NO-ASK: a write that succeeded with confirm on and no approval recorded
+RULES OK   [CHK-3] but not when confirm was off for that run
+RULES OK   [CHK-3] RETRY-DENIED: the same command repeated after the user refused it
+RULES OK   [CHK-3] SECRET-ECHO / SECRET-ARG: a hidden value repeated by the model
+RULES OK   [CHK-3] BATCH (review): five rounds in a row of one bash call
+RULES OK   [CHK-3] LIVE-REVIEW: a network/build command is listed for a human to confirm the user asked for it
+RULES OK   [CHK-4] the export header line counts violations and carries no content at the numbers level :: # rules check (automatic): 1 violation(s), 0 to review / #   NARR x1
+RULES GAPS known=5 (listed above as GAP lines; each is documented in ci/rules.json)
+RULES DONE fails=1 total=69
+SSH OK   bash echo/pwd/id :: hello-ssh ⏎ /tmp/lmci ⏎ runner
+SSH OK   write_file new (relative path) :: Wrote 18 chars to [ci-server] /tmp/lmci/proj/hello.txt
+SSH OK   bash sees the file write_file wrote :: line1 ⏎ line2 ⏎ line3
+SSH OK   read_file :: [/tmp/lmci/proj/hello.txt · lines 1-3 of 3] ⏎ 1	line1 ⏎ 2	line2 ⏎ 3	line3 ⏎ 
+SSH OK   edit_file :: Edited /tmp/lmci/proj/hello.txt: 1 edit(s) applied
+SSH OK   bash sees the edit :: line1 ⏎ LINE-TWO ⏎ line3
+SSH OK   list_directory :: /tmp/lmci/proj ⏎ f hello.txt (21 B)
+SSH OK   search_files pattern+glob :: Found 1 match(es) in 1 file(s) (paths relative to /tmp/lmci; searched on workspace "ci-server") ⏎ proj/hello.txt:2:LINE-TWO
+SSH OK   search_files glob only :: Found 1 file(s) (paths relative to /tmp/lmci; searched on workspace "ci-server") ⏎ proj/hello.txt
+SSH OK   outline_file :: [/tmp/lmci/proj/hello.txt · 3 lines · 0 symbols] ⏎ No structure recognized (the outline is a heuristic for formatted source code and markdown). Use search_files, or read_file with offset/limit.
+SSH OK   write_file overwrite guard (unread file) :: You have not read all of /tmp/lmci/proj/other.txt in this conversation (or it changed on disk since you read it), so overwriting it could destroy content you have not seen. Read it with read_file first, or change only what you need with edit_file. Nothing was 
+SSH OK   write_file append :: Appended 10 chars to [ci-server] /tmp/lmci/proj/hello.txt
+SSH OK   bash sees the append :: tail-line
+SSH OK   write_file creates parent dirs :: Wrote 4 chars to [ci-server] /tmp/lmci/deep/a/b/c.txt
+SSH OK   bash sees deep file :: found-deep
+SSH OK   blocked key path :: Access to /home/runner/.ssh/id_ed25519 is blocked: it holds keys or credentials. Ask the user to run the command themselves if it is really needed.
+SSH OK   read_file on missing file :: File not found: /tmp/lmci/nope/missing.txt
+SSH OK   timeout kills the command :: (no output) ⏎ [timed out after 2s: the process was killed. Use a larger timeout_ms or run_in_background]
+SSH OK   non-zero exit code reported :: (no output) ⏎ [exit code: 3]
+SSH OK   cd persists across calls :: /tmp/lmci/proj
+SSH OK   relative path follows the new cwd :: [/tmp/lmci/proj/hello.txt · lines 1-4 of 4] ⏎ 1	line1 ⏎ 2	LINE-TWO ⏎ 3	line3 ⏎ 4	tail-line ⏎ 
+SSH OK   background job starts :: Started background job j82fc10 (pid 4742). Read its output with bash_output, stop it with kill_shell.
+SSH OK   background job output (incremental) :: [job j82fc10: running] ⏎ job-start ⏎ [job j82fc10: finished, exit code 0] ⏎ job-end ⏎ 
+SSH OK   create workspace skills :: skills-made
+SSH OK   use_skill lists workspace skills :: Available skills (call use_skill with the name): ⏎ - ci-proj [this project]: project skill from cwd ⏎ - ci-start [this project]: skill from start dir
+SSH OK   use_skill loads cwd skill :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
+SSH OK   use_skill loads start-dir skill :: # Skill: ci-start (from this project) ⏎ Skill folder: /tmp/lmci/.claude/skills/ci-start ⏎  ⏎ START-BODY ⏎  ⏎ --- ⏎ Other files in the skill folder: notes.md ⏎ Read them with use_skill {"name": "ci-start", "file": "<relative path>"} or read_file; scripts can be
+SSH OK   use_skill reads a workspace skill file :: NOTE-OK ⏎ 
+SSH OK   use_skill rejects path traversal :: file must be a relative path inside the skill folder
+SSH OK   runTool dispatches use_skill on ssh :: # Skill: ci-proj (from this project) ⏎ Skill folder: /tmp/lmci/proj/.claude/skills/ci-proj ⏎  ⏎ PROJ-BODY
+SSH DONE fails=0 total=30
+SHOT ask
+SHOT plan
+SHOT summary
+SHOT tracesheet
+SHOT data
+SHOT chatdone
+SHOT chatlive
+SHOT termlive
+SHOT settings
+SHOT behaviour
+SHOT about
+DONE
+--- crash
+--- package flags (ALLOW_BACKUP must be absent)
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]
+--- keepalive: foreground service (dumpsys activity services)
+  * ServiceRecord{c6401b0 u0 com.lmclient.lm_client/com.lmclient.keepalive.KeepAliveService}
+    intent={cmp=com.lmclient.lm_client/com.lmclient.keepalive.KeepAliveService}
+    infoAllowStartForeground=[callingPackage: com.lmclient.lm_client; callingUid: 10192; uidState: TOP ; uidBFSL: [BFSL]; intent: Intent { cmp=com.lmclient.lm_client/com.lmclient.keepalive.KeepAliveService (has extras) }; code:PROC_STATE_TOP; tempAllowListReason:<null>; targetSdkVersion:34; callerTargetSdkVersion:34; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+    isForeground=true foregroundId=4271 types=00000001 foregroundNoti=Notification(channel=lmclient_work shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x6a color=0x00000000 vis=PRIVATE)
+--- keepalive: notification
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x0a3ed7d4: pkg=com.lmclient.lm_client user=UserHandle{0} id=4271 tag=null importance=2 key=0|com.lmclient.lm_client|4271|null|10192: Notification(channel=lmclient_work shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x6a color=0x00000000 vis=PRIVATE))
+      uid=10192 userId=0
+      opPkg=com.lmclient.lm_client
+      icon=Icon(typ=RESOURCE pkg=com.lmclient.lm_client id=0x0108007c)
+      flags=0x6a
+      originalFlags=0x4a
+      pri=0
+      key=0|com.lmclient.lm_client|4271|null|10192
+      seen=false
+      groupKey=0|com.lmclient.lm_client|4271|null|10192
+      notification=
+            fullscreenIntent=null
+            contentIntent=PendingIntent{47cad7d: PendingIntentRecord{89685d0 com.lmclient.lm_client startActivity (allowlist: ef9531c:+30s0ms/0/NOTIFICATION_SERVICE/NotificationManagerService)}}
+            deleteIntent=null
+            number=0
+            groupAlertBehavior=0
+            when=1794049073146
+            tickerText=null
+            vis=0
+            contentView=null
+            bigContentView=null
+            headsUpContentView=null
+            color=0x00000000
+            timeout=unknown
+            extras={
+                android.title=String (LMClient probe)
+                android.reduced.images=Boolean (true)
+                android.text=String (keepalive self-test)
+--- keepalive: wake lock
+  PARTIAL_WAKE_LOCK              'lmclient:work' ACQ=-2s621ms (uid=10192 pid=3221)
+  11-07 10:57:35.985 - 10192 - ACQ lmclient:work (partial)
+  11-07 10:57:50.116 - 10192 - REL lmclient:work
+  11-07 10:57:53.147 - 10192 - ACQ lmclient:work (partial)
