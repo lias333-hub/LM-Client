@@ -1,1 +1,1 @@
-pubspec=2.14.1 kAppVersion=2.14.1
+pubspec=2.14.2 kAppVersion=2.14.2
