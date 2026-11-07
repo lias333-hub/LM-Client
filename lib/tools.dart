@@ -323,6 +323,60 @@ bool isPrivateAddress(InternetAddress ad) {
   return false;
 }
 
+/// يحلّ [host] مرة واحدة ويفحص كل العناوين الناتجة، ثم يعيدها (IPv4 أولاً) ليتصل العميل بأحدها مباشرة.
+/// السبب: كان الفحص بحلّ DNS والاتصال بحلّ ثانٍ، فيستطيع خادم أسماء خبيث (DNS rebinding) أن يعيد عنواناً عاماً عند الفحص
+/// ثم عنواناً محلياً عند الاتصال. [lookup] للاختبار فقط.
+Future<List<InternetAddress>> checkedAddresses(String host, {Future<List<InternetAddress>> Function(String host)? lookup}) async {
+  if (isPrivateHost(host)) throw const ToolError('Local/private network addresses are blocked');
+  final Future<List<InternetAddress>> Function(String) look = lookup ?? ((String h) => InternetAddress.lookup(h));
+  List<InternetAddress> addrs;
+  try {
+    addrs = await look(host).timeout(const Duration(seconds: 10));
+  } catch (_) {
+    throw const ToolError('Could not resolve host');
+  }
+  if (addrs.isEmpty) throw const ToolError('Could not resolve host');
+  for (final InternetAddress a in addrs) {
+    if (isPrivateAddress(a)) throw const ToolError('Host resolves to a local/private address: blocked');
+  }
+  return <InternetAddress>[
+    ...addrs.where((InternetAddress a) => a.type == InternetAddressType.IPv4),
+    ...addrs.where((InternetAddress a) => a.type != InternetAddressType.IPv4),
+  ];
+}
+
+/// مصنع اتصالات fetch_url: يفحص ثم يتصل بالعنوان المفحوص نفسه (Socket.startConnect بعنوان لا باسم)، فلا يوجد حلّ ثانٍ يمكن التلاعب به.
+/// الـ TLS يُرقّى من HttpClient بالاسم الأصلي، فتبقى شهادة الموقع تُفحص باسمه.
+Future<ConnectionTask<Socket>> pinnedConnect(Uri uri, String? proxyHost, int? proxyPort, {Future<List<InternetAddress>> Function(String host)? lookup}) async {
+  if (proxyHost != null) throw const ToolError('Proxies are not supported for web fetches');
+  final List<InternetAddress> addrs = await checkedAddresses(uri.host, lookup: lookup);
+  InternetAddress pick = addrs.first;
+  if (addrs.length > 1) {
+    // أول عنوان يردّ فعلاً (كلها مفحوصة)؛ عنوان واحد لا يحتاج تجربة.
+    for (final InternetAddress a in addrs) {
+      try {
+        final Socket probe = await Socket.connect(a, uri.port, timeout: const Duration(seconds: 6));
+        probe.destroy();
+        pick = a;
+        break;
+      } catch (_) {}
+    }
+  }
+  return Socket.startConnect(pick, uri.port);
+}
+
+/// عميل fetch_url: كل اتصال يمرّ عبر [pinnedConnect].
+final Dio _fetchClient = Dio(BaseOptions(
+  connectTimeout: const Duration(seconds: 30),
+  sendTimeout: const Duration(seconds: 60),
+  receiveTimeout: const Duration(seconds: 60),
+))
+  ..httpClientAdapter = IOHttpClientAdapter(createHttpClient: () {
+    final HttpClient c = HttpClient();
+    c.connectionFactory = (Uri uri, String? proxyHost, int? proxyPort) => pinnedConnect(uri, proxyHost, proxyPort);
+    return c;
+  });
+
 Future<void> _assertPublicUrl(Uri u) async {
   if (!(u.scheme == 'http' || u.scheme == 'https') || u.host.isEmpty) throw const ToolError('Invalid URL (http/https only)');
   if (isPrivateHost(u.host)) throw const ToolError('Local/private network addresses are blocked');
@@ -1207,16 +1261,23 @@ Future<ToolOutcome> _toolFetchUrl(Map<String, dynamic> a, Agent? agent, AppSetti
       if (!ok) throw const ToolError('The user denied this action');
     }
     lastHost = host;
-    final r = await httpClient.get<ResponseBody>(
-      cur.toString(),
-      options: Options(
-        responseType: ResponseType.stream,
-        followRedirects: false,
-        validateStatus: (c) => true,
-        receiveTimeout: const Duration(seconds: 25),
-        headers: <String, dynamic>{'User-Agent': 'LMClient/$kAppVersion', 'Accept': 'text/html,text/plain,application/json;q=0.9,*/*;q=0.5'},
-      ),
-    );
+    final Response<ResponseBody> r;
+    try {
+      r = await _fetchClient.get<ResponseBody>(
+        cur.toString(),
+        options: Options(
+          responseType: ResponseType.stream,
+          followRedirects: false,
+          validateStatus: (c) => true,
+          receiveTimeout: const Duration(seconds: 25),
+          headers: <String, dynamic>{'User-Agent': 'LMClient/$kAppVersion', 'Accept': 'text/html,text/plain,application/json;q=0.9,*/*;q=0.5'},
+        ),
+      );
+    } on DioException catch (e) {
+      final Object? inner = e.error;
+      if (inner is ToolError) throw inner;
+      rethrow;
+    }
     final rb = r.data;
     if (rb == null) throw const ToolError('Empty response');
     final code = r.statusCode ?? 0;

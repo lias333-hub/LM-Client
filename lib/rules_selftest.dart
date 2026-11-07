@@ -923,7 +923,34 @@ Future<void> runRulesSelfTest() async {
       confirmAnswer = null;
       st.set('confirm', false);
       gap('NET-4', 'redirect hops are re-checked in code, but no test: it needs a controllable PUBLIC server that redirects to a private address');
-      gap('NET-5', 'DNS rebinding: the host is resolved and checked, then resolved again by the HTTP client (time-of-check/time-of-use); the fix is to connect to the checked address');
+      // NET-5: حلّ واحد فقط ثم الاتصال بالعنوان المفحوص نفسه (قبل 2.14.2: فحص بحلّ ثم اتصال بحلّ ثانٍ = DNS rebinding)
+      int lookups = 0;
+      Future<List<InternetAddress>> rebinding(String host) async {
+        lookups++;
+        return lookups == 1 ? <InternetAddress>[InternetAddress('93.184.216.34')] : <InternetAddress>[InternetAddress('127.0.0.1')];
+      }
+
+      final List<InternetAddress> pinned = await checkedAddresses('rebind.example', lookup: rebinding);
+      rec('NET-5', 'a rebinding name is resolved exactly once and the checked (public) address is the one returned', lookups == 1 && pinned.length == 1 && pinned.first.address == '93.184.216.34', 'lookups=$lookups ${pinned.map((InternetAddress a) => a.address).join(',')}');
+      bool blockedPriv = false;
+      final int hitsBefore = mock.bodies.length;
+      try {
+        await pinnedConnect(Uri.parse('http://innocent-name.example:$port/'), null, null, lookup: (String h) async => <InternetAddress>[InternetAddress('127.0.0.1')]);
+      } on ToolError catch (e) {
+        blockedPriv = e.toString().contains('private');
+      }
+      rec('NET-5', 'a public-looking name that resolves to loopback is refused at connect time and the local server sees nothing', blockedPriv && mock.bodies.length == hitsBefore, 'blocked=$blockedPriv hits=${mock.bodies.length - hitsBefore}');
+      bool mixedBlocked = false;
+      try {
+        await checkedAddresses('mixed.example', lookup: (String h) async => <InternetAddress>[InternetAddress('8.8.8.8'), InternetAddress('10.1.2.3')]);
+      } on ToolError {
+        mixedBlocked = true;
+      }
+      rec('NET-5', 'one private address among public ones is enough to refuse the host', mixedBlocked, '');
+      final ToolOutcome https = await call(full, kToolFetchUrl, <String, dynamic>{'url': 'https://example.com/'}, conv: conv);
+      rec('NET-6', 'positive control through the pinned connection: a public HTTPS page is fetched (TLS upgrade on a checked address works)', !https.error && https.text.contains('Example Domain'), clip(https.text, 70));
+      final ToolOutcome http = await call(full, kToolFetchUrl, <String, dynamic>{'url': 'http://example.com/'}, conv: conv);
+      rec('NET-6', 'and so is a public HTTP page', !http.error && http.text.contains('Example Domain'), clip(http.text, 70));
     });
 
     // ================================================================

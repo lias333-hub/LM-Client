@@ -29,7 +29,7 @@
     {"id": "NET-2", "class": "code", "text": "Only http/https URLs with a host are accepted", "tests": ["RULES:NET-2"]},
     {"id": "NET-3", "class": "code", "text": "With confirm on, opening a link asks first", "tests": ["RULES:NET-3"]},
     {"id": "NET-4", "class": "gap", "text": "Redirect hops are re-checked in code but not tested (needs a controllable public redirector)", "tests": ["RULES:NET-4"]},
-    {"id": "NET-5", "class": "gap", "text": "DNS rebinding: time-of-check/time-of-use between the address check and the connection", "tests": ["RULES:NET-5"]},
+    {"id": "NET-5", "class": "code", "text": "DNS rebinding: the host is resolved once and the client connects to the checked address itself; one private address refuses the host", "tests": ["RULES:NET-5", "RULES:NET-6"]},
     {"id": "SEC-1", "class": "code", "text": "Secrets found in files, notes and command output never reach the model provider nor the saved tool results", "tests": ["RULES:SEC-1"]},
     {"id": "SEC-2", "class": "code", "text": "Secrets never reach the run trace on disk", "tests": ["RULES:SEC-2", "TRACE:no secret reaches the disk", "TRACE:every export level is redacted"]},
     {"id": "SEC-3", "class": "code", "text": "Redaction patterns (keys, tokens, JWT, private keys, bearer, assignments) work and do not hit ordinary code", "tests": ["ENGINE:redact", "ENGINE:assignment heuristic", "ENGINE:json key heuristic", "ENGINE:no false positives", "ENGINE:app-known secret", "ENGINE:bash output", "ENGINE:read_file of a sensitive-named file"]},
