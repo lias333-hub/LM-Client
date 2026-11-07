@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# One-time preparation of the checkout: the same steps as "Prepare Android project" in build.yml
+# (keep both in sync), then pub get. Leaves untracked android/ in place so later `dsync` keeps it.
+set -e
+cd "${DS_REPO:?}"
+rm -rf /tmp/bak; mkdir -p /tmp/bak
+cp pubspec.yaml /tmp/bak/pubspec.yaml
+cp analysis_options.yaml /tmp/bak/analysis_options.yaml
+cp -r lib /tmp/bak/lib
+flutter create . --project-name lm_client --org com.lmclient --platforms android --overwrite
+cp /tmp/bak/pubspec.yaml ./pubspec.yaml
+cp /tmp/bak/analysis_options.yaml ./analysis_options.yaml
+rm -rf lib test
+cp -r /tmp/bak/lib ./lib
+MANIFEST="android/app/src/main/AndroidManifest.xml"
+sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />\n    <queries><package android:name="com.termux" /></queries>\n    <application|' "$MANIFEST"
+sed -i '0,/<application/s|<application|<application android:allowBackup="false" android:fullBackupContent="false"|' "$MANIFEST"
+flutter pub get
+touch .ds_prepared
+echo "dprep done"

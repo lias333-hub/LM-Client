@@ -1,0 +1,30 @@
+name: Dev shell (interactive build box)
+# A short-lived Linux box with Flutter that executes commands pushed to the branch `shell-in`
+# and publishes their output to the branch `shell-out` (see ci/devshell/README.md).
+# Started by pushing the branch `dev-shell`. Uses no repository secrets. The repository is public:
+# every command and output is public, so none may contain secrets.
+on:
+  push:
+    branches: [dev-shell]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dev-shell
+  cancel-in-progress: true
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          cache: true
+      - name: relay
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/devshell/loop.sh

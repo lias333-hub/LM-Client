@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# dsync [branch=merge-a]: move the working tree to origin/<branch> (untracked android/ and build caches stay).
+set -e
+cd "${DS_REPO:?}"
+BR="${1:-merge-a}"
+h0=$(sha256sum pubspec.yaml | cut -c1-16)
+git fetch -q --depth=1 origin "+$BR:refs/remotes/origin/$BR"
+git reset -q --hard "origin/$BR"
+git log -1 --format='synced %h %s'
+h1=$(sha256sum pubspec.yaml | cut -c1-16)
+if [ "$h0" != "$h1" ]; then flutter pub get; fi
