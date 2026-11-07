@@ -1,0 +1,1 @@
+fc-list | grep -i -E "arab|naskh|kufi|noto|dejavu|roboto" | head -12; echo ---; ls $(dirname $(dirname $(which flutter)))/bin/cache/artifacts/material_fonts/ 2>/dev/null; echo ---; ls /usr/share/fonts/truetype 2>/dev/null; grep -n "fontFamily\|fonts:" pubspec.yaml | head; grep -rn "fontFamily:" lib/*.dart | head -5
