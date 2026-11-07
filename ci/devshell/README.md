@@ -16,4 +16,4 @@ Rules
 - GitHub's Actions terms limit use to building/testing the project in the repository: keep sessions short, stop when done.
 - Not a replacement for the emulator probe in build.yml.
 
-Local simulation: the scripts accept `DS_REMOTE` (any git URL), `DS_MAIN`, `DS_HOME`, `POLL`, `IDLE_MAX`, so the logic can be tested against a bare repo (done for v2.14.3 dev-shell, all paths passed).
+Local simulation: the scripts accept `DS_REMOTE` (any git URL), `DS_MAIN`, `DS_HOME`, `POLL`, `IDLE_MAX`, so the logic can be tested against a bare repo (all paths passed: start, run, multiline, failure rc, timeout rc=124, artifacts, dsync, token isolation, stop).
