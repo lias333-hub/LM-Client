@@ -948,7 +948,7 @@ Future<void> runRulesSelfTest() async {
       }
       rec('NET-5', 'one private address among public ones is enough to refuse the host', mixedBlocked, '');
       final ToolOutcome https = await call(full, kToolFetchUrl, <String, dynamic>{'url': 'https://example.com/'}, conv: conv);
-      rec('NET-6', 'positive control through the pinned connection: a public HTTPS page is fetched (TLS upgrade on a checked address works)', !https.error && https.text.contains('Example Domain'), clip(https.text, 70));
+      rec('NET-6', 'positive control through the pinned connection: a public HTTPS page is fetched (TLS to a checked address validates the certificate by host name)', !https.error && https.text.contains('Example Domain'), clip(https.text, 70));
       final ToolOutcome http = await call(full, kToolFetchUrl, <String, dynamic>{'url': 'http://example.com/'}, conv: conv);
       rec('NET-6', 'and so is a public HTTP page', !http.error && http.text.contains('Example Domain'), clip(http.text, 70));
     });

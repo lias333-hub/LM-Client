@@ -346,7 +346,7 @@ Future<List<InternetAddress>> checkedAddresses(String host, {Future<List<Interne
 }
 
 /// مصنع اتصالات fetch_url: يفحص ثم يتصل بالعنوان المفحوص نفسه (Socket.startConnect بعنوان لا باسم)، فلا يوجد حلّ ثانٍ يمكن التلاعب به.
-/// الـ TLS يُرقّى من HttpClient بالاسم الأصلي، فتبقى شهادة الموقع تُفحص باسمه.
+/// في https يتولّى المصنع نفسه TLS (SecureSocket) بعنوان يحمل اسم المضيف الأصلي.
 Future<ConnectionTask<Socket>> pinnedConnect(Uri uri, String? proxyHost, int? proxyPort, {Future<List<InternetAddress>> Function(String host)? lookup}) async {
   if (proxyHost != null) throw const ToolError('Proxies are not supported for web fetches');
   final List<InternetAddress> addrs = await checkedAddresses(uri.host, lookup: lookup);
@@ -362,6 +362,10 @@ Future<ConnectionTask<Socket>> pinnedConnect(Uri uri, String? proxyHost, int? pr
       } catch (_) {}
     }
   }
+  // https: HttpClient لا يرقّي مقبس المصنع إلى TLS (جرّبناه: كان يرسل HTTP صريحاً إلى المنفذ 443 فيردّ الخادم 400)،
+  // فنُنشئ اتصالاً آمناً مباشرة بالعنوان المفحوص. العنوان الناتج من lookup يحمل اسم المضيف الأصلي (InternetAddress.host)
+  // فيُستعمل لفحص الشهادة وSNI، فتبقى الشهادة تُفحص باسم الموقع لا بالرقم.
+  if (uri.scheme == 'https') return SecureSocket.startConnect(pick, uri.port);
   return Socket.startConnect(pick, uri.port);
 }
 
