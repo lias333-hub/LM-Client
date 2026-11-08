@@ -5,6 +5,8 @@ on:
     paths-ignore:
       - '.github/workflows/keycheck.yml'
       - 'ci/keycheck.py'
+      - '.github/workflows/thinkcheck.yml'
+      - 'ci/thinkcheck.py'
   workflow_dispatch:
 permissions:
   contents: write
