@@ -203,7 +203,8 @@ class GenRequest {
     }
     if (k == kGemini) {
       if ((t.contains('thought_signature') || t.contains('thoughtsignature')) && _add('dummysig')) return true;
-      if (t.contains('thinking') && thinkLevel > 0 && _add('nothink')) return true;
+      // (بلا شرط thinkLevel: الطلب يحمل thinkingConfig حتى عند «مُطفأ» لنماذج Gemini 3 flash.)
+      if (t.contains('thinking') && _add('nothink')) return true;
       return false;
     }
     if (t.contains('max_completion_tokens') && _add('maxcomp')) return true;
@@ -580,14 +581,18 @@ Map<String, dynamic> geminiBody(GenRequest r) {
   if (r.temperature >= 0) gc['temperature'] = r.temperature;
   if (r.topP >= 0) gc['topP'] = r.topP;
   if (r.maxTokens > 0) gc['maxOutputTokens'] = r.maxTokens;
+  final String gml = r.model.toLowerCase();
   if (r.thinkLevel > 0 && !r.heal.contains('nothink')) {
     final lv = clampInt(r.thinkLevel, 1, 3);
-    final ml = r.model.toLowerCase();
-    if (ml.contains('gemini-3')) {
+    if (gml.contains('gemini-3')) {
       gc['thinkingConfig'] = <String, dynamic>{'thinkingLevel': kEffort[lv - 1], 'includeThoughts': true};
-    } else if (ml.contains('gemini-2.5') || ml.contains('thinking')) {
+    } else if (gml.contains('gemini-2.5') || gml.contains('thinking')) {
       gc['thinkingConfig'] = <String, dynamic>{'thinkingBudget': kGeminiBudgets[lv - 1], 'includeThoughts': true};
     }
+  } else if (r.thinkLevel <= 0 && !r.heal.contains('nothink') && gml.contains('gemini-3') && gml.contains('flash')) {
+    // «التفكير مُطفأ» عند المستخدم: Gemini 3.x flash يفكّر افتراضياً (قياس CI على gemini-3.5-flash: 969 توكن تفكير لسؤال صغير، ومنها 69%
+    // من مخرجات تشغيل حقيقي) فنطلب أدنى مستوى صراحةً؛ القياس: minimal = 0 توكن تفكير، واستدعاء الأدوات يعمل. (Pro لا يقبل minimal: نتركه.)
+    gc['thinkingConfig'] = <String, dynamic>{'thinkingLevel': 'minimal'};
   }
   if (gc.isNotEmpty) body['generationConfig'] = gc;
   if (r.tools.isNotEmpty) {

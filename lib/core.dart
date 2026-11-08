@@ -6,7 +6,7 @@ part of 'main.dart';
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
 // يجب أن يطابق `version:` في pubspec.yaml (يفحصه CI ويُفشل البناء عند الاختلاف).
-const String kAppVersion = '2.14.2';
+const String kAppVersion = '2.14.3';
 // رقم البناء الحقيقي: يحقنه CI عبر --dart-define=LM_BUILD=<run>-<sha7>؛ 'local' خارج CI.
 const String kBuildId = String.fromEnvironment('LM_BUILD', defaultValue: 'local');
 const String kOpenAI = 'openai';

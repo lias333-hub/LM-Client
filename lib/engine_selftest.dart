@@ -413,6 +413,40 @@ Future<void> runEngineSelfTest() async {
 
     // ---- الاحتياط: خادم تجاهل البث (لا أحداث) لا يُعدّ مقطوعاً
     rec('no events is not a truncation', truncationError(kAnthropic, SseState()) == null, '');
+
+    // ---- Gemini: «التفكير مُطفأ» يُترجم إلى thinkingLevel=minimal لنماذج Gemini 3 flash فقط (قياس CI: 0 توكن تفكير)
+    Map<String, dynamic>? gcfg(String model, int level, {Set<String> heal = const <String>{}}) {
+      final GenRequest gr = GenRequest(
+        profile: const ApiProfile(id: 'gm', name: 'gm', kind: kGemini, baseUrl: 'https://generativelanguage.googleapis.com', apiKey: 'k', selectedModel: 'x'),
+        model: model,
+        system: '',
+        msgs: <RMsg>[RMsg.user(const <RPart>[RPart.text('hi')])],
+        tools: const <ToolDef>[],
+        thinkLevel: level,
+      );
+      gr.heal.addAll(heal);
+      final dynamic g = geminiBody(gr)['generationConfig'];
+      return g is Map ? (g['thinkingConfig'] is Map ? Map<String, dynamic>.from(g['thinkingConfig'] as Map) : <String, dynamic>{}) : null;
+    }
+
+    final Map<String, dynamic>? t35 = gcfg('gemini-3.5-flash', 0);
+    final Map<String, dynamic>? tLite = gcfg('models/gemini-3.1-flash-lite', 0);
+    final Map<String, dynamic>? tPro = gcfg('gemini-3.1-pro', 0);
+    final Map<String, dynamic>? t25 = gcfg('gemini-2.5-flash', 0);
+    final Map<String, dynamic>? tMed = gcfg('gemini-3.5-flash', 2);
+    final Map<String, dynamic>? tHeal = gcfg('gemini-3.5-flash', 0, heal: <String>{'nothink'});
+    rec('gemini 3 flash with thinking off asks for thinkingLevel=minimal', t35 != null && t35['thinkingLevel'] == 'minimal' && tLite != null && tLite['thinkingLevel'] == 'minimal', '$t35 $tLite');
+    rec('gemini pro, 2.5 and a healed request send no thinkingConfig when thinking is off', (tPro == null || tPro.isEmpty) && (t25 == null || t25.isEmpty) && (tHeal == null || tHeal.isEmpty), '$tPro $t25 $tHeal');
+    rec('gemini 3 flash with thinking on keeps the chosen level and thoughts', tMed != null && tMed['thinkingLevel'] == 'medium' && tMed['includeThoughts'] == true, '$tMed');
+    final GenRequest gh = GenRequest(
+      profile: const ApiProfile(id: 'gm', name: 'gm', kind: kGemini, baseUrl: 'https://generativelanguage.googleapis.com', apiKey: 'k', selectedModel: 'x'),
+      model: 'gemini-3.5-flash',
+      system: '',
+      msgs: <RMsg>[RMsg.user(const <RPart>[RPart.text('hi')])],
+      tools: const <ToolDef>[],
+    );
+    final bool healed = gh.tryHeal(ApiException('Invalid thinking level for this model', status: 400));
+    rec('a 400 that mentions thinking drops the thinking config even when thinking is off', healed && gh.heal.contains('nothink'), '${gh.heal}');
   } catch (e) {
     rec('engine tests', false, '$e');
   }
