@@ -92,6 +92,9 @@ class RuleChecker {
           out.add(RuleViolation('LIVE-REVIEW', 'review', run, n, 'network/build/install command; check the user asked for it: ${clip(cmd, 80)}'));
         }
       }
+      if (name == kToolEditFile && isErr && '${r['result'] ?? ''}'.contains(kEditWholeMarker)) {
+        out.add(RuleViolation('EDIT-WHOLE', 'review', run, n, 'edit_file tried to replace nearly the whole file (refused; asked: write_file for a rewrite)'));
+      }
       if ((name == kToolWriteFile || name == kToolEditFile || name == kToolSaveMemory) && !isErr && (confirmOf[run] ?? true) && ap.isEmpty) {
         out.add(RuleViolation('WRITE-NO-ASK', 'violation', run, n, '$name succeeded with confirm on but no approval was recorded'));
       }
@@ -793,6 +796,7 @@ Future<void> runRulesSelfTest() async {
       rec('FILE-2', 'paths outside shared storage and ../ traversal are blocked (${outside.length} forms)', blockedOut == outside.length, 'blocked=$blockedOut');
       o = await call(const Agent(id: 'rules-scoped', name: 's', canRead: true, allowedPaths: <String>['Download/lm_none_xyz']), kToolReadFile, <String, dynamic>{'path': '$root/gate1.txt'}, conv: conv);
       rec('FILE-2', 'an agent limited to a folder cannot read outside it', o.error && o.text.contains('not allowed for this agent'), clip(o.text, 70));
+      rec('FILE-2', 'the refusal names the allowed folder so the model can correct the path in one try', o.error && o.text.contains('Allowed folders:') && o.text.contains('lm_none_xyz'), clip(o.text, 160));
       // رابط رمزي يشير إلى بيانات التطبيق الخاصة
       final String link = '$root/link_to_private';
       bool linked = false;
@@ -837,6 +841,20 @@ Future<void> runRulesSelfTest() async {
       o = await call(full, kToolEditFile, <String, dynamic>{'path': e, 'old_string': 'gamma', 'new_string': 'G'}, conv: conv);
       final bool good = !o.error && await File(e).readAsString() == 'alpha\nbeta\nbeta\nG\n';
       rec('FILE-7', 'edit_file: ambiguous match refused, missing text refused, multi-edit all-or-nothing, unique edit applied', dup && missing && atomic && good, 'dup=$dup missing=$missing atomic=$atomic good=$good');
+
+      // edit_file لا يُستعمل لإعادة كتابة الملف كله (v2.14.3): ملف كبير يُرفض، تعديل صغير ينجح، ملف صغير جداً مستثنى
+      final String big = '$root/edit_big.txt';
+      final String bigText = List<String>.generate(50, (int i) => 'row ${i + 1} ${'x' * 30}').join('\n') + '\n';
+      await File(big).writeAsString(bigText);
+      o = await call(full, kToolEditFile, <String, dynamic>{'path': big, 'old_string': bigText.substring(0, bigText.length - 10), 'new_string': 'replaced everything'}, conv: conv);
+      final bool wholeRefused = o.error && o.text.contains(kEditWholeMarker) && o.text.contains('write_file') && await File(big).readAsString() == bigText;
+      o = await call(full, kToolEditFile, <String, dynamic>{'path': big, 'old_string': 'row 7 ', 'new_string': 'ROW 7 '}, conv: conv);
+      final bool smallOk = !o.error && (await File(big).readAsString()).contains('ROW 7 ');
+      final String tiny = '$root/edit_tiny.txt';
+      await File(tiny).writeAsString('a\nb\nc\n');
+      o = await call(full, kToolEditFile, <String, dynamic>{'path': tiny, 'old_string': 'a\nb\nc\n', 'new_string': 'z\n'}, conv: conv);
+      final bool tinyOk = !o.error && await File(tiny).readAsString() == 'z\n';
+      rec('FILE-8', 'edit_file refuses to replace nearly the whole of a file over $kEditWholeMinLines lines (and says to use write_file); a small patch and a tiny file are fine', wholeRefused && smallOk && tinyOk, 'refused=$wholeRefused small=$smallOk tiny=$tinyOk');
 
       // الموافقة قبل أي تعديل
       st.set('confirm', true);
@@ -1101,6 +1119,10 @@ Future<void> runRulesSelfTest() async {
         tool(kToolBash, <String, dynamic>{'command': 'echo [REDACTED]', 'description': 'x'}, ap: <Map<String, dynamic>>[<String, dynamic>{'how': 'asked', 'ok': true}]),
       ]).containsAll(<String>['SECRET-ECHO', 'SECRET-ARG']), '');
       rec('CHK-3', 'BATCH (review): five rounds in a row of one bash call', codes(<Map<String, dynamic>>[start(), for (int i = 1; i <= 5; i++) resp(i, 20, <String>[kToolBash])]).contains('BATCH'), '');
+      rec('CHK-3', 'EDIT-WHOLE (review): an edit_file call refused for replacing nearly the whole file', codes(<Map<String, dynamic>>[
+        start(),
+        <String, dynamic>{...tool(kToolEditFile, <String, dynamic>{'path': 'a.sh', 'old_string': 'x', 'new_string': 'y', 'description': 'edit a'}, err: true), 'result': 'edit in a.sh: old_string covers 99% of the file, so this $kEditWholeMarker.'},
+      ]).contains('EDIT-WHOLE'), '');
       rec('CHK-3', 'LIVE-REVIEW: a network/build command is listed for a human to confirm the user asked for it', codes(<Map<String, dynamic>>[start(), tool(kToolBash, <String, dynamic>{'command': 'curl -s https://example.com', 'description': 'x'}, ap: <Map<String, dynamic>>[<String, dynamic>{'how': 'asked', 'ok': true}])]).contains('LIVE-REVIEW'), '');
       final List<String> head = RuleChecker.summaryLines(<Map<String, dynamic>>[start(), resp(1, 0, <String>[kToolBash])], withText: false);
       rec('CHK-4', 'the export header line counts violations and carries no content at the numbers level', head.isNotEmpty && head.first.contains('1 violation') && !head.join('\n').contains('narration'), head.join(' / '));

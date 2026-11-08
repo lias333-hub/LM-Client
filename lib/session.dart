@@ -1303,6 +1303,20 @@ class ChatSession extends ChangeNotifier {
     }
   }
 
+  // لقطة مجلدات الـ agent: تُحسب مرة لكل (محادثة، agent) وتُعاد حرفياً كي يبقى مطلع الطلب ثابتاً (الكاش).
+  String? _folderSnap;
+  String? _folderSnapAgent;
+  bool _folderSnapDone = false;
+
+  Future<String?> _snapFor(Agent? agent) async {
+    final String key = agent?.id ?? '';
+    if (_folderSnapDone && _folderSnapAgent == key) return _folderSnap;
+    _folderSnap = await agentFolderSnapshot(agent);
+    _folderSnapAgent = key;
+    _folderSnapDone = true;
+    return _folderSnap;
+  }
+
   Future<GenRequest> _buildRequest(ChatMessage pending) async {
     final c = appContainer;
     final s = c.read(settingsProvider);
@@ -1322,7 +1336,7 @@ class ChatSession extends ChangeNotifier {
     final SubAgentSpec? sp = sub;
     // الوكيل الفرعي: أدواته قراءة فقط، وتعليماته مختصرة خاصة به (لا مشروع ولا ذاكرة ولا مكتبة في الـ prompt).
     final tools = sp == null ? all : subAgentToolDefs(all);
-    final system = sp != null ? sp.system : await buildSystemPrompt(s: s, project: project, agent: agent, memory: mem, library: lib, tools: tools);
+    final system = sp != null ? sp.system : await buildSystemPrompt(s: s, project: project, agent: agent, memory: mem, library: lib, tools: tools, folderSnapshot: await _snapFor(agent));
     final hist = _history(pending, s);
     if (hist.isEmpty) throw ApiException('لا توجد رسائل لإرسالها (كلها مستبعدة من السياق).');
     final msgs = await resolveMessages(hist, profile, s, minFullFrom: _ffFor(hist));

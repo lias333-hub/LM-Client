@@ -274,12 +274,14 @@ class PathGuard {
     if (roots.isEmpty) {
       // بدون مجلدات محددة: كل التخزين المشترك فقط (وليس كل نظام الملفات).
       if (_under(r, realOf(PhoneStorage.root))) return r;
-      throw ToolError('Path is outside shared storage: $raw');
+      throw ToolError('Path is outside shared storage: $raw. Use a path under ${PhoneStorage.root} (a relative path is resolved there).');
     }
     for (final ap in roots) {
       if (_under(r, realOf(_rootFor(ap)))) return r;
     }
-    throw ToolError('Path not allowed for this agent: $raw');
+    // الرسالة تُقرأ من النموذج: نسرد المجلدات المسموحة ليصحّح المسار من أول محاولة بدل التخمين.
+    final String shown = roots.map(_rootFor).join(', ');
+    throw ToolError('Path not allowed for this agent: $raw. Allowed folders: $shown. Use a path inside one of them (a relative path is resolved under ${PhoneStorage.root}).');
   }
 }
 
@@ -950,6 +952,28 @@ class _EditOp {
   _EditOp(this.o, this.n, this.all);
 }
 
+/// edit_file كإعادة كتابة للملف كله يدفع النص مرتين (القديم والجديد) ويطيل مراجعة الموافقة؛ write_file أرخص وأوضح.
+/// نرفضه عند ملف أكبر من [kEditWholeMinLines] سطراً إذا غطّت نصوص old_string نسبة [kEditWholeRatio] أو أكثر منه.
+/// يعيد نص الخطأ أو null. (الأسطر والنسبة ثوابت لتكون قابلة للاختبار.)
+const int kEditWholeMinLines = 40;
+const double kEditWholeRatio = 0.6;
+const String kEditWholeMarker = 'replaces nearly the whole file';
+
+String? editWholeGuard(String text, List<_EditOp> ops, String where) {
+  if (text.isEmpty) return null;
+  final int lines = '\n'.allMatches(text).length + 1;
+  if (lines <= kEditWholeMinLines) return null;
+  int covered = 0;
+  for (final _EditOp op in ops) {
+    if (!op.all) covered += op.o.length;
+  }
+  if (covered < text.length * kEditWholeRatio) return null;
+  final int pct = (covered * 100 / text.length).round();
+  return '$where: old_string covers $pct% of the file ($covered of ${text.length} chars), so this $kEditWholeMarker. '
+      'edit_file is for small targeted patches. To rewrite the file call write_file with the complete new content (read the file first); '
+      'otherwise send only the lines that change. No changes were made.';
+}
+
 /// يطبّق تعديلاً واحداً في الذاكرة. يرمي ToolError إن لم يوجد النص أو لم يكن فريداً.
 String _applyEdit(String text, _EditOp op, String where) {
   var o = op.o;
@@ -1008,6 +1032,8 @@ Future<ToolOutcome> _toolEditFile(Map<String, dynamic> a, Agent? agent, AppSetti
   final tx = _tryUtf8(bytes);
   if (tx == null) throw const ToolError('File is not valid UTF-8; refusing to edit it to avoid corrupting it');
   final text = tx;
+  final String? whole = editWholeGuard(text, ops, 'edit in $p');
+  if (whole != null) throw ToolError(whole);
   // كل التعديلات تُطبَّق في الذاكرة بالترتيب أولاً: إن فشل أي واحد لا يُكتب شيء (كلها أو لا شيء).
   var updated = text;
   for (int i = 0; i < ops.length; i++) {
@@ -1489,10 +1515,65 @@ const String kWorkStyleGuide =
     'Working style: before each batch of tool calls write ONE short sentence, in the user\'s language, saying what you are about to check and why; the user watches a live progress line and otherwise cannot tell what you are doing. '
     'Give every tool call a `description` of at most 8 words, in the user\'s language, naming that step (it is the step title in the progress summary the user watches). '
     'Combine independent commands into a single call instead of one command per round. '
+    'When several reads or searches do not depend on each other (for example reading three files), request them together in the same turn as several tool calls instead of one per round: each round costs the user a long wait. '
     'For open-ended requests ("analyze", "check", "look into") stay within what was asked: gather what you need, stop, and report, then offer deeper work instead of doing it unasked. '
     'Do not run builds, installs, test suites, servers, or requests to live or paid APIs with the user\'s credentials unless the user asked for that. '
     'Never print or echo secrets (API keys, tokens, passwords, private keys, env files, shell rc files); to learn whether a variable is set, test for its presence without showing its value. '
     'If the app says it hid secret values, do not try to recover them.';
+
+/// لقطة قصيرة لمحتوى المجلدات المسموحة للـ agent (محلياً فقط). تجيب عن «ما الموجود أصلاً؟» دون جولات قراءة، وتمنع كتابة ملف
+/// موجود. تُحسب مرة واحدة لكل محادثة ويُعاد استعمالها حرفياً (تغيّرها بين الطلبات يكسر كاش الـ prompt)؛ نصّها يقول إنها قد تقدُم.
+Future<String?> agentFolderSnapshot(Agent? agent) async {
+  if (agent == null || !agent.canRead || currentFs().isRemote) return null;
+  final List<String> roots = agent.allowedPaths.where((String e) => e.trim().isNotEmpty).toList();
+  if (roots.isEmpty) return null;
+  final StringBuffer b = StringBuffer('Allowed folders and what they contained when this conversation started (it may be outdated; call list_directory to refresh):');
+  int total = 0;
+  for (final String ap in roots.take(4)) {
+    final String root = PathGuard._rootFor(ap);
+    try {
+      if (PathGuard.isDenied(PathGuard.realOf(root))) continue;
+      b.write('\n$root/');
+      final Directory d = Directory(root);
+      if (!await d.exists()) {
+        b.write(' (does not exist yet)');
+        continue;
+      }
+      final List<FileSystemEntity> items = await d.list(followLinks: false).toList();
+      String nameOf(FileSystemEntity e) => e.path.substring(e.path.lastIndexOf('/') + 1);
+      items.sort((FileSystemEntity x, FileSystemEntity y) => nameOf(x).compareTo(nameOf(y)));
+      int shown = 0;
+      for (final FileSystemEntity e in items) {
+        final String name = nameOf(e);
+        if (name.startsWith('.') || _kSkipDirs.contains(name)) continue;
+        if (shown >= 40 || total >= 80) {
+          b.write('\n  …');
+          break;
+        }
+        shown++;
+        total++;
+        if (e is Directory) {
+          int n = 0;
+          try {
+            n = e.listSync(followLinks: false).length;
+          } catch (_) {}
+          b.write('\n  ${clip(name, 60)}/ ($n entries)');
+        } else if (e is File) {
+          int len = 0;
+          try {
+            len = e.lengthSync();
+          } catch (_) {}
+          b.write('\n  ${clip(name, 60)} (${fmtBytes(len)})');
+        }
+      }
+      if (shown == 0) b.write(' (empty)');
+    } catch (_) {
+      b.write(' (unreadable)');
+    }
+  }
+  final String out = b.toString();
+  return out.contains('\n') ? out : null;
+}
 
 Future<String> buildSystemPrompt({
   required AppSettings s,
@@ -1501,6 +1582,7 @@ Future<String> buildSystemPrompt({
   required List<MemoryPart> memory,
   required List<LibraryItem> library,
   required List<ToolDef> tools,
+  String? folderSnapshot,
 }) async {
   final sec = <String>[];
   if (s.instructions.trim().isNotEmpty) sec.add(s.instructions.trim());
@@ -1559,6 +1641,7 @@ Future<String> buildSystemPrompt({
     if (skSec != null) sec.add(skSec);
   }
   if (ws != null) sec.add(workspacePromptSection(ws));
+  if (folderSnapshot != null && folderSnapshot.isNotEmpty) sec.add(folderSnapshot);
   if (names.contains(kToolTodoWrite)) sec.add(planningPromptSection());
   if (tools.isNotEmpty) {
     sec.add(kWorkStyleGuide);

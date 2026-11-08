@@ -22,6 +22,7 @@
     {"id": "FILE-5", "class": "code", "text": "Shrinking a large file by more than half needs an explicit confirm_overwrite", "tests": ["RULES:FILE-5"]},
     {"id": "FILE-6", "class": "code", "text": "With confirm on, write_file, edit_file and save_memory ask first and a refusal changes nothing", "tests": ["RULES:FILE-6"]},
     {"id": "FILE-7", "class": "code", "text": "edit_file: ambiguous or missing match is refused; several edits are all-or-nothing", "tests": ["RULES:FILE-7"]},
+    {"id": "FILE-8", "class": "code", "text": "edit_file refuses to replace nearly the whole of a file over 40 lines (write_file is the tool for a rewrite)", "tests": ["RULES:FILE-8"]},
     {"id": "TOOL-1", "class": "code", "text": "Malformed JSON arguments never run a tool", "tests": ["RULES:TOOL-1"]},
     {"id": "TOOL-2", "class": "code", "text": "A tool that is unknown or switched off is refused", "tests": ["RULES:TOOL-2"]},
     {"id": "TOOL-3", "class": "code", "text": "Agent permissions (write, shell, web) are enforced at call time, not only in the tool list", "tests": ["RULES:TOOL-3"]},
