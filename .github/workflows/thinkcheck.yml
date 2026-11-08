@@ -1,0 +1,21 @@
+name: Thinking check (eval key)
+# Which thinkingConfig turns Gemini thinking off? Uses the repo secret LM_EVAL_GEMINI_KEY; prints only codes and token counts.
+on:
+  workflow_dispatch:
+  push:
+    branches: [merge-a]
+    paths:
+      - '.github/workflows/thinkcheck.yml'
+      - 'ci/thinkcheck.py'
+permissions:
+  contents: read
+jobs:
+  thinkcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: probe thinkingConfig variants
+        env:
+          GEMINI_KEY: ${{ secrets.LM_EVAL_GEMINI_KEY }}
+        run: python3 -I ci/thinkcheck.py
