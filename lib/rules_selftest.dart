@@ -856,6 +856,15 @@ Future<void> runRulesSelfTest() async {
       final bool tinyOk = !o.error && await File(tiny).readAsString() == 'z\n';
       rec('FILE-8', 'edit_file refuses to replace nearly the whole of a file over $kEditWholeMinLines lines (and says to use write_file); a small patch and a tiny file are fine', wholeRefused && smallOk && tinyOk, 'refused=$wholeRefused small=$smallOk tiny=$tinyOk');
 
+      // لقطة مجلدات الـ agent المسموحة (v2.14.3): تسرد ما في المجلد، فارغة لـ agent بلا قيود أو بلا قراءة، وحرفياً متطابقة بين استدعاءين
+      final Agent snapAgent = Agent(id: 'rules-snap', name: 'snap', canRead: true, allowedPaths: <String>[root]);
+      final String? snap1 = await agentFolderSnapshot(snapAgent);
+      final String? snap2 = await agentFolderSnapshot(snapAgent);
+      final String? snapFree = await agentFolderSnapshot(const Agent(id: 'rules-free', name: 'free', canRead: true));
+      final String? snapNoRead = await agentFolderSnapshot(Agent(id: 'rules-noread', name: 'nr', canRead: false, allowedPaths: <String>[root]));
+      final bool snapOk = snap1 != null && snap1.contains('edit_big.txt (') && snap1.contains('may be outdated') && snap1 == snap2 && snapFree == null && snapNoRead == null;
+      rec('CTX-1', 'the allowed-folder snapshot lists the folder contents, is stable between calls and absent for an unrestricted or no-read agent', snapOk, 'snap=${snap1 == null ? 'null' : clip(snap1.replaceAll('\n', ' | '), 120)}');
+
       // الموافقة قبل أي تعديل
       st.set('confirm', true);
       asks.clear();
