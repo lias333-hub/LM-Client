@@ -1,0 +1,7 @@
+seq=13 rc=0 secs=12 at=2026-11-10T10:19:59Z
+Analyzing lib...                                                
+
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/main.dart:5:8 • unnecessary_import
+warning • The value of the field '_profile' isn't used • lib/project_agent.dart:388:23 • unused_field
+
+2 issues found. (ran in 9.2s)

@@ -1,0 +1,7 @@
+seq=14 rc=0 secs=12 at=2026-11-10T10:20:38Z
+Try `flutter pub outdated` for more information.
+
+✅ pinned states
+
+🎉 1 test passed.
+pinned.png
