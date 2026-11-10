@@ -934,3 +934,27 @@ class _PulseBoxState extends State<_PulseBox> with SingleTickerProviderStateMixi
     );
   }
 }
+
+/// معاينة CI/اختبار الرسم (لا تُستعمل في التطبيق): الشريط المثبّت بحالاته الثلاث ببيانات نموذجية.
+class TerminalPinnedPreview extends StatelessWidget {
+  final int state; // 0 سطر العمل، 1 شريط انتظار موافقة، 2 شريط أمر خطير
+  const TerminalPinnedPreview({super.key, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final Pal p = pal(context);
+    final ApprovalWait w = ApprovalWait(state == 2 ? 'bash · rm -rf todo_test/build' : 'bash · sh todo_test/test.sh', state == 2, DateTime.now().subtract(const Duration(seconds: 42)), alerted: true);
+    if (state == 0) {
+      final ChatSession s = previewSummarySession(live: true);
+      return Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 44),
+        alignment: AlignmentDirectional.centerStart,
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+        decoration: BoxDecoration(color: p.surface, border: Border(top: BorderSide(color: p.border))),
+        child: TerminalWorkLine(session: s, pinned: true, onOpen: () {}),
+      );
+    }
+    return _ApprovalStrip(wait: w, p: p, atBottom: ValueNotifier<bool>(state == 2 ? false : true), onShow: () {});
+  }
+}
