@@ -46,6 +46,15 @@ class KeepAlive {
     await _call('update', <String, dynamic>{'title': 'LMClient', 'text': text});
   }
 
+  /// إشعار منبّه منفصل (قناة عالية الأهمية) لانتظار موافقة طويل؛ يُزال بـ [clearAlert] أو بالضغط عليه. آمن خارج أندرويد.
+  static Future<void> alert(String title, String text) async {
+    await _call('alert', <String, dynamic>{'title': title, 'text': text});
+  }
+
+  static Future<void> clearAlert() async {
+    await _call('clearAlert');
+  }
+
   static Future<void> release() async {
     if (_holds > 0) _holds--;
     if (_holds == 0 && _on) {
@@ -108,6 +117,8 @@ Future<void> runKeepAliveSelfTest() async {
     print('LMPROBE|SHOT keepalive');
     await Future<void>.delayed(const Duration(seconds: 7));
     rec('update accepted while running', await KeepAlive._call('update', <String, dynamic>{'title': 'LMClient probe', 'text': 'tool: read_file'}), '');
+    rec('approval alert notification accepted', await KeepAlive._call('alert', <String, dynamic>{'title': 'LMClient probe', 'text': 'bash · sh test.sh'}), '');
+    rec('approval alert cleared', await KeepAlive._call('clearAlert'), '');
     rec('stop accepted', await KeepAlive._call('stop'), '');
     await Future<void>.delayed(const Duration(seconds: 2));
     rec('service stopped', !(await KeepAlive._call('isRunning')), '');

@@ -824,14 +824,14 @@ Future<BashDecision> approveBash(WorkspaceConfig w, String cwd, String command, 
   }
   final BuildContext? ctx = navKey.currentContext;
   if (ctx == null) return noted('no-ui', BashDecision(allow: false, command: command, reason: 'no UI available to ask the user'));
-  final BashDecision? d = await showModalBottomSheet<BashDecision>(
+  final BashDecision? d = await ApprovalWatch.guard<BashDecision?>(approvalLabel('أمر bash', '\$ $command'), danger, () => showModalBottomSheet<BashDecision>(
     context: ctx,
     isScrollControlled: true,
     isDismissible: false,
     enableDrag: false,
     backgroundColor: Colors.transparent,
     builder: (BuildContext c) => BashApprovalSheet(ws: w, cwd: cwd, command: command, description: description),
-  );
+  ));
   final BashDecision r = d ?? BashDecision(allow: false, command: command);
   if (r.allow && r.prefix.isNotEmpty) BashRuntime.allow(convId, r.prefix);
   return noted(r.allow && r.prefix.isNotEmpty ? 'asked+remember' : 'asked', r);

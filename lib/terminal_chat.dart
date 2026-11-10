@@ -25,7 +25,7 @@ Future<bool> requestInlineApproval(String title, String body, String ok, String 
   }
   final r = ApprovalRequest(title, body, ok, cancel);
   inlineApproval.value = r;
-  final res = await r.done.future;
+  final res = await ApprovalWatch.guard<bool>(approvalLabel(title, body), title.contains('خطير'), () => r.done.future);
   if (identical(inlineApproval.value, r)) inlineApproval.value = null;
   return res;
 }
@@ -159,6 +159,8 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
   final Set<String> _open = <String>{};
   final List<_ShellRun> _runs = <_ShellRun>[];
   bool _stick = true;
+  // هل القائمة عند أسفلها؟ (لزر «عرض» في شريط انتظار الموافقة عندما تكون البطاقة خارج الشاشة)
+  final ValueNotifier<bool> _atBottom = ValueNotifier<bool>(true);
   int _sig = 0;
 
   @override
@@ -194,6 +196,7 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
       });
     }
     _ctrl.dispose();
+    _atBottom.dispose();
     _scroll.dispose();
     _focus.dispose();
     super.dispose();
@@ -219,6 +222,14 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
     return h * 2 + (s.generating ? 1 : 0);
   }
 
+  void _jumpToEnd() {
+    _stick = true;
+    if (_atBottom.value != true) _atBottom.value = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    });
+  }
+
   void _maybeScroll(ChatSession s) {
     final sig = _signature(s);
     if (sig == _sig) return;
@@ -230,7 +241,10 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
   }
 
   bool _onScroll(ScrollNotification n) {
-    if (n.metrics.axis == Axis.vertical) _stick = n.metrics.pixels >= n.metrics.maxScrollExtent - 80;
+    if (n.metrics.axis == Axis.vertical) {
+      _stick = n.metrics.pixels >= n.metrics.maxScrollExtent - 80;
+      if (_atBottom.value != _stick) _atBottom.value = _stick;
+    }
     return false;
   }
 
@@ -485,8 +499,17 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
       if (!r.done.isCompleted) r.done.complete(v);
     }
 
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ValueListenableBuilder<ApprovalWait?>(
+        valueListenable: ApprovalWatch.current,
+        builder: (BuildContext c, ApprovalWait? w, Widget? _) => _PulseBox(active: w != null && w.alerted, color: dangerous ? p.danger : p.accent, radius: 12, child: _approvalCardBody(p, r, dangerous, isCheckpoint, answer)),
+      ),
+    );
+  }
+
+  Widget _approvalCardBody(Pal p, ApprovalRequest r, bool dangerous, bool isCheckpoint, void Function(bool, {bool always}) answer) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: dangerous ? p.danger : p.accent)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
@@ -649,8 +672,26 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
     );
   }
 
-  Widget _working(Pal p, ChatSession s) {
-    return TerminalWorkLine(session: s, onOpen: () => showSummarySheet(context, s));
+  /// سطر ثابت فوق شريط الإدخال (خارج قائمة التمرير فلا يغيب عن الشاشة): سطر العمل الحيّ أثناء التشغيل، ويتحوّل إلى شريط تنبيه
+  /// بعد 30 ثانية من انتظار موافقة. الضغط على سطر العمل يفتح الملخّص، وعلى الشريط ينتقل إلى البطاقة.
+  Widget _pinned(Pal p, ChatSession s) {
+    return ValueListenableBuilder<ApprovalWait?>(
+      valueListenable: ApprovalWatch.current,
+      builder: (BuildContext c, ApprovalWait? w, Widget? _) {
+        if (w != null && w.alerted && inlineApproval.value != null) {
+          return _ApprovalStrip(wait: w, p: p, atBottom: _atBottom, onShow: _jumpToEnd);
+        }
+        if (!s.generating) return const SizedBox.shrink();
+        return Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: AlignmentDirectional.centerStart,
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+          decoration: BoxDecoration(color: p.surface, border: Border(top: BorderSide(color: p.border))),
+          child: TerminalWorkLine(session: s, pinned: true, onOpen: () => showSummarySheet(context, s)),
+        );
+      },
+    );
   }
 
   Widget _prompt(Pal p, ChatSession s) {
@@ -746,7 +787,7 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
     }
     final req = inlineApproval.value;
     if (req != null) rows.add(() => _approvalCard(p, req));
-    rows.add(() => s.generating ? _working(p, s) : const SizedBox(height: 4));
+    rows.add(() => const SizedBox(height: 4));
     return Column(children: <Widget>[
       Expanded(
         child: NotificationListener<ScrollNotification>(
@@ -761,9 +802,135 @@ class _TerminalChatViewState extends ConsumerState<TerminalChatView> {
           ),
         ),
       ),
+      _pinned(p, s),
       _palette(p),
       _statusLine(p, s, agentName),
       _prompt(p, s),
     ]);
+  }
+}
+
+
+/// شريط انتظار الموافقة (بعد 30 ثانية): «بانتظار موافقتك منذ 0:42». يتحدّث كل ثانية، ويعرض «عرض» إن كانت البطاقة خارج الشاشة.
+class _ApprovalStrip extends StatefulWidget {
+  final ApprovalWait wait;
+  final Pal p;
+  final ValueNotifier<bool> atBottom;
+  final VoidCallback onShow;
+  const _ApprovalStrip({required this.wait, required this.p, required this.atBottom, required this.onShow});
+  @override
+  State<_ApprovalStrip> createState() => _ApprovalStripState();
+}
+
+class _ApprovalStripState extends State<_ApprovalStrip> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (Timer _) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Pal p = widget.p;
+    final Color tone = widget.wait.danger ? p.danger : p.accent;
+    final String lead = widget.wait.danger ? 'أمر خطير بانتظار موافقتك منذ' : 'بانتظار موافقتك منذ';
+    return Semantics(
+      liveRegion: true,
+      child: Material(
+        color: tone.withAlpha(36),
+        child: InkWell(
+          onTap: widget.onShow,
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: tone.withAlpha(150)))),
+            child: Row(children: <Widget>[
+              Icon(Icons.schedule, size: 16, color: tone),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('$lead ${_ltrIso(ApprovalWatch.elapsed(widget.wait))}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.text, fontSize: 13.5, fontWeight: FontWeight.w600)),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: widget.atBottom,
+                builder: (BuildContext c, bool at, Widget? _) => at ? const SizedBox.shrink() : Text('عرض', style: TextStyle(color: tone, fontSize: 13.5, fontWeight: FontWeight.w700)),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// نبض خفيف حول بطاقة الموافقة بعد 30 ثانية (حلقة ظلّ تتسع وتخبو كل ثانيتين)؛ بلا حركة إن طلب المستخدم تقليل الحركة.
+class _PulseBox extends StatefulWidget {
+  final bool active;
+  final Color color;
+  final double radius;
+  final Widget child;
+  const _PulseBox({required this.active, required this.color, required this.radius, required this.child});
+  @override
+  State<_PulseBox> createState() => _PulseBoxState();
+}
+
+class _PulseBoxState extends State<_PulseBox> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 1));
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PulseBox old) {
+    super.didUpdateWidget(old);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.active) {
+      if (!_c.isAnimating) _c.repeat(reverse: true);
+    } else {
+      _c.stop();
+      _c.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active) return widget.child;
+    final bool still = MediaQuery.of(context).disableAnimations;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (BuildContext c, Widget? child) {
+        final double t = still ? 0.6 : Curves.easeInOut.transform(_c.value);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.radius),
+            boxShadow: <BoxShadow>[BoxShadow(color: widget.color.withAlpha((90 * t).round()), spreadRadius: 5 * t, blurRadius: 0)],
+          ),
+          child: child,
+        );
+      },
+    );
   }
 }

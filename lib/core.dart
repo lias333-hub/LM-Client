@@ -6,7 +6,7 @@ part of 'main.dart';
 // ---------------------------------------------------------------------
 const String kAppName = 'LMClient';
 // يجب أن يطابق `version:` في pubspec.yaml (يفحصه CI ويُفشل البناء عند الاختلاف).
-const String kAppVersion = '2.14.3';
+const String kAppVersion = '2.14.4';
 // رقم البناء الحقيقي: يحقنه CI عبر --dart-define=LM_BUILD=<run>-<sha7>؛ 'local' خارج CI.
 const String kBuildId = String.fromEnvironment('LM_BUILD', defaultValue: 'local');
 const String kOpenAI = 'openai';
@@ -340,7 +340,7 @@ Future<bool> askConfirm(String title, String body, {String ok = 'موافقة', 
 Future<bool> askConfirmDialog(String title, String body, {String ok = 'موافقة', String cancel = 'رفض'}) async {
   final ctx = navKey.currentContext;
   if (ctx == null) return false;
-  final r = await showDialog<bool>(
+  final r = await ApprovalWatch.guard<bool?>(approvalLabel(title, body), title.contains('خطير'), () => showDialog<bool>(
     context: ctx,
     barrierDismissible: false,
     builder: (c) {
@@ -356,7 +356,7 @@ Future<bool> askConfirmDialog(String title, String body, {String ok = 'مواف�
         ],
       );
     },
-  );
+  ));
   return r == true;
 }
 

@@ -345,27 +345,27 @@ Future<ToolOutcome> _toolExitPlan(Map<String, dynamic> a, String convId) async {
 Future<List<AskAnswer>?> _showAskSheet(List<AskQuestion> qs) async {
   final BuildContext? ctx = navKey.currentContext;
   if (ctx == null) return null;
-  return showModalBottomSheet<List<AskAnswer>>(
+  return ApprovalWatch.guard<List<AskAnswer>?>('سؤال من النموذج: ${clip(qs.isEmpty ? '' : qs.first.question, 60)}', false, () => showModalBottomSheet<List<AskAnswer>>(
     context: ctx,
     isScrollControlled: true,
     isDismissible: true,
     enableDrag: false,
     backgroundColor: Colors.transparent,
     builder: (BuildContext c) => AskUserSheet(questions: qs),
-  );
+  ));
 }
 
 Future<PlanDecision> _showPlanSheet(String plan) async {
   final BuildContext? ctx = navKey.currentContext;
   if (ctx == null) return const PlanDecision(false, 'No screen is available to show the plan to the user.');
-  final PlanDecision? d = await showModalBottomSheet<PlanDecision>(
+  final PlanDecision? d = await ApprovalWatch.guard<PlanDecision?>('خطة تنتظر موافقتك', false, () => showModalBottomSheet<PlanDecision>(
     context: ctx,
     isScrollControlled: true,
     isDismissible: false,
     enableDrag: false,
     backgroundColor: Colors.transparent,
     builder: (BuildContext c) => PlanApprovalSheet(plan: plan),
-  );
+  ));
   return d ?? const PlanDecision(false);
 }
 

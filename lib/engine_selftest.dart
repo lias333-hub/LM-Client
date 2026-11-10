@@ -447,6 +447,40 @@ Future<void> runEngineSelfTest() async {
     );
     final bool healed = gh.tryHeal(ApiException('Invalid thinking level for this model', status: 400));
     rec('a 400 that mentions thinking drops the thinking config even when thinking is off', healed && gh.heal.contains('nothink'), '${gh.heal}');
+
+    // ---- مراقب انتظار الموافقة (v2.14.4): تنبيه واحد بعد المهلة، لا تنبيه إن أُجيب قبلها، وتنظيف الحالة
+    final List<String> fired = <String>[];
+    ApprovalWatch.alertHook = (ApprovalWait w) => fired.add('${w.label}|${w.danger}|${w.alerted}');
+    final bool slow = await ApprovalWatch.guard<bool>('bash · sh slow.sh', false, () async {
+      await Future<void>.delayed(const Duration(milliseconds: 260));
+      return true;
+    }, after: const Duration(milliseconds: 80));
+    final bool slowOk = slow && fired.length == 1 && fired.first == 'bash · sh slow.sh|false|true' && ApprovalWatch.current.value == null;
+    final String slowFired = fired.join(',');
+    fired.clear();
+    final bool quick = await ApprovalWatch.guard<bool>('bash · sh quick.sh', false, () async {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      return true;
+    }, after: const Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    final bool quickOk = quick && fired.isEmpty && ApprovalWatch.current.value == null;
+    // موافقتان متداخلتان: نحتفظ بالأولى ولا ينتهي الانتظار إلا بانتهاء الأخيرة
+    String? firstLabel;
+    String? midLabel;
+    await ApprovalWatch.guard<void>('outer', true, () async {
+      firstLabel = ApprovalWatch.current.value?.label;
+      await ApprovalWatch.guard<void>('inner', false, () async {
+        midLabel = ApprovalWatch.current.value?.label;
+      });
+      midLabel = '$midLabel/${ApprovalWatch.current.value?.label}';
+    }, after: const Duration(seconds: 5));
+    final bool nestOk = firstLabel == 'outer' && midLabel == 'outer/outer' && ApprovalWatch.current.value == null;
+    final bool labelOk = approvalLabel('أمر bash', 'phone · ~\n\$ sh test.sh\n— تشغيل') == 'bash · sh test.sh' && approvalLabel('خطة', 'نص بلا أمر') == 'خطة';
+    ApprovalWatch.alertHook = null;
+    rec('an approval that waits past the limit raises exactly one alert and the state is cleared afterwards', slowOk, 'fired=$slowFired slow=$slow');
+    rec('an approval answered before the limit raises no alert', quickOk, 'fired=$fired');
+    rec('nested approvals keep the first label and end together', nestOk, 'first=$firstLabel mid=$midLabel');
+    rec('the approval label uses the command line, else the title', labelOk, '');
   } catch (e) {
     rec('engine tests', false, '$e');
   }

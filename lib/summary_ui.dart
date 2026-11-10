@@ -385,7 +385,9 @@ class _StepRowState extends State<_StepRow> {
 class TerminalWorkLine extends StatefulWidget {
   final ChatSession session;
   final VoidCallback onOpen;
-  const TerminalWorkLine({super.key, required this.session, required this.onOpen});
+  /// مثبّت فوق شريط الإدخال (v2.14.4): بلا هامش سفلي لأن الحاوية تتولّى التباعد.
+  final bool pinned;
+  const TerminalWorkLine({super.key, required this.session, required this.onOpen, this.pinned = false});
   @override
   State<TerminalWorkLine> createState() => _TerminalWorkLineState();
 }
@@ -438,7 +440,7 @@ class _TerminalWorkLineState extends State<TerminalWorkLine> {
     final String note = s.liveNote;
     final TextStyle mono = TextStyle(fontFamily: 'monospace', fontSize: 12.5, height: 1.45, color: p.muted);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: widget.pinned ? 0 : 8),
       child: Directionality(
         textDirection: TextDirection.ltr,
         child: InkWell(
