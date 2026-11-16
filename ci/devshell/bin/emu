@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# emu: a real Android emulator (Pixel 6 profile, x86_64, KVM) on the dev-shell box, driven through adb.
+# Run it on the box with: client.sh run 'emu <command>'. Needs a runner with /dev/kvm (ubuntu-latest has it).
+#   emu start [api]        enable KVM, install the system image, create the AVD, boot headless, wait until ready
+#   emu status             boot state, screen size, app in the foreground
+#   emu pkg app.apk        print the package name of an APK
+#   emu install app.apk    adb install -r -g (grants every runtime permission)
+#   emu launch <package>   start the app's launcher activity
+#   emu shot [name]        screenshot to $DS_ART/<name>.png (then, on the client: client.sh art N, and open the PNG)
+#   emu burst N [secs]     N screenshots, secs apart (default 1): loading states, animations
+#   emu tap X Y | swipe X1 Y1 X2 Y2 [ms] | text 'abc' | key BACK|HOME|ENTER|<keycode>
+#   emu ui                 uiautomator dump: one line per element (text, description, bounds). Flutter apps expose little here
+#   emu tapt 'label'       tap the centre of the first element whose text or description contains label
+#   emu log [n]            last n logcat lines (default 200);  emu crash: FATAL EXCEPTION blocks;  emu logclear
+#   emu sh <cmd...>        adb shell <cmd...>
+#   emu stop               shut the emulator down
+# Env: EMU_API (34), EMU_DEVICE (pixel_6), EMU_AVD (ds_phone), EMU_BOOT_TIMEOUT (420 s), EMU_IMG_TAG (google_apis).
+# Everything the box prints or saves is public when the repository is public (screenshots of your app too).
+set -u
+SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+export ANDROID_HOME="$SDK" ANDROID_SDK_ROOT="$SDK"
+export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
+API="${EMU_API:-34}"; TAG="${EMU_IMG_TAG:-google_apis}"; DEVICE="${EMU_DEVICE:-pixel_6}"; AVD="${EMU_AVD:-ds_phone}"
+BOOT_TO="${EMU_BOOT_TIMEOUT:-420}"
+TMPD="${DS_TMP:-/tmp}"; LOG="$TMPD/emu.log"
+ART="${DS_ART:-$PWD}"
+SERIAL="${EMU_SERIAL:-emulator-5554}"
+A() { adb -s "$SERIAL" "$@"; }
+
+die() { echo "emu: $*" >&2; exit 1; }
+booted() { [ "$(A shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; }
+alive() { pgrep -f 'qemu-system-x86_64|emulator.*-avd' > /dev/null 2>&1; }
+
+cmd_start() {
+  local t0 api="${1:-$API}" img have
+  t0=$(date +%s)
+  img="system-images;android-$api;$TAG;x86_64"
+  if booted; then echo "already running"; cmd_status; return 0; fi
+  [ -e /dev/kvm ] || die "no /dev/kvm on this runner: the emulator would be unusably slow, not starting"
+  if [ ! -w /dev/kvm ]; then
+    echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules > /dev/null
+    sudo udevadm control --reload-rules; sudo udevadm trigger --name-match=kvm; sleep 1
+  fi
+  [ -w /dev/kvm ] || die "/dev/kvm is not writable even after the udev rule"
+  have="$SDK/system-images/android-$api/$TAG/x86_64"
+  if [ ! -d "$have" ] || ! command -v emulator > /dev/null 2>&1; then
+    echo "installing emulator + $img ..."
+    yes | sdkmanager --licenses > /dev/null 2>&1
+    sdkmanager --install "emulator" "platform-tools" "$img" > "$TMPD/sdkmanager.log" 2>&1 || { tail -20 "$TMPD/sdkmanager.log"; die "sdkmanager failed"; }
+  fi
+  echo "creating AVD $AVD ($DEVICE, $img)"
+  echo no | avdmanager create avd --force -n "$AVD" -k "$img" -d "$DEVICE" > "$TMPD/avd.log" 2>&1 || { tail -20 "$TMPD/avd.log"; die "avdmanager failed"; }
+  adb start-server > /dev/null 2>&1
+  setsid nohup emulator -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 3072 -cores 3 -netdelay none -netspeed full > "$LOG" 2>&1 < /dev/null &
+  sleep 5
+  alive || { tail -30 "$LOG"; die "emulator process did not start"; }
+  echo "emulator started, waiting for boot (limit ${BOOT_TO}s) ..."
+  local b0; b0=$(date +%s)
+  until booted; do
+    alive || { tail -30 "$LOG"; die "emulator died while booting"; }
+    [ $(( $(date +%s) - b0 )) -gt "$BOOT_TO" ] && { tail -30 "$LOG"; die "boot timeout after ${BOOT_TO}s"; }
+    sleep 3
+  done
+  A shell settings put global window_animation_scale 0
+  A shell settings put global transition_animation_scale 0
+  A shell settings put global animator_duration_scale 0
+  A shell settings put global hide_error_dialogs 1
+  A shell settings put system screen_off_timeout 1800000
+  A shell input keyevent KEYCODE_WAKEUP
+  A shell wm dismiss-keyguard > /dev/null 2>&1
+  echo "ready after $(( $(date +%s) - t0 ))s (boot $(( $(date +%s) - b0 ))s)"
+  cmd_status
+}
+
+cmd_status() {
+  A get-state 2>&1 | head -1
+  if booted; then
+    echo "model=$(A shell getprop ro.product.model | tr -d '\r') sdk=$(A shell getprop ro.build.version.sdk | tr -d '\r') $(A shell wm size | tr -d '\r' | tail -1) $(A shell wm density | tr -d '\r' | tail -1)"
+    echo "foreground: $(A shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' | sed 's/^ *//' | cut -c1-160)"
+  else
+    echo "not booted"; return 1
+  fi
+}
+
+cmd_pkg() {
+  local apk="${1:?apk path}" aapt2 p
+  aapt2=$(ls -d "$SDK"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+  [ -n "$aapt2" ] || die "aapt2 not found under $SDK/build-tools"
+  p=$("$aapt2" dump packagename "$apk" 2>/dev/null | head -1)
+  [ -n "$p" ] || p=$("$aapt2" dump badging "$apk" 2>/dev/null | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+  [ -n "$p" ] || die "could not read the package name"
+  echo "$p"
+}
+
+cmd_install() { local apk="${1:?apk path}"; [ -f "$apk" ] || die "no such file: $apk"; A install -r -g "$apk" 2>&1; }
+
+cmd_launch() {
+  local p="${1:?package}"
+  A shell monkey -p "$p" -c android.intent.category.LAUNCHER 1 2>&1 | tail -2
+}
+
+cmd_shot() {
+  local n="${1:-screen}"; mkdir -p "$ART"
+  A exec-out screencap -p > "$ART/$n.png" || die "screencap failed"
+  echo "$ART/$n.png $(stat -c %s "$ART/$n.png") bytes, $(A shell wm size | tr -d '\r' | tail -1)"
+}
+
+cmd_burst() {
+  local n="${1:?count}" gap="${2:-1}" i
+  for i in $(seq 1 "$n"); do cmd_shot "burst_$(printf '%02d' "$i")"; [ "$i" -lt "$n" ] && sleep "$gap"; done
+}
+
+cmd_key() {
+  local k="${1:?key}"
+  case "$k" in
+    BACK|HOME|ENTER|MENU|TAB|DEL|SEARCH|APP_SWITCH|VOLUME_UP|VOLUME_DOWN|POWER|DPAD_UP|DPAD_DOWN|DPAD_LEFT|DPAD_RIGHT|DPAD_CENTER|ESCAPE) k="KEYCODE_$k";;
+  esac
+  A shell input keyevent "$k"
+}
+
+cmd_text() { local t="${*:?text}"; t="${t// /%s}"; A shell input text "$t"; }
+
+ui_dump() {
+  A shell uiautomator dump /sdcard/ds_ui.xml > /dev/null 2>&1 || return 1
+  A exec-out cat /sdcard/ds_ui.xml > "$TMPD/ui.xml"
+}
+
+ui_list() {
+  python3 - "$TMPD/ui.xml" "$@" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+path = sys.argv[1]; want = sys.argv[2] if len(sys.argv) > 2 else None
+root = ET.parse(path).getroot()
+rows = []
+for n in root.iter('node'):
+    t = n.get('text', ''); d = n.get('content-desc', ''); rid = n.get('resource-id', '')
+    m = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', n.get('bounds', ''))
+    if not m: continue
+    x1, y1, x2, y2 = map(int, m.groups())
+    rows.append((t, d, rid, n.get('class', '').split('.')[-1], n.get('clickable') == 'true', x1, y1, x2, y2))
+if want is None:
+    for t, d, rid, c, ck, x1, y1, x2, y2 in rows:
+        if t or d or ck:
+            print(f"[{x1},{y1}][{x2},{y2}] {c}{' *' if ck else ''} text={t!r} desc={d!r} id={rid.split('/')[-1]!r}")
+    print(f"({len(rows)} nodes)")
+else:
+    for t, d, rid, c, ck, x1, y1, x2, y2 in rows:
+        if want in t or want in d:
+            print((x1 + x2) // 2, (y1 + y2) // 2); break
+    else:
+        sys.exit(3)
+PY
+}
+
+cmd_ui() { ui_dump || die "uiautomator dump failed"; ui_list; }
+
+cmd_tapt() {
+  local label="${1:?label}" xy
+  ui_dump || die "uiautomator dump failed"
+  xy=$(ui_list "$label") || die "no element with text/description containing: $label"
+  echo "tap $xy"; A shell input tap $xy
+}
+
+cmd_log() { A logcat -d -t "${1:-200}" 2>&1; }
+cmd_crash() { A logcat -d 2>&1 | grep -E -A25 'FATAL EXCEPTION' | head -80; }
+
+cmd_stop() { A emu kill > /dev/null 2>&1; sleep 2; alive && pkill -f 'qemu-system-x86_64' ; echo stopped; }
+
+c="${1:-}"; [ $# -gt 0 ] && shift
+case "$c" in
+  start) cmd_start "$@";;
+  status) cmd_status;;
+  pkg) cmd_pkg "$@";;
+  install) cmd_install "$@";;
+  launch) cmd_launch "$@";;
+  shot) cmd_shot "$@";;
+  burst) cmd_burst "$@";;
+  tap) A shell input tap "${1:?X}" "${2:?Y}";;
+  swipe) A shell input swipe "${1:?X1}" "${2:?Y1}" "${3:?X2}" "${4:?Y2}" "${5:-300}";;
+  text) cmd_text "$@";;
+  key) cmd_key "$@";;
+  ui) cmd_ui;;
+  tapt) cmd_tapt "$@";;
+  log) cmd_log "$@";;
+  crash) cmd_crash;;
+  logclear) A logcat -c;;
+  sh) A shell "$@";;
+  stop) cmd_stop;;
+  *) sed -n '2,18p' "$0";;
+esac
