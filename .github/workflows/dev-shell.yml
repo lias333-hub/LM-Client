@@ -24,6 +24,10 @@ jobs:
         with:
           flutter-version: '3.22.0'
           cache: true
+      - name: Use JDK 17
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
       - name: relay
         env:
           GH_TOKEN: ${{ github.token }}

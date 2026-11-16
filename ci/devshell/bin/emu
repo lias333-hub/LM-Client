@@ -8,8 +8,8 @@
 #   emu launch <package>   start the app's launcher activity
 #   emu shot [name]        screenshot to $DS_ART/<name>.png (then, on the client: client.sh art N, and open the PNG)
 #   emu burst N [secs]     N screenshots, secs apart (default 1): loading states, animations
-#   emu tap X Y | swipe X1 Y1 X2 Y2 [ms] | text 'abc' | key BACK|HOME|ENTER|<keycode>
-#   emu ui                 uiautomator dump: one line per element (text, description, bounds). Flutter apps expose little here
+#   emu tap X Y | swipe X1 Y1 X2 Y2 [ms] | text 'abc' (ASCII only; check the result in a screenshot) | key BACK|HOME|ENTER|DEL|<keycode>
+#   emu ui                 uiautomator dump: one line per element (text, description, bounds). Flutter apps show only what has Semantics labels
 #   emu tapt 'label'       tap the centre of the first element whose text or description contains label
 #   emu log [n]            last n logcat lines (default 200);  emu crash: FATAL EXCEPTION blocks;  emu logclear
 #   emu sh <cmd...>        adb shell <cmd...>
@@ -68,8 +68,16 @@ cmd_start() {
   A shell settings put global animator_duration_scale 0
   A shell settings put global hide_error_dialogs 1
   A shell settings put system screen_off_timeout 1800000
+  A shell settings put global device_provisioned 1
+  A shell settings put secure user_setup_complete 1
   A shell input keyevent KEYCODE_WAKEUP
   A shell wm dismiss-keyguard > /dev/null 2>&1
+  # boot_completed comes before the Google setup screens have gone: wait (max ~30 s) until the launcher is in front
+  local i
+  for i in $(seq 1 15); do
+    A shell dumpsys activity activities 2>/dev/null | grep -m1 'topResumedActivity' | grep -q -E 'googlesdksetup|SetupWizard|setupwizard' || break
+    sleep 2
+  done
   echo "ready after $(( $(date +%s) - t0 ))s (boot $(( $(date +%s) - b0 ))s)"
   cmd_status
 }
