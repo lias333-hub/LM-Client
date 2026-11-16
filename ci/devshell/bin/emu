@@ -22,6 +22,8 @@ export ANDROID_HOME="$SDK" ANDROID_SDK_ROOT="$SDK"
 export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
 API="${EMU_API:-34}"; TAG="${EMU_IMG_TAG:-google_apis}"; DEVICE="${EMU_DEVICE:-pixel_6}"; AVD="${EMU_AVD:-ds_phone}"
 BOOT_TO="${EMU_BOOT_TIMEOUT:-420}"
+# avdmanager honours XDG_CONFIG_HOME (set on GitHub runners) but the emulator looks in $HOME/.android/avd: pin both.
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"; mkdir -p "$ANDROID_AVD_HOME"
 TMPD="${DS_TMP:-/tmp}"; LOG="$TMPD/emu.log"
 ART="${DS_ART:-$PWD}"
 SERIAL="${EMU_SERIAL:-emulator-5554}"
@@ -45,11 +47,11 @@ cmd_start() {
   have="$SDK/system-images/android-$api/$TAG/x86_64"
   if [ ! -d "$have" ] || ! command -v emulator > /dev/null 2>&1; then
     echo "installing emulator + $img ..."
-    yes | sdkmanager --licenses > /dev/null 2>&1
-    sdkmanager --install "emulator" "platform-tools" "$img" > "$TMPD/sdkmanager.log" 2>&1 || { tail -20 "$TMPD/sdkmanager.log"; die "sdkmanager failed"; }
+    yes 2> /dev/null | sdkmanager --licenses > /dev/null 2>&1
+    sdkmanager --install "emulator" "platform-tools" "$img" > "$TMPD/sdkmanager.log" 2>&1 || { tr "\r" "\n" < "$TMPD/sdkmanager.log" | tail -15; die "sdkmanager failed"; }
   fi
   echo "creating AVD $AVD ($DEVICE, $img)"
-  echo no | avdmanager create avd --force -n "$AVD" -k "$img" -d "$DEVICE" > "$TMPD/avd.log" 2>&1 || { tail -20 "$TMPD/avd.log"; die "avdmanager failed"; }
+  echo no | avdmanager create avd --force -n "$AVD" -k "$img" -d "$DEVICE" > "$TMPD/avd.log" 2>&1 || { tr "\r" "\n" < "$TMPD/avd.log" | tail -15; die "avdmanager failed"; }
   adb start-server > /dev/null 2>&1
   setsid nohup emulator -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 3072 -cores 3 -netdelay none -netspeed full > "$LOG" 2>&1 < /dev/null &
   sleep 5
