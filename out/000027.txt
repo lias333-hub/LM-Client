@@ -1,0 +1,14 @@
+seq=27 rc=0 secs=282 at=2026-11-16T10:54:13Z
+Running Gradle task 'assembleRelease'...                          269.5s
+✓ Built build/app/outputs/flutter-apk/app-release.apk (27.9MB)
+
+real	4m31.134s
+user	0m9.606s
+sys	0m2.838s
+-rw-r--r-- 1 runner runner 27928797 Nov 16 10:54 build/app/outputs/flutter-apk/app-release.apk
+pkg=com.lmclient.lm_client
+Performing Streamed Install
+Success
+foreground: topResumedActivity=ActivityRecord{8f084b7 u0 com.lmclient.lm_client/.MainActivity t8}
+/tmp/ds-art/final.png 118120 bytes, Physical size: 1080x2400
+crash-check-done

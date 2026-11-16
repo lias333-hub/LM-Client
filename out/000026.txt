@@ -1,0 +1,14 @@
+seq=26 rc=0 secs=85 at=2026-11-16T10:49:21Z
+openjdk version "17.0.21" 2026-10-20
+JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+--- cold emulator start
+creating AVD ds_phone (pixel_6, system-images;android-34;google_apis;x86_64)
+emulator started, waiting for boot (limit 420s) ...
+ready after 83s (boot 37s)
+device
+model=sdk_gphone64_x86_64 sdk=34 Physical size: 1080x2400 Physical density: 420
+foreground: topResumedActivity=ActivityRecord{8e66548 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t7}
+
+real	1m24.915s
+user	0m40.672s
+sys	0m8.659s
